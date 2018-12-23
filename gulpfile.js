@@ -11,12 +11,12 @@ const BUILD_DIR = 'build';
 gulp.task('build-lib', function() {
 
   const src = {
-    core:     SOURCE_DIR + '/cue-core',
-    plugins:  SOURCE_DIR + '/cue-plugins',
-    proto:    SOURCE_DIR + '/cue-proto',
-    state:    SOURCE_DIR + '/cue-state',
-    ui:       SOURCE_DIR + '/cue-ui',
-    app:      SOURCE_DIR + '/cue-app'
+    core:     SOURCE_DIR + '/core',
+    plugins:  SOURCE_DIR + '/plugins',
+    proto:    SOURCE_DIR + '/proto',
+    state:    SOURCE_DIR + '/state',
+    ui:       SOURCE_DIR + '/ui',
+    app:      SOURCE_DIR + '/app'
   };
   
   const modules = {

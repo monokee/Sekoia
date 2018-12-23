@@ -10,11 +10,25 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/example.html">
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/sekoia_mock.html">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-118">
+            <state relative-caret-position="850">
               <caret line="50" column="36" selection-start-line="50" selection-start-column="36" selection-end-line="50" selection-end-column="36" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js">
+          <provider selected="true" editor-type-id="text-editor" />
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-view.js">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="306">
+              <caret line="18" column="4" selection-start-line="18" selection-start-column="4" selection-end-line="18" selection-end-column="4" />
             </state>
           </provider>
         </entry>
@@ -68,9 +82,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/cue-state/build/cue-state.js" />
-        <option value="$PROJECT_DIR$/cue-state/src/Observables.js" />
-        <option value="$PROJECT_DIR$/cue-state/src/Reactions.js" />
         <option value="$PROJECT_DIR$/cue-state/src/ReactionCue.js" />
         <option value="$PROJECT_DIR$/cue-state/example/js/app.js" />
         <option value="$PROJECT_DIR$/cue-state/example/js/chat_list.js" />
@@ -110,7 +121,6 @@
         <option value="$PROJECT_DIR$/src/cue-state/observable.js" />
         <option value="$PROJECT_DIR$/src/cue-core/index.js" />
         <option value="$PROJECT_DIR$/src/cue-state/state-proto.js" />
-        <option value="$PROJECT_DIR$/gulpfile.js" />
         <option value="$PROJECT_DIR$/src/cue-app/public-api.js" />
         <option value="$PROJECT_DIR$/src/cue-ui/ui-proto.js" />
         <option value="$PROJECT_DIR$/src/cue-ui/public-api.js" />
@@ -119,6 +129,10 @@
         <option value="$PROJECT_DIR$/src/cue-ui/mapped-classList.js" />
         <option value="$PROJECT_DIR$/src/cue-ui/scoped-css.js" />
         <option value="$PROJECT_DIR$/example.html" />
+        <option value="$PROJECT_DIR$/gulpfile.js" />
+        <option value="$PROJECT_DIR$/tests/sekoia_mock/example.html" />
+        <option value="$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js" />
+        <option value="$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-view.js" />
       </list>
     </option>
   </component>
@@ -151,43 +165,28 @@
             <path>
               <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
               <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
-              <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="tests" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
               <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
-              <item name="src" type="462c0819:PsiDirectoryNode" />
-              <item name="cue-app" type="462c0819:PsiDirectoryNode" />
+              <item name="tests" type="462c0819:PsiDirectoryNode" />
+              <item name="sekoia_mock" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
               <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
-              <item name="src" type="462c0819:PsiDirectoryNode" />
-              <item name="cue-core" type="462c0819:PsiDirectoryNode" />
+              <item name="tests" type="462c0819:PsiDirectoryNode" />
+              <item name="sekoia_mock" type="462c0819:PsiDirectoryNode" />
+              <item name="modules" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
               <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
-              <item name="src" type="462c0819:PsiDirectoryNode" />
-              <item name="cue-plugins" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
-              <item name="src" type="462c0819:PsiDirectoryNode" />
-              <item name="cue-proto" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
-              <item name="src" type="462c0819:PsiDirectoryNode" />
-              <item name="cue-state" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
-              <item name="src" type="462c0819:PsiDirectoryNode" />
-              <item name="cue-ui" type="462c0819:PsiDirectoryNode" />
+              <item name="tests" type="462c0819:PsiDirectoryNode" />
+              <item name="sekoia_mock" type="462c0819:PsiDirectoryNode" />
+              <item name="modules" type="462c0819:PsiDirectoryNode" />
+              <item name="app" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -208,11 +207,11 @@
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Jonathan\Desktop\Cue.js\tests\sekoia_mock" />
+      <recent name="C:\Users\Jonathan\Desktop\Cue.js\tests" />
       <recent name="C:\Users\Jonathan\Desktop\Cue.js\src\cue-proto" />
       <recent name="C:\Users\Jonathan\Desktop\Cue.js\src\cue-ui" />
       <recent name="C:\Users\Jonathan\Desktop\Cue.js\src" />
-      <recent name="C:\Users\Jonathan\Desktop\Cue.js\cue-state" />
-      <recent name="C:\Users\Jonathan\Desktop\Cue.js" />
     </key>
   </component>
   <component name="RunDashboard">
@@ -227,8 +226,8 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="JavaScript Debug.example.html">
-    <configuration name="example.html" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:63342/Cue.js/example.html" useBuiltInWebServerPort="true">
+  <component name="RunManager" selected="JavaScript Debug.sekoia_mock.html">
+    <configuration name="sekoia_mock.html" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:63342/Cue.js/tests/sekoia_mock/sekoia_mock.html" useBuiltInWebServerPort="true">
       <method v="2" />
     </configuration>
     <configuration default="true" type="js.build_tools.gulp">
@@ -277,13 +276,13 @@
       <item itemvalue="Gulp.js.build-lib" />
       <item itemvalue="Gulp.js.build-state" />
       <item itemvalue="Gulp.js.minify-lib" />
-      <item itemvalue="JavaScript Debug.example.html" />
+      <item itemvalue="JavaScript Debug.sekoia_mock.html" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="JavaScript Debug.sekoia_mock.html" />
         <item itemvalue="Gulp.js.minify-lib" />
         <item itemvalue="Gulp.js.build-lib" />
-        <item itemvalue="JavaScript Debug.example.html" />
         <item itemvalue="Gulp.js.build-state" />
       </list>
     </recent_temporary>
@@ -311,24 +310,25 @@
       <workItem from="1544724325565" duration="22743000" />
       <workItem from="1544802316756" duration="99292000" />
       <workItem from="1545348869166" duration="24000" />
-      <workItem from="1545348926011" duration="29452000" />
+      <workItem from="1545348926011" duration="33593000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="280601000" />
+    <option name="totallyTimeSpent" value="284742000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="2576" height="1416" extended-state="6" />
+    <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.87261146" visible="true" weight="0.19554849" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.87283826" visible="true" weight="0.19554849" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
-      <window_info id="Gulp" order="3" sideWeight="0.12738854" side_tool="true" visible="true" weight="0.19554849" />
+      <window_info id="Gulp" order="3" sideWeight="0.12716176" side_tool="true" visible="true" weight="0.19554849" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.2657833" />
-      <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.49960256" weight="0.23382697" />
+      <window_info anchor="bottom" id="Find" order="1" weight="0.32969603" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.2657833" />
+      <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.49960256" visible="true" weight="0.23382697" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
@@ -347,18 +347,6 @@
     <option name="version" value="1" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/../Plum.js/gulpfile.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="986">
-          <caret line="105" column="3" lean-forward="true" selection-start-line="62" selection-end-line="105" selection-end-column="3" />
-          <folding>
-            <element signature="e#323#1353#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/cue-state/example/css/styles.css" />
-    <entry file="file://$PROJECT_DIR$/cue-state/build/cue-state.min.js" />
     <entry file="file://$PROJECT_DIR$/cue-state/example/js/utils.js" />
     <entry file="file://$PROJECT_DIR$/cue-state/example/js/messages_model.js" />
     <entry file="file://$PROJECT_DIR$/cue-state/build/cue-state.js" />
@@ -370,7 +358,7 @@
     <entry file="file://$PROJECT_DIR$/cue-state/example/js/user_model.js" />
     <entry file="file://$PROJECT_DIR$/cue-core/state-api.js" />
     <entry file="file://$PROJECT_DIR$/cue-plugins/Utils.js" />
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/math-utils.js">
+    <entry file="file://$PROJECT_DIR$/src/proto/math-utils.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="17">
           <caret line="1" selection-start-line="1" selection-end-line="1" />
@@ -392,7 +380,7 @@
     <entry file="file://$PROJECT_DIR$/src/cue-ui/register-setup.js">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/reconcile.js">
+    <entry file="file://$PROJECT_DIR$/src/ui/reconcile.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="68">
           <caret line="299" column="1" lean-forward="true" selection-start-line="299" selection-start-column="1" selection-end-line="299" selection-end-column="1" />
@@ -403,7 +391,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/fn-utils.js">
+    <entry file="file://$PROJECT_DIR$/src/proto/fn-utils.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="34">
           <caret line="2" lean-forward="true" selection-start-line="2" selection-end-line="2" />
@@ -417,7 +405,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/array-utils.js">
+    <entry file="file://$PROJECT_DIR$/src/proto/array-utils.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="425">
           <caret line="123" column="3" lean-forward="true" selection-start-line="123" selection-start-column="3" selection-end-line="123" selection-end-column="3" />
@@ -437,7 +425,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/obj-utils.js">
+    <entry file="file://$PROJECT_DIR$/src/proto/obj-utils.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="187">
           <caret line="151" column="27" selection-start-line="151" selection-start-column="27" selection-end-line="151" selection-end-column="27" />
@@ -451,7 +439,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/string-utils.js">
+    <entry file="file://$PROJECT_DIR$/src/proto/string-utils.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="153">
           <caret line="33" column="3" lean-forward="true" selection-start-line="33" selection-start-column="3" selection-end-line="33" selection-end-column="3" />
@@ -463,7 +451,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/dom-utils.js">
+    <entry file="file://$PROJECT_DIR$/src/proto/dom-utils.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="102">
           <caret line="63" column="12" selection-start-line="63" selection-start-column="12" selection-end-line="63" selection-end-column="12" />
@@ -491,7 +479,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/reactor.js">
+    <entry file="file://$PROJECT_DIR$/src/ui/reactor.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="323">
           <caret line="277" column="1" lean-forward="true" selection-start-line="277" selection-start-column="1" selection-end-line="277" selection-end-column="1" />
@@ -508,7 +496,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-state/derivatives.js">
+    <entry file="file://$PROJECT_DIR$/src/state/derivatives.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="255">
           <caret line="288" column="39" selection-start-line="288" selection-start-column="39" selection-end-line="288" selection-end-column="39" />
@@ -530,14 +518,14 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-state/index.js">
+    <entry file="file://$PROJECT_DIR$/src/state/index.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="102">
           <caret line="6" column="34" selection-start-line="6" selection-start-column="34" selection-end-line="6" selection-end-column="34" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-state/observable.js">
+    <entry file="file://$PROJECT_DIR$/src/state/observable.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="17">
           <caret line="1" column="17" selection-start-line="1" selection-start-column="17" selection-end-line="1" selection-end-column="17" />
@@ -556,35 +544,35 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-state/observer.js">
+    <entry file="file://$PROJECT_DIR$/src/state/observer.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="153">
           <caret line="9" column="3" lean-forward="true" selection-start-line="9" selection-start-column="3" selection-end-line="9" selection-end-column="3" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-core/utils.js">
+    <entry file="file://$PROJECT_DIR$/src/core/utils.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="102">
           <caret line="6" column="29" lean-forward="true" selection-start-line="6" selection-start-column="29" selection-end-line="6" selection-end-column="29" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/index.js">
+    <entry file="file://$PROJECT_DIR$/src/proto/index.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="68">
           <caret line="4" column="47" selection-start-line="4" selection-start-column="47" selection-end-line="4" selection-end-column="47" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-plugins/index.js">
+    <entry file="file://$PROJECT_DIR$/src/plugins/index.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="51">
           <caret line="3" selection-start-line="3" selection-end-line="3" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-state/reaction-cue.js">
+    <entry file="file://$PROJECT_DIR$/src/state/reaction-cue.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="153">
           <caret line="94" column="1" selection-start-line="94" selection-start-column="1" selection-end-line="94" selection-end-column="1" />
@@ -626,56 +614,49 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-plugins/public-api.js">
+    <entry file="file://$PROJECT_DIR$/src/plugins/public-api.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1394">
           <caret line="82" column="7" lean-forward="true" selection-start-line="82" selection-start-column="7" selection-end-line="82" selection-end-column="7" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/index.js">
+    <entry file="file://$PROJECT_DIR$/src/ui/index.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="136">
           <caret line="8" column="31" lean-forward="true" selection-start-line="8" selection-start-column="31" selection-end-line="8" selection-end-column="31" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-state/public-api.js">
+    <entry file="file://$PROJECT_DIR$/src/state/public-api.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="374">
           <caret line="22" column="64" selection-start-line="22" selection-start-column="59" selection-end-line="22" selection-end-column="64" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-state/state-proto.js">
+    <entry file="file://$PROJECT_DIR$/src/state/state-proto.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="136">
           <caret line="8" column="19" lean-forward="true" selection-start-line="6" selection-start-column="6" selection-end-line="8" selection-end-column="19" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-core/index.js">
+    <entry file="file://$PROJECT_DIR$/src/core/index.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="187">
           <caret line="11" column="80" selection-start-line="11" selection-start-column="80" selection-end-line="11" selection-end-column="80" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/gulpfile.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1207">
-          <caret line="71" column="6" lean-forward="true" selection-start-line="71" selection-start-column="6" selection-end-line="71" selection-end-column="6" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/ui-proto.js">
+    <entry file="file://$PROJECT_DIR$/src/ui/ui-proto.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="119">
           <caret line="7" column="49" selection-start-line="7" selection-start-column="49" selection-end-line="7" selection-end-column="49" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/public-api.js">
+    <entry file="file://$PROJECT_DIR$/src/ui/public-api.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="357">
           <caret line="21" column="47" selection-start-line="21" selection-start-column="47" selection-end-line="21" selection-end-column="47" />
@@ -686,7 +667,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-app/app-proto.js">
+    <entry file="file://$PROJECT_DIR$/src/app/app-proto.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="272">
           <caret line="86" column="3" lean-forward="true" selection-start-line="86" selection-start-column="3" selection-end-line="86" selection-end-column="3" />
@@ -700,14 +681,14 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-app/public-api.js">
+    <entry file="file://$PROJECT_DIR$/src/app/public-api.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="255">
           <caret line="15" column="3" lean-forward="true" selection-start-line="15" selection-start-column="3" selection-end-line="15" selection-end-column="3" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/mapped-classList.js">
+    <entry file="file://$PROJECT_DIR$/src/ui/mapped-classList.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="357">
           <caret line="52" column="1" lean-forward="true" selection-start-line="52" selection-start-column="1" selection-end-line="52" selection-end-column="1" />
@@ -723,7 +704,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/ui-wrapper.js">
+    <entry file="file://$PROJECT_DIR$/src/ui/ui-wrapper.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="119">
           <caret line="7" column="54" selection-start-line="7" selection-start-column="54" selection-end-line="7" selection-end-column="54" />
@@ -743,7 +724,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/scoped-css.js">
+    <entry file="file://$PROJECT_DIR$/src/ui/scoped-css.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="238">
           <caret line="52" column="1" lean-forward="true" selection-start-line="52" selection-start-column="1" selection-end-line="52" selection-end-column="1" />
@@ -755,10 +736,34 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/example.html">
+    <entry file="file://$PROJECT_DIR$/gulpfile.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-118">
+        <state relative-caret-position="238">
+          <caret line="14" column="29" selection-start-line="14" selection-start-column="29" selection-end-line="14" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../Sekoia/SEKOIA/app/modules/core/FileIO.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="187">
+          <caret line="11" column="2" lean-forward="true" selection-start-line="11" selection-start-column="2" selection-end-line="11" selection-end-column="2" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/sekoia_mock.html">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="850">
           <caret line="50" column="36" selection-start-line="50" selection-start-column="36" selection-end-line="50" selection-end-column="36" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-view.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="306">
+          <caret line="18" column="4" selection-start-line="18" selection-start-column="4" selection-end-line="18" selection-end-column="4" />
         </state>
       </provider>
     </entry>
