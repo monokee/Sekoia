@@ -19,18 +19,9 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js">
           <provider selected="true" editor-type-id="text-editor" />
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-view.js">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="306">
-              <caret line="18" column="4" selection-start-line="18" selection-start-column="4" selection-end-line="18" selection-end-column="4" />
-            </state>
-          </provider>
         </entry>
       </file>
     </leaf>
@@ -310,12 +301,12 @@
       <workItem from="1544724325565" duration="22743000" />
       <workItem from="1544802316756" duration="99292000" />
       <workItem from="1545348869166" duration="24000" />
-      <workItem from="1545348926011" duration="33593000" />
+      <workItem from="1545348926011" duration="33655000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="284742000" />
+    <option name="totallyTimeSpent" value="284804000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="2576" height="1416" extended-state="6" />
@@ -757,15 +748,15 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
     <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-view.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="306">
-          <caret line="18" column="4" selection-start-line="18" selection-start-column="4" selection-end-line="18" selection-end-column="4" />
+        <state relative-caret-position="289">
+          <caret line="17" lean-forward="true" selection-start-line="17" selection-end-line="17" />
         </state>
       </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js">
+      <provider selected="true" editor-type-id="text-editor" />
     </entry>
   </component>
 </project>
