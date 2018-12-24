@@ -1,27 +1,31 @@
-Cue.State('App', Module => {
-
-  return function(props) {
-
-
-
-  }
-
-});
-
 Cue.State('App', Module => ({
 
   model: {
-    // internally: create proto object for computed methods
+    some: 'static data',
+    a({computed, property}) {
+      return `${computed} by destructuring the required ${property}`;
+    }
+  },
+
+  components: {
+    stuff: 'toImport...'
   },
 
   actions: {
-    // conceptually tied to model but
-    // operates on a data instance, not the static model
-    // could also be a third top-level api Cue.Action
+    doSomething(payload) {
+      if (this.a === undefined) {
+        this.some = 'something else.'
+      } else {
+        this.totallyNew = [];
+        this.totallyNew.push(payload);
+      }
+    }
   },
 
-  create(props) {
-    // can validate props
+  factory(model, props) {
+    // model === default data values + computed properties (on shared prototype).
+    // can validate props here...
+    // we can return the static data or a new copy of it.
     return Object.assign(Object.create(this.model), props);
   }
 
