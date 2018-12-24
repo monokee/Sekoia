@@ -19,16 +19,32 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js">
-          <provider selected="true" editor-type-id="text-editor" />
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="442">
+              <caret line="26" lean-forward="true" selection-start-line="26" selection-end-line="26" />
+            </state>
+          </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/state/public-api.js">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="408">
+              <caret line="24" column="7" lean-forward="true" selection-start-line="24" selection-start-column="7" selection-end-line="24" selection-end-column="7" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-view.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="306">
-              <caret line="18" column="4" selection-start-line="18" selection-start-column="4" selection-end-line="18" selection-end-column="4" />
+            <state relative-caret-position="408">
+              <caret line="55" lean-forward="true" selection-start-line="55" selection-end-line="55" />
+              <folding>
+                <element signature="e#403#939#0" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -131,8 +147,8 @@
         <option value="$PROJECT_DIR$/example.html" />
         <option value="$PROJECT_DIR$/gulpfile.js" />
         <option value="$PROJECT_DIR$/tests/sekoia_mock/example.html" />
-        <option value="$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js" />
         <option value="$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-view.js" />
+        <option value="$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js" />
       </list>
     </option>
   </component>
@@ -142,7 +158,7 @@
     <other-services-enabled>true</other-services-enabled>
     <auto-save>true</auto-save>
   </component>
-  <component name="ProjectFrameBounds" extendedState="6">
+  <component name="ProjectFrameBounds" extendedState="7">
     <option name="x" value="-8" />
     <option name="y" value="-8" />
     <option name="width" value="2576" />
@@ -154,35 +170,45 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
             <path>
-              <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
+              <item name="Cue" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Cue" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
-              <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
+              <item name="Cue" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Cue" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Cue" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Cue" type="462c0819:PsiDirectoryNode" />
+              <item name="src" type="462c0819:PsiDirectoryNode" />
+              <item name="state" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="Cue" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Cue" type="462c0819:PsiDirectoryNode" />
               <item name="tests" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
-              <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
+              <item name="Cue" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Cue" type="462c0819:PsiDirectoryNode" />
               <item name="tests" type="462c0819:PsiDirectoryNode" />
               <item name="sekoia_mock" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
-              <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
+              <item name="Cue" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Cue" type="462c0819:PsiDirectoryNode" />
               <item name="tests" type="462c0819:PsiDirectoryNode" />
               <item name="sekoia_mock" type="462c0819:PsiDirectoryNode" />
               <item name="modules" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
-              <item name="Cue.js" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Cue.js" type="462c0819:PsiDirectoryNode" />
+              <item name="Cue" type="b2602c69:ProjectViewProjectNode" />
+              <item name="Cue" type="462c0819:PsiDirectoryNode" />
               <item name="tests" type="462c0819:PsiDirectoryNode" />
               <item name="sekoia_mock" type="462c0819:PsiDirectoryNode" />
               <item name="modules" type="462c0819:PsiDirectoryNode" />
@@ -192,6 +218,7 @@
           <select />
         </subPane>
       </pane>
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -227,7 +254,7 @@
     </option>
   </component>
   <component name="RunManager" selected="JavaScript Debug.sekoia_mock.html">
-    <configuration name="sekoia_mock.html" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:63342/Cue.js/tests/sekoia_mock/sekoia_mock.html" useBuiltInWebServerPort="true">
+    <configuration name="sekoia_mock.html" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:63342/Cue.js/tests/sekoia_mock/sekoia_mock.html">
       <method v="2" />
     </configuration>
     <configuration default="true" type="js.build_tools.gulp">
@@ -311,20 +338,22 @@
       <workItem from="1544802316756" duration="99292000" />
       <workItem from="1545348869166" duration="24000" />
       <workItem from="1545348926011" duration="33593000" />
+      <workItem from="1544547607689" duration="176000" />
+      <workItem from="1545610378154" duration="3450000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="284742000" />
+    <option name="totallyTimeSpent" value="288368000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="2576" height="1416" extended-state="6" />
+    <frame x="-6" y="-6" width="1381" height="895" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.87283826" visible="true" weight="0.19554849" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.86928105" visible="true" weight="0.19501133" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
-      <window_info id="Gulp" order="3" sideWeight="0.12716176" side_tool="true" visible="true" weight="0.19554849" />
+      <window_info id="Gulp" order="3" sideWeight="0.13071896" side_tool="true" visible="true" weight="0.19501133" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32969603" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.2657833" />
@@ -367,27 +396,13 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/cue-state/utils.js" />
     <entry file="file://$PROJECT_DIR$/src/cue-state/variables.js" />
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/custom-dataset.js">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/module-import.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="204">
-          <caret line="12" column="109" lean-forward="true" selection-start-line="10" selection-start-column="8" selection-end-line="12" selection-end-column="109" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-ui/register-setup.js">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/cue-ui/custom-dataset.js" />
+    <entry file="file://$PROJECT_DIR$/src/cue-proto/module-import.js" />
+    <entry file="file://$PROJECT_DIR$/src/cue-ui/register-setup.js" />
     <entry file="file://$PROJECT_DIR$/src/ui/reconcile.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="68">
           <caret line="299" column="1" lean-forward="true" selection-start-line="299" selection-start-column="1" selection-end-line="299" selection-end-column="1" />
-          <folding>
-            <element signature="n#!!block;n#reconcile#0" />
-            <element signature="n#!!block;n#longestIncreasingSubsequence#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -398,30 +413,11 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/cue-proto/css-utils.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="136">
-          <caret line="8" column="7" lean-forward="true" selection-start-line="8" selection-start-column="7" selection-end-line="8" selection-end-column="7" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/cue-proto/css-utils.js" />
     <entry file="file://$PROJECT_DIR$/src/proto/array-utils.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="425">
           <caret line="123" column="3" lean-forward="true" selection-start-line="123" selection-start-column="3" selection-end-line="123" selection-end-column="3" />
-          <folding>
-            <element signature="e#60#175#0" />
-            <element signature="e#213#905#0" />
-            <element signature="e#937#1057#0" />
-            <element signature="e#1100#1157#0" />
-            <element signature="e#1210#1565#0" />
-            <element signature="e#1602#1954#0" />
-            <element signature="e#1991#2163#0" />
-            <element signature="e#2210#2350#0" />
-            <element signature="e#2396#2536#0" />
-            <element signature="e#2568#2736#0" />
-            <element signature="e#2769#2935#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -429,13 +425,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="187">
           <caret line="151" column="27" selection-start-line="151" selection-start-column="27" selection-end-line="151" selection-end-column="27" />
-          <folding>
-            <element signature="e#37#535#0" />
-            <element signature="e#556#746#0" />
-            <element signature="e#769#1892#0" />
-            <element signature="e#1918#2790#0" />
-            <element signature="e#2820#3066#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -443,11 +432,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="153">
           <caret line="33" column="3" lean-forward="true" selection-start-line="33" selection-start-column="3" selection-end-line="33" selection-end-column="3" />
-          <folding>
-            <element signature="e#36#388#0" />
-            <element signature="e#418#555#0" />
-            <element signature="e#584#710#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -455,27 +439,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="102">
           <caret line="63" column="12" selection-start-line="63" selection-start-column="12" selection-end-line="63" selection-end-column="12" />
-          <folding>
-            <element signature="e#123#1386#0" />
-            <element signature="e#1401#2331#0" />
-            <element signature="e#2357#2433#0" />
-            <element signature="e#2459#2524#0" />
-            <element signature="e#2548#2616#0" />
-            <element signature="e#2664#2807#0" />
-            <element signature="e#2843#2915#0" />
-            <element signature="e#2950#3034#0" />
-            <element signature="e#3065#3431#0" />
-            <element signature="e#3453#3504#0" />
-            <element signature="e#3526#3587#0" />
-            <element signature="e#3616#3995#0" />
-            <element signature="e#4032#4555#0" />
-            <element signature="e#4585#4861#0" />
-            <element signature="e#4900#5129#0" />
-            <element signature="e#5981#6410#0" />
-            <element signature="e#6480#6844#0" />
-            <element signature="e#6877#6971#0" />
-            <element signature="e#7007#7420#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -483,16 +446,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="323">
           <caret line="277" column="1" lean-forward="true" selection-start-line="277" selection-start-column="1" selection-end-line="277" selection-end-column="1" />
-          <folding>
-            <element signature="n#!!block;n#constructor#0;n#Reactor#0" />
-            <element signature="n#!!block;n#attachTo#0;n#Reactor#0" />
-            <element signature="n#!!block;n#detach#0;n#Reactor#0" />
-            <element signature="n#!!block;n#dispose#0;n#Reactor#0" />
-            <element signature="n#!!block;n#observeProperty#0;n#Reactor#0" />
-            <element signature="n#!!block;n#observeProperties#0;n#Reactor#0" />
-            <element signature="n#!!block;n#unobserveProperty#0;n#Reactor#0" />
-            <element signature="n#!!block;n#unobserveProperties#0;n#Reactor#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -500,21 +453,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="255">
           <caret line="288" column="39" selection-start-line="288" selection-start-column="39" selection-end-line="288" selection-end-column="39" />
-          <folding>
-            <element signature="n#Derivative#0" />
-            <element signature="n#!!block;n#constructor#0;n#Derivative#0" />
-            <element signature="n#!!block;n#value#0;n#Derivative#0" />
-            <element signature="n#!!block;n#updateProperty#0;n#Derivative#0" />
-            <element signature="n#!!block;n#connect#0;n#Derivative#0" />
-            <element signature="n#!!block;n#refreshCache#0;n#Derivative#0" />
-            <element signature="n#!!block;n#dispose#0;n#Derivative#0" />
-            <element signature="n#!!block;n#setupDerivatives#0" />
-            <element signature="n#!!block;n#addDerivative#0" />
-            <element signature="n#!!block;n#setEndOfPropagationInBranchOf#0" />
-            <element signature="n#!!block;n#unflagAllSuperDerivativesOf#0" />
-            <element signature="n#!!block;n#flagDeepestObservedSubDerivativesOf#0" />
-            <element signature="n#!!block;n#flagClosestObservedSuperDerivativesOf#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -529,18 +467,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="17">
           <caret line="1" column="17" selection-start-line="1" selection-start-column="17" selection-end-line="1" selection-end-column="17" />
-          <folding>
-            <element signature="n#Observable#0" />
-            <element signature="n#!!block;n#create#0;n#Observable#0" />
-            <element signature="n#!!block;n#constructor#0;n#Observable#0" />
-            <element signature="n#!!block;n#get#0;n#Observable#0" />
-            <element signature="e#3060#4744#0" />
-            <element signature="n#!!block;n#set#0;n#Observable#0" />
-            <element signature="n#!!block;n#deleteProperty#0;n#Observable#0" />
-            <element signature="n#!!block;n#setupDerivatives#0;n#Observable#0" />
-            <element signature="n#!!block;n#addDerivative#0;n#Observable#0" />
-            <element signature="n#!!block;n#dispose#0;n#Observable#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -576,12 +502,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="153">
           <caret line="94" column="1" selection-start-line="94" selection-start-column="1" selection-end-line="94" selection-end-column="1" />
-          <folding>
-            <element signature="n#!!block;n#cue#0" />
-            <element signature="n#!!block;n#cueImmediate#0" />
-            <element signature="n#!!block;n#cueAccumulated#0" />
-            <element signature="n#!!block;n#react#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -589,28 +509,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1055">
           <caret line="2797" column="13" lean-forward="true" selection-start-line="2797" selection-start-column="13" selection-end-line="2797" selection-end-column="13" />
-          <folding>
-            <element signature="e#1533#3502#0" />
-            <element signature="e#3526#4265#0" />
-            <element signature="e#4289#7618#0" />
-            <element signature="e#7642#10798#0" />
-            <element signature="e#10822#13543#0" />
-            <element signature="e#13833#14159#0" />
-            <element signature="e#14209#16463#0" />
-            <element signature="e#18255#18680#0" />
-            <element signature="e#48234#48503#0" />
-            <element signature="e#48525#57247#0" />
-            <element signature="e#57484#58972#0" />
-            <element signature="e#59119#59286#0" />
-            <element signature="e#59412#60499#0" />
-            <element signature="e#60549#61232#0" />
-            <element signature="e#61340#66584#0" />
-            <element signature="e#66640#67673#0" />
-            <element signature="e#67963#74873#0" />
-            <element signature="e#74955#76203#0" />
-            <element signature="e#76274#78041#0" />
-            <element signature="e#78083#78630#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -625,13 +523,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="136">
           <caret line="8" column="31" lean-forward="true" selection-start-line="8" selection-start-column="31" selection-end-line="8" selection-end-column="31" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/state/public-api.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="374">
-          <caret line="22" column="64" selection-start-line="22" selection-start-column="59" selection-end-line="22" selection-end-column="64" />
         </state>
       </provider>
     </entry>
@@ -660,10 +551,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="357">
           <caret line="21" column="47" selection-start-line="21" selection-start-column="47" selection-end-line="21" selection-end-column="47" />
-          <folding>
-            <element signature="n#!!block;n#setupModule#0" />
-            <element signature="n#!!block;n#createTemplateRootElement#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -671,13 +558,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="272">
           <caret line="86" column="3" lean-forward="true" selection-start-line="86" selection-start-column="3" selection-end-line="86" selection-end-column="3" />
-          <folding>
-            <element signature="e#59#192#0" />
-            <element signature="e#212#222#0" />
-            <element signature="e#617#642#0" />
-            <element signature="e#851#1477#0" />
-            <element signature="e#1491#1903#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -692,15 +572,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="357">
           <caret line="52" column="1" lean-forward="true" selection-start-line="52" selection-start-column="1" selection-end-line="52" selection-end-column="1" />
-          <folding>
-            <element signature="n#!!block;n#constructor#0;n#MappedClassList#0" />
-            <element signature="n#!!block;n#item#0;n#MappedClassList#0" />
-            <element signature="n#!!block;n#contains#0;n#MappedClassList#0" />
-            <element signature="n#!!block;n#add#0;n#MappedClassList#0" />
-            <element signature="n#!!block;n#remove#0;n#MappedClassList#0" />
-            <element signature="n#!!block;n#replace#0;n#MappedClassList#0" />
-            <element signature="n#!!block;n#toggle#0;n#MappedClassList#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -708,19 +579,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="119">
           <caret line="7" column="54" selection-start-line="7" selection-start-column="54" selection-end-line="7" selection-end-column="54" />
-          <folding>
-            <element signature="n#!!block;n#constructor#0;n#UI#0" />
-            <element signature="n#!!block;n#getRefs#0;n#UI#0" />
-            <element signature="n#!!block;n#getIndex#0;n#UI#0" />
-            <element signature="n#!!block;n#getSiblings#0;n#UI#0" />
-            <element signature="n#!!block;n#getBoundingBox#0;n#UI#0" />
-            <element signature="n#!!block;n#setChildren#0;n#UI#0" />
-            <element signature="n#!!block;n#observe#0;n#UI#0" />
-            <element signature="n#!!block;n#unobserve#0;n#UI#0" />
-            <element signature="n#!!block;n#on#0;n#UI#0" />
-            <element signature="n#!!block;n#once#0;n#UI#0" />
-            <element signature="n#!!block;n#off#0;n#UI#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -728,11 +586,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="238">
           <caret line="52" column="1" lean-forward="true" selection-start-line="52" selection-start-column="1" selection-end-line="52" selection-end-column="1" />
-          <folding>
-            <element signature="n#!!block;n#scopeStylesToComponent#0" />
-            <element signature="n#!!block;n#replaceClassNameInElement#0" />
-            <element signature="n#!!block;n#scopeKeyframesToComponent#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -743,13 +596,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../Sekoia/SEKOIA/app/modules/core/FileIO.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="187">
-          <caret line="11" column="2" lean-forward="true" selection-start-line="11" selection-start-column="2" selection-end-line="11" selection-end-column="2" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/../Sekoia/SEKOIA/app/modules/core/FileIO.js" />
     <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/sekoia_mock.html">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="850">
@@ -757,13 +604,27 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
     <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-view.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="306">
-          <caret line="18" column="4" selection-start-line="18" selection-start-column="4" selection-end-line="18" selection-end-column="4" />
+        <state relative-caret-position="408">
+          <caret line="55" lean-forward="true" selection-start-line="55" selection-end-line="55" />
+          <folding>
+            <element signature="e#403#939#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/state/public-api.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="408">
+          <caret line="24" column="7" lean-forward="true" selection-start-line="24" selection-start-column="7" selection-end-line="24" selection-end-column="7" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/sekoia_mock/modules/app/app-state.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="442">
+          <caret line="26" lean-forward="true" selection-start-line="26" selection-end-line="26" />
         </state>
       </provider>
     </entry>
