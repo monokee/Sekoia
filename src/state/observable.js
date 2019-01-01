@@ -251,13 +251,186 @@ class Observable {
 
 }
 
+// Model instances always have the exact same setup
+// we should account for this and build the proxification around the similarity of models.
+// we are ultimately constructing a state tree which:
+// - consists of nested plain objects and arrays
+// - these objects contain: primitives, nested models and also getters and actions.
+
+// Meta Properties
+
+// Proxy:
+//
+//  -> Target
+//    -> Default Props (Deep Clone of Model)
+//    -> Computed Props (Converted to Getters on Target. Computation Functions live statically on Model)
+//    -> Actions (Delegate Prototype of Target. Source Functions live statically on Model ("this" refers to instance))
+//
+//  -> Handler
+//    -> Interceptors (Need access to Meta Properties.
+//
+//
+
+// MOCK:
+const Interceptors = {
+  get(target, prop) {
+    console.log('get', this.shouldBeUnique);
+  },
+  set(target, prop, value) {
+    console.log('set', this);
+  },
+  deleteProperty(target, prop) {
+    console.log('deleteProperty', this);
+  }
+};
+
+function Observable(data) {
+
+  // closure.
+  // the extended proxy handler object below can access this closure.
+  // shared interceptor methods can access non-standard handler properties via "this"
+
+  return new Proxy(data, {
+    // metaProperties (unique per instance)
+    shouldBeUnique: Math.random().toFixed(3),
+    metaProperties: new Map(),
+    // Handler methods (shared in memory)
+    get: Interceptors.get,
+    set: Interceptors.set,
+    deleteProperty: Interceptors.deleteProperty
+  });
+
+}
+
+
+class WrappedProxy {
+
+  constructor() {
+
+    this.fnCache = new Map();
+    this.valueCache = new Map();
+
+    this.metaProperties = new Map();
+
+  }
+
+  get(target, prop) {
+
+    // HANDLE DERIVATIVE INSTALLATION
+    if (derivativeToConnect !== null) {
+
+      // install it as a derivative of the "gotten" property on the model
+      if (this.derivativesOf.has(prop)) {
+        this.derivativesOf.get(prop).push(derivativeToConnect);
+      } else {
+        this.derivativesOf.set(prop, [ derivativeToConnect ]);
+      }
+
+      // add the "gotten" property key to the derivatives' dependencies
+      if (derivativeToConnect.dependencies.indexOf(prop) === -1) {
+        derivativeToConnect.dependencies.push(prop);
+      }
+
+      // if the "gotten" property is a derivative itself, we install the derivativeToConnect
+      // as a derivative of the "gotten" derivative, and the "gotten" property as a
+      // superDerivative of derivativeToConnect allowing for "self-aware" traversal in both directions.
+      const thisDerivative = this.derivedProperties.get(prop);
+
+      if (thisDerivative) {
+
+        if (thisDerivative.derivatives.indexOf(derivativeToConnect) === -1) {
+          thisDerivative.derivatives.push(derivativeToConnect);
+        }
+
+        if (derivativeToConnect.superDerivatives.indexOf(thisDerivative) === -1) {
+          derivativeToConnect.superDerivatives.push(thisDerivative);
+        }
+
+      }
+
+      return;
+
+    }
+
+    // HANDLE META PROPERTY ACCESS
+    if (typeof prop === 'symbol' && this.metaProperties.has(prop)) {
+      return this.metaProperties.get(prop);
+    }
+
+    // HANDLE NORMAL GET REQUESTS
+    const value = _get(target, prop);
+
+    if (value && !value[_IS_OBSERVABLE_] && (isArray(value) || value.constructor === Object)) {
+
+      // Recursively proxify plain objects and arrays
+      return new Observable(value, target, prop);
+
+    } else if (typeof value === 'function') {
+
+      // Cache function access
+      return this.fnCache.get(prop) || (this.fnCache.set(prop, (...args) => {
+
+        // if method is not mutating OR there is no attemptCue function on the parent, return early.
+        if (!ARRAY_MUTATORS.has(prop) || !this.attemptCueParent) {
+          return _apply(value, target, args);
+        }
+
+        // create a shallow clone of the target
+        const previous = createShallowClone(target);
+
+        // apply function to and (potentially) mutate target
+        const result =  _apply(value, target, args);
+
+        // if properties have been mutated
+        if (!isShallowEqual(previous, target)) {
+
+          // if parent is being observed or derived from
+          if (this.attemptCueParent('methodCall', this.ownPropertyName, target, {method: prop, arguments: args, result: result})) {
+
+            // if we're not accumulating changes
+            if (!isAccumulating) {
+              react();
+            }
+
+          }
+
+        }
+
+        // return function result to comply with default behaviour
+        return result;
+
+      })).get(prop);
+
+    } else {
+
+      return value;
+
+    }
+
+  }
+
+}
+
 function Obs_ervable(data, _parent, _ownPropertyName) {
+
+  // structure this differently
+  // - observable HAS a proxy
+  // - observable HAS source data
+
+  // - proxy HAS source data
+  // - proxy HAS interceptors
+  // - interceptors need access to:
+  //   - proxyCache (val, functions)
+  //   - metaProperties
+  //   -
 
   if (data[_IS_OBSERVABLE_]) return data;
   if (data[_PROXY_MODEL_]) return data[_PROXY_MODEL_];
 
   // reuse proxy handler methods
-  const handler = Object.create(Interceptors);
+  const observable = {};
+
+  const handler = create(Interceptors);
 
   // extend the proxy handler
   const uid = handler.uid = Symbol();
@@ -327,106 +500,6 @@ function Obs_ervable(data, _parent, _ownPropertyName) {
 }
 
 // Proxy Interceptors Delegate Prototype
-
-class Observable {
-
-  constructor(data, _parent, _ownPropertyName) {
-
-    const uid = this.uid = Symbol();
-    const reactors = this.reactors = new Set();
-    const observersOf = this.observersOf = new Map();
-    const derivativesOf = this.derivativesOf = new Map();
-    const derivedProperties = this.derivedProperties = new Map();
-
-    this.fnCache = new Map();
-    this.valueCache = new Map();
-
-    if (_parent) {
-
-      this.parent = _parent;
-      this.ownPropertyName = _ownPropertyName;
-
-    } else {
-
-      const {parent, ownPropertyName} = findParentAndOwnPropertyName(data, STORE);
-      this.parent = parent;
-      this.ownPropertyName = ownPropertyName;
-
-    }
-
-    // Has to be arrow function w/o own this binding so it can be shared across scopes.
-    this.attemptCue = (type, prop, value, mutationDetails) => {
-
-      const drv = this.derivativesOf.get(prop);
-      const obs = this.observersOf.get(prop);
-
-      if (drv || obs) {
-
-        if (isAccumulating) {
-          cueImmediate(type, prop, value, mutationDetails, obs, drv, false);
-        } else {
-          cue(type, prop, value, mutationDetails, obs, drv, false);
-        }
-
-        return true;
-
-      } else {
-
-        return false;
-
-      }
-
-    };
-
-    this.attemptCueParent = this.parent[_GET_OWN_CUER_];
-
-    this.metaProperties = new Map([
-      [_IS_OBSERVABLE_, true],
-      [_SOURCE_DATA_, data],
-      [_PARENT_, this.parent],
-      [_OBSERVERS_OF_, observersOf],
-      [_DERIVATIVES_OF_, derivativesOf],
-      [_DERIVED_PROPERTIES_, derivedProperties],
-      [_OWNPROPERTYNAME_, this.ownPropertyName],
-      [_REACTORS_, reactors],
-      [_GET_OWN_CUER_, this.attemptCue],
-      [_SET_PARENT_CUER_, value => this.attemptCueParent = value],
-      [_SET_PARENT_, value => this.parent = value],
-      [_UID_, uid],
-    ]);
-
-    this.data = data;
-
-    // We're using "this" as the handler object so that compatible methods are shared in memory
-    this.model = new Proxy(data, this);
-
-    // Install any derivatives on the data
-    this.setupDerivatives();
-
-    // Establish link to parent object and parent Cue function
-    let key, val;
-    for (key in data) {
-      if ((val = data[key]) && val[_IS_OBSERVABLE_]) {
-        val[_SET_PARENT_](this.model);
-        val[_SET_PARENT_CUER_](this.attemptCue);
-      }
-    }
-
-    // decorate the data object with a link to the reactive model
-    Object.defineProperty(data, _PROXY_MODEL_, {
-      value: this.model,
-      configurable: true
-    });
-
-    // replace plain data with reactive model on the state tree
-    (this.parent[_SOURCE_DATA_] || this.parent)[this.ownPropertyName] = this.model;
-
-    // return the reactive model
-    return this.model;
-
-  }
-
-}
 
 const Interceptors = {
 
