@@ -101,173 +101,6 @@ class Observable {
 
   }
 
-  get(target, prop) {
-
-    // HANDLE DERIVATIVE INSTALLATION
-    if (derivativeToConnect !== null) {
-
-      // if the derivative depends on a property that is an "object" and the object is not itself a derivative
-      // we have to turn that object into an observable so that it can propagate changes to the derivative
-      const dep = _get(target, prop);
-
-      if (typeof dep === 'object' && dep !== null && !dep[_IS_OBSERVABLE_] && !dep[_IS_DERIVATIVE_]) {
-        this.constructor.create(dep, target, prop);
-      }
-
-      // install it as a derivative of the "gotten" property on the model
-      if (this.derivativesOf.has(prop)) {
-        this.derivativesOf.get(prop).push(derivativeToConnect);
-      } else {
-        this.derivativesOf.set(prop, [ derivativeToConnect ]);
-      }
-
-      // add the "gotten" property key to the derivatives' dependencies
-      if (derivativeToConnect.dependencies.indexOf(prop) === -1) {
-        derivativeToConnect.dependencies.push(prop);
-      }
-
-      // if the "gotten" property is a derivative itself, we install the derivativeToConnect
-      // as a derivative of the "gotten" derivative, and the "gotten" property as a
-      // superDerivative of derivativeToConnect allowing for "self-aware" traversal in both directions.
-      const thisDerivative = this.derivedProperties.get(prop);
-
-      if (thisDerivative) {
-
-        if (thisDerivative.derivatives.indexOf(derivativeToConnect) === -1) {
-          thisDerivative.derivatives.push(derivativeToConnect);
-        }
-
-        if (derivativeToConnect.superDerivatives.indexOf(thisDerivative) === -1) {
-          derivativeToConnect.superDerivatives.push(thisDerivative);
-        }
-
-      }
-
-      // now all dependencies are established. handshake done. tea time.
-      return;
-
-    }
-
-    // HANDLE META PROPERTY ACCESS
-    const meta = this.metaProperties.get(prop);
-    if (meta) return meta;
-
-    // HANDLE NORMAL GET REQUESTS
-    const value = _get(target, prop);
-
-    // RETURN VALUE OR MEMOIZED METHOD
-    return typeof value !== 'function' ? value : this.fnCache.get(prop) || (this.fnCache.set(prop, (...args) => {
-
-      // if method is not mutating OR there is no attemptCue function on the parent, return early.
-      if (!ARRAY_MUTATORS.has(prop) || !this.attemptCueParent) {
-        return _apply(value, target, args);
-      }
-
-      // create a shallow clone of the target
-      const previous = createShallowClone(target);
-
-      // apply function to and potentially mutate target
-      const result =  _apply(value, target, args);
-
-      // if properties have been mutated
-      if (!isShallowEqual(previous, target)) {
-
-        // if parent is being observed or derived from
-        if (this.attemptCueParent('methodCall', this.ownPropertyName, target, {method: prop, arguments: args, result: result})) {
-
-          // if we're not accumulating changes
-          if (!isAccumulating) {
-            react();
-          }
-
-        }
-
-      }
-
-      return result;
-
-    })).get(prop);
-
-  }
-
-  set(target, prop, value) {
-
-    if (this.derivedProperties.has(prop)) {
-      throw new Error(`Can not set property "${prop}" because it is derived. Derivatives have to be explicitly deleted before they can be redefined.`);
-    }
-
-    if (!isReacting && value !== this.valueCache.get(prop)) {
-
-      if (typeof value === 'function') {
-
-        const derivative = this.addDerivative(prop);
-        derivative.connect();
-        derivative.refreshCache();
-        value = derivative.value;
-
-      } else {
-
-        _set(target, prop, value);
-        this.valueCache.set(prop, value ? value[_SOURCE_DATA_] || value : value);
-
-      }
-
-      // attemptCue property observers + derivatives + check for required extension
-      // Note: "attemptCue" will add existing observers + derivatives to MAIN_QUEUE and return true. if there was nothing to add it returns false
-      if (this.attemptCue('set', prop, value, undefined)) {
-
-        if (typeof value === 'object' && value !== null && !value[_IS_OBSERVABLE_] && !value[_IS_DERIVATIVE_]) {
-          this.constructor.create(value, target, prop);
-        }
-
-        if (this.attemptCueParent) {
-          this.attemptCueParent('setChild', this.ownPropertyName, target, {childProperty: prop, mutationType: 'set'});
-        }
-
-        if (!isAccumulating) {
-          react();
-        }
-
-        return true;
-
-      } else if (this.attemptCueParent && this.attemptCueParent('setChild', this.ownPropertyName, target, {childProperty: prop, mutationType: 'set'})) {
-
-        if (!isAccumulating) {
-          react();
-        }
-
-        return true;
-
-      }
-
-    }
-
-  }
-
-  deleteProperty(target, prop) {
-
-    if (!isReacting) {
-
-      if (this.derivedProperties.has(prop)) {
-        this.derivedProperties.get(prop).dispose(true);
-      }
-
-      _delete(target, prop);
-      this.valueCache.delete(prop);
-
-      this.attemptCue('delete', prop, undefined, undefined);
-      this.attemptCueParent && this.attemptCueParent('deleteChild', this.ownPropertyName, target, {childProperty: prop, mutationType: 'delete'});
-
-      if (!isAccumulating) {
-        react();
-      }
-
-      return true;
-
-    }
-
-  }
-
   setupDerivatives() {
 
     const props = Object.keys(this.data);
@@ -417,6 +250,349 @@ class Observable {
   }
 
 }
+
+function Obs_ervable(data, _parent, _ownPropertyName) {
+
+  if (data[_IS_OBSERVABLE_]) return data;
+  if (data[_PROXY_MODEL_]) return data[_PROXY_MODEL_];
+
+  // reuse proxy handler methods
+  const handler = Object.create(Interceptors);
+
+  // extend the proxy handler
+  const uid = handler.uid = Symbol();
+  const reactors = handler.reactors = new Set();
+  const observersOf = handler.observersOf = new Map();
+  const derivativesOf = handler.derivativesOf = new Map();
+  const derivedProperties = handler.derivedProperties = new Map();
+
+  let parent, ownPropertyName;
+
+  if (_parent) {
+    parent = handler.parent = _parent;
+    ownPropertyName = handler.ownPropertyName = _ownPropertyName;
+  } else {
+    const parentAndOwnPropertyName = findParentAndOwnPropertyName(data, STORE);
+    if (parentAndOwnPropertyName) {
+      parent = handler.parent = parentAndOwnPropertyName.parent;
+      ownPropertyName = handler.ownPropertyName = parentAndOwnPropertyName.ownPropertyName;
+    } else {
+      throw new Error(`State Module does not have a parent. All State must be composed onto a single root store.`);
+    }
+  }
+
+  const attemptCue = handler.attemptCue = (type, prop, value, mutationDetails) => {
+
+    const drv = derivativesOf.get(prop);
+    const obs = observersOf.get(prop);
+
+    if (drv || obs) {
+
+      if (isAccumulating) {
+        cueImmediate(type, prop, value, mutationDetails, obs, drv, false);
+      } else {
+        cue(type, prop, value, mutationDetails, obs, drv, false);
+      }
+
+      return true;
+
+    } else {
+
+      return false;
+
+    }
+
+  };
+
+  let attemptCueParent = handler.attempCueParent = handler.parent[_GET_OWN_CUER_];
+
+  handler.metaProperties = new Map([
+    [_IS_OBSERVABLE_, true],
+    [_SOURCE_DATA_, data],
+    [_PARENT_, parent],
+    [_OBSERVERS_OF_, observersOf],
+    [_DERIVATIVES_OF_, derivativesOf],
+    [_DERIVED_PROPERTIES_, derivedProperties],
+    [_OWNPROPERTYNAME_, ownPropertyName],
+    [_REACTORS_, reactors],
+    [_GET_OWN_CUER_, attemptCue],
+    [_SET_PARENT_CUER_, value => attemptCueParent = handler.attemptCueParent = value],
+    [_SET_PARENT_, value => parent = handler.parent = value],
+    [_UID_, uid],
+  ]);
+
+  handler.data = data;
+  
+
+}
+
+// Proxy Interceptors Delegate Prototype
+
+class Observable {
+
+  constructor(data, _parent, _ownPropertyName) {
+
+    const uid = this.uid = Symbol();
+    const reactors = this.reactors = new Set();
+    const observersOf = this.observersOf = new Map();
+    const derivativesOf = this.derivativesOf = new Map();
+    const derivedProperties = this.derivedProperties = new Map();
+
+    this.fnCache = new Map();
+    this.valueCache = new Map();
+
+    if (_parent) {
+
+      this.parent = _parent;
+      this.ownPropertyName = _ownPropertyName;
+
+    } else {
+
+      const {parent, ownPropertyName} = findParentAndOwnPropertyName(data, STORE);
+      this.parent = parent;
+      this.ownPropertyName = ownPropertyName;
+
+    }
+
+    // Has to be arrow function w/o own this binding so it can be shared across scopes.
+    this.attemptCue = (type, prop, value, mutationDetails) => {
+
+      const drv = this.derivativesOf.get(prop);
+      const obs = this.observersOf.get(prop);
+
+      if (drv || obs) {
+
+        if (isAccumulating) {
+          cueImmediate(type, prop, value, mutationDetails, obs, drv, false);
+        } else {
+          cue(type, prop, value, mutationDetails, obs, drv, false);
+        }
+
+        return true;
+
+      } else {
+
+        return false;
+
+      }
+
+    };
+
+    this.attemptCueParent = this.parent[_GET_OWN_CUER_];
+
+    this.metaProperties = new Map([
+      [_IS_OBSERVABLE_, true],
+      [_SOURCE_DATA_, data],
+      [_PARENT_, this.parent],
+      [_OBSERVERS_OF_, observersOf],
+      [_DERIVATIVES_OF_, derivativesOf],
+      [_DERIVED_PROPERTIES_, derivedProperties],
+      [_OWNPROPERTYNAME_, this.ownPropertyName],
+      [_REACTORS_, reactors],
+      [_GET_OWN_CUER_, this.attemptCue],
+      [_SET_PARENT_CUER_, value => this.attemptCueParent = value],
+      [_SET_PARENT_, value => this.parent = value],
+      [_UID_, uid],
+    ]);
+
+    this.data = data;
+
+    // We're using "this" as the handler object so that compatible methods are shared in memory
+    this.model = new Proxy(data, this);
+
+    // Install any derivatives on the data
+    this.setupDerivatives();
+
+    // Establish link to parent object and parent Cue function
+    let key, val;
+    for (key in data) {
+      if ((val = data[key]) && val[_IS_OBSERVABLE_]) {
+        val[_SET_PARENT_](this.model);
+        val[_SET_PARENT_CUER_](this.attemptCue);
+      }
+    }
+
+    // decorate the data object with a link to the reactive model
+    Object.defineProperty(data, _PROXY_MODEL_, {
+      value: this.model,
+      configurable: true
+    });
+
+    // replace plain data with reactive model on the state tree
+    (this.parent[_SOURCE_DATA_] || this.parent)[this.ownPropertyName] = this.model;
+
+    // return the reactive model
+    return this.model;
+
+  }
+
+}
+
+const Interceptors = {
+
+  get(target, prop) {
+
+    // HANDLE DERIVATIVE INSTALLATION
+    if (derivativeToConnect !== null) {
+
+      // install it as a derivative of the "gotten" property on the model
+      if (this.derivativesOf.has(prop)) {
+        this.derivativesOf.get(prop).push(derivativeToConnect);
+      } else {
+        this.derivativesOf.set(prop, [ derivativeToConnect ]);
+      }
+
+      // add the "gotten" property key to the derivatives' dependencies
+      if (derivativeToConnect.dependencies.indexOf(prop) === -1) {
+        derivativeToConnect.dependencies.push(prop);
+      }
+
+      // if the "gotten" property is a derivative itself, we install the derivativeToConnect
+      // as a derivative of the "gotten" derivative, and the "gotten" property as a
+      // superDerivative of derivativeToConnect allowing for "self-aware" traversal in both directions.
+      const thisDerivative = this.derivedProperties.get(prop);
+
+      if (thisDerivative) {
+
+        if (thisDerivative.derivatives.indexOf(derivativeToConnect) === -1) {
+          thisDerivative.derivatives.push(derivativeToConnect);
+        }
+
+        if (derivativeToConnect.superDerivatives.indexOf(thisDerivative) === -1) {
+          derivativeToConnect.superDerivatives.push(thisDerivative);
+        }
+
+      }
+
+      return;
+
+    }
+
+    // HANDLE META PROPERTY ACCESS
+    if (typeof prop === 'symbol' && this.metaProperties.has(prop)) {
+      return this.metaProperties.get(prop);
+    }
+
+    // HANDLE NORMAL GET REQUESTS
+    const value = _get(target, prop);
+
+    if (value && !value[_IS_OBSERVABLE_] && (isArray(value) || value.constructor === Object)) {
+
+      // Recursively proxify plain objects and arrays
+      return new Observable(value, target, prop);
+
+    } else if (typeof value === 'function') {
+
+      // Cache function access
+      return this.fnCache.get(prop) || (this.fnCache.set(prop, (...args) => {
+
+        // if method is not mutating OR there is no attemptCue function on the parent, return early.
+        if (!ARRAY_MUTATORS.has(prop) || !this.attemptCueParent) {
+          return _apply(value, target, args);
+        }
+
+        // create a shallow clone of the target
+        const previous = createShallowClone(target);
+
+        // apply function to and (potentially) mutate target
+        const result =  _apply(value, target, args);
+
+        // if properties have been mutated
+        if (!isShallowEqual(previous, target)) {
+
+          // if parent is being observed or derived from
+          if (this.attemptCueParent('methodCall', this.ownPropertyName, target, {method: prop, arguments: args, result: result})) {
+
+            // if we're not accumulating changes
+            if (!isAccumulating) {
+              react();
+            }
+
+          }
+
+        }
+
+        // return function result to comply with default behaviour
+        return result;
+
+      })).get(prop);
+
+    } else {
+
+      return value;
+
+    }
+
+  },
+
+  set(target, prop, value) {
+
+    if (this.derivedProperties.has(prop)) {
+      throw new Error(`Can not set property "${prop}" because it is derived. Derivatives have to be explicitly deleted before they can be redefined.`);
+    }
+
+    if (!isReacting && value !== this.valueCache.get(prop)) {
+
+      _set(target, prop, value);
+      this.valueCache.set(prop, value ? value[_SOURCE_DATA_] || value : value);
+
+      // attemptCue property observers + derivatives + check for required extension
+      // Note: "attemptCue" will add existing observers + derivatives to MAIN_QUEUE and return true. if there was nothing to add it returns false
+      if (this.attemptCue('set', prop, value, undefined)) {
+
+        if (this.attemptCueParent) {
+          this.attemptCueParent('setChild', this.ownPropertyName, target, {childProperty: prop, mutationType: 'set'});
+        }
+
+        if (!isAccumulating) {
+          react();
+        }
+
+        return true;
+
+      } else if (this.attemptCueParent && this.attemptCueParent('setChild', this.ownPropertyName, target, {childProperty: prop, mutationType: 'set'})) {
+
+        if (!isAccumulating) {
+          react();
+        }
+
+        return true;
+
+      }
+
+    }
+
+  },
+
+  deleteProperty(target, prop) {
+
+    if (!isReacting) {
+
+      if (this.derivedProperties.has(prop)) {
+        this.derivedProperties.get(prop).dispose(true);
+      }
+
+      _delete(target, prop);
+
+      this.valueCache.delete(prop);
+
+      this.attemptCue('delete', prop, undefined, undefined);
+
+      if (this.attemptCueParent) {
+        this.attemptCueParent('deleteChild', this.ownPropertyName, target, {childProperty: prop, mutationType: 'delete'});
+      }
+
+      if (!isAccumulating) {
+        react();
+      }
+
+      return true;
+
+    }
+
+  }
+
+};
 
 function findParentAndOwnPropertyName(target, scope) {
 

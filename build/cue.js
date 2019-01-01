@@ -13,7 +13,7 @@
   console.log(`%c🍑 Cue.js - Version ${_CUE_VERSION_}`, 'color: rgb(0, 140, 255)');
 
   // Global Library Singleton
-  const Cue = global.Cue = function() {};
+  const Cue = global.Cue = Object.create(null);
 
   // Cue Scoped Utils and Helpers (available anywhere in the library)
 
@@ -194,7 +194,7 @@
 
         for (let i = 0, v; i < o.length; i++) {
           v = o[i];
-          clone[i] = typeof v === 'object' ? this.deepClone(v) : v[i];
+          clone[i] = typeof v === 'object' ? this.deepClone(v) : v;
         }
 
         return clone;
@@ -209,7 +209,7 @@
 
         for (i in o) {
           v = o[i];
-          clone[i] = typeof v === 'object' ? this.deepClone(v) : v[i];
+          clone[i] = typeof v === 'object' ? this.deepClone(v) : v;
         }
 
         return clone;
@@ -572,6 +572,122 @@
     }
 
   });
+
+  { // Cue Event Bus
+
+    const CUE_EVENTS = new Map();
+    const CUE_EVENTS_ARGS_ERROR = `Can't add listener because the provided arguments are invalid.`;
+
+    let _type, _handler, _scope, _events, _event, _disposable = [];
+
+    const addEvent = (type, handler, scope, once) => {
+
+      const event = {
+        handler: handler,
+        scope: scope,
+        once: once
+      };
+
+      if (CUE_EVENTS.has(type)) {
+        CUE_EVENTS.get(type).push(event);
+      } else {
+        CUE_EVENTS.set(type, [event]);
+      }
+
+    };
+
+    const addEvents = (events, scope, once) => {
+
+      for (_type in events) {
+
+        _handler = events[_type];
+
+        if (typeof _handler === 'function') {
+          addEvent(_type, _handler, scope, once);
+        } else {
+          throw new TypeError(`Can't add listener because handler for "${_type}" is not a function but of type ${typeof _handler}`);
+        }
+
+      }
+
+    };
+
+    // Public API
+
+    defineProperties(Cue, {
+
+      on: {
+
+        value: function(type, handler, scope) {
+
+          if (type && type.constructor === Object) {
+            _scope = typeof handler === 'object' ? handler : null;
+            addEvents(type, _scope, false);
+          } else if (typeof type === 'string' && typeof handler === 'function') {
+            _scope = typeof scope === 'object' ? scope : null;
+            addEvent(type, handler, _scope, false);
+          } else {
+            throw new TypeError(CUE_EVENTS_ARGS_ERROR);
+          }
+
+        }
+
+      },
+
+      once: {
+
+        value: function(type, handler, scope) {
+
+          if (type && type.constructor === Object) {
+            _scope = typeof handler === 'object' ? handler : null;
+            addEvents(type, _scope, true);
+          } else if (typeof type === 'string' && typeof handler === 'function') {
+            _scope = typeof scope === 'object' ? scope : null;
+            addEvent(type, handler, _scope, true);
+          } else {
+            throw new TypeError(CUE_EVENTS_ARGS_ERROR);
+          }
+
+        }
+
+      },
+
+      off: {
+
+        value: function(type) {
+          CUE_EVENTS.delete(type);
+        }
+
+      },
+
+      trigger: {
+
+        value: function(type, payload) {
+
+          if ((_events = CUE_EVENTS.get(type))) {
+
+            for (let i = 0; i < _events.length; i++) {
+              _event = _events[i];
+              _event.handler.call(_event.scope, payload);
+              if (_event.once) _disposable.push(_event);
+            }
+
+            if (_disposable.length) {
+              CUE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
+              _disposable.length = 0;
+            }
+
+            _events = null;
+
+          }
+
+        }
+
+      }
+
+    });
+
+  }
 
   // Plugin Repository
   const CUE_PLUGINS = new Map();
@@ -1648,44 +1764,155 @@
 
   // Public API: Cue.State [function]
   defineProperty(Cue, 'State', {
+    value: registerStateModule
+  });
 
-    value: function(name, initialize) {
+  function registerStateModule(name, moduleInitializer) {
 
-      if (CUE_STATE_MODULES.has(name)) {
-        throw new Error(`A State Model has already been registered under name "${name}". Unregister it first or use a unique name.`);
-      }
+    if (typeof name !== 'string') {
+      throw new TypeError(`Can't create Cue State Module. First argument must be name of type string but is of type "${typeof name}".`);
+    } else if (typeof moduleInitializer !== 'function') {
+      throw new TypeError(`Can't create Cue State Module. Second argument must be module of type function but is of type "${typeof moduleInitializer}".`);
+    } else if (CUE_STATE_MODULES.has(name)) {
+      throw new Error(`A State Module has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
+    }
 
-      CUE_STATE_MODULES.set(name, function Model(...rest) {
+    let module = null;
+    let statik = null;
 
-        if (!this.instance) {
-          defineProperty(Model, 'instance', {
-            value: defineProperties({}, {
-              type: {
-                value: CUE_STATE_TYPE_ID,
-                enumerable: true
-              },
-              name: {
-                value: name,
-                enumerable: true
-              },
-              value: {
-                value: undefined,
-                enumerable: true,
-                writable: true
-              }
-            })
-          });
+    const StateConstructor = props => {
+
+      // lazily initialize the module
+      module || (module = setupStateModule(moduleInitializer));
+
+      if (module.static) { // static indicates that all calls to this module should return the same pointer to the underlying data model (not a new instance)
+
+        statik || (statik = assign(create(module.actions), module.defaults, module.computed));
+
+        if (module.initialize) {
+          module.initialize.call(statik, props);
         }
 
-        return this.instance.value || (this.instance.value = initialize(create(CUE_STATE_PROTO, {
-          instance: Object.getOwnPropertyDescriptor(this, 'instance')
-        }), ...rest));
+        return statik;
 
-      });
+      } else {
+
+        // create a new instance by deep cloning defaults
+        const instance = assign(
+          create(module.actions),
+          deepCloneStateInstance(module.defaults),
+          module.computed
+        );
+
+        if (module.initialize) {
+          module.initialize.call(instance, props);
+        }
+
+        return instance;
+
+      }
+
+    };
+
+    CUE_STATE_MODULES.set(name, StateConstructor);
+
+    return StateConstructor;
+
+  }
+
+  function setupStateModule(moduleInitializer) {
+
+    const CONFIG = moduleInitializer(CUE_STATE_PROTO);
+
+    if (!CONFIG || CONFIG.constructor !== Object) {
+      throw new TypeError(`Can't create State Module because the CONFIGuration function does not return a plain object.`);
+    }
+
+    if (!CONFIG.props || CONFIG.props.constructor !== Object) {
+      throw new TypeError(`State Module requires "props" pojo containing default and optional computed properties.`);
+    }
+
+    const MODULE = {
+      defaults: {},
+      computed: {},
+      initialize: undefined,
+      actions: {},
+      static: CONFIG.static === true,
+      imports: CONFIG.imports,
+    };
+
+    // Split props into default and computed properties
+    let prop, val;
+    for (prop in CONFIG.props) {
+
+      val = CONFIG.props[prop];
+
+      if (typeof val === 'function') {
+        MODULE.computed[prop] = val;
+      } else {
+        MODULE.defaults[prop] = val;
+      }
 
     }
 
-  });
+    // Collect all methods except "initialize" on action delegate prototype
+    for (prop in CONFIG) {
+
+      val = CONFIG[prop];
+
+      if (prop === 'initialize') {
+
+        if (typeof val === 'function') {
+          MODULE.initialize = val;
+        } else {
+          throw new TypeError(`"initialize" is a reserved word for Cue State Modules and must be a function but is of type ${typeof val}`);
+        }
+
+      } else if (typeof val === 'function') {
+
+        MODULE.actions[prop] = val;
+
+      }
+
+    }
+
+    return MODULE;
+
+  }
+
+  function deepCloneStateInstance(o) {
+
+    // Deep cloning for plain Arrays and Objects
+
+    if (isArray(o)) {
+
+      const clone = [];
+
+      for (let i = 0, v; i < o.length; i++) {
+        v = o[i];
+        clone[i] = typeof v === 'object' ? deepCloneStateInstance(v) : v;
+      }
+
+      return clone;
+
+    }
+
+    if (o && o.constructor === Object) {
+
+      const clone = {};
+
+      let i, v;
+
+      for (i in o) {
+        v = o[i];
+        clone[i] = typeof v === 'object' ? deepCloneStateInstance(v) : v;
+      }
+
+      return clone;
+
+    }
+
+  }
 
   // Registered UI Components
   const CUE_UI_MODULES = new Map();
@@ -1998,51 +2225,55 @@
   // Useful when a component has generated unique, component-scoped classNames
   // but we want to work with the user-defined classNames in our high-level code.
 
+  const __mappedClassNames__ = Symbol('ClassName Map');
+  const __elementClassList__ = Symbol('Original ClassList');
+
   class MappedClassList {
 
     constructor(map, element) {
 
       if (!map) {
-        throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object or a Map but is ${JSON.stringify(map)}.`);
+        throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object, 2D Array or a Map but is ${JSON.stringify(map)}.`);
       } else if (map.constructor === Object) {
         map = new Map(Object.entries(map));
       } else if (Array.isArray(map)) {
         map = new Map(map);
       }
 
+      // internalize map and original classList
       Object.defineProperties(this, {
-        __map__: {
+      [__mappedClassNames__]: {
           value: map
         },
-        __org__: {
-          value: element.classList
+      [__elementClassList__]: {
+          value: element.classList // internal reference to original classList.
         }
       });
 
     }
 
     item(index) {
-      return this.__org__.item(index);
+      return this[__elementClassList__].item(index);
     }
 
     contains(token) {
-      return this.__org__.contains(this.__map__.get(token) || token);
+      return this[__elementClassList__].contains(this[__mappedClassNames__].get(token) || token);
     }
 
     add(token) {
-      this.__org__.add(this.__map__.get(token) || token);
+      this[__elementClassList__].add(this[__mappedClassNames__].get(token) || token);
     }
 
     remove(token) {
-      this.__org__.remove(this.__map__.get(token) || token);
+      this[__elementClassList__].remove(this[__mappedClassNames__].get(token) || token);
     }
 
     replace(existingToken, newToken) {
-      this.__org__.replace((this.__map__.get(existingToken) || existingToken), (this.__map__.get(newToken) || newToken));
+      this[__elementClassList__].replace((this[__mappedClassNames__].get(existingToken) || existingToken), (this[__mappedClassNames__].get(newToken) || newToken));
     }
 
     toggle(token) {
-      this.__org__.toggle(this.__map__.get(token) || token);
+      this[__elementClassList__].toggle(this[__mappedClassNames__].get(token) || token);
     }
 
   }
@@ -2441,26 +2672,29 @@
   }
 
   // UI Instance wrapper available as "this" in component lifecycle methods.
-  // Provides access to the raw dom element, components, keyframes and styles
+  // Provides access to the raw dom element, imports, keyframes and styles
   // Exposes shorthands and utility methods that allow for efficient and convenient DOM querying, manipulation and event binding.
 
-  class UI {
+  class CueComponent {
 
-    constructor(element, components, styles, keyframes) {
+    constructor(element, imports, styles, keyframes) {
 
       this.element = element;
 
-      this.components = components;
+      this.imports = imports;
 
       this.keyframes = keyframes;
       this.styles = styles;
 
       // In case component-scope classes have been generated in a styles object, map default classNames to unique classNames internally.
-      // In all cases map classList directly to "this". Original classList is always available via this.element.classList
+      // overwrite element.classList with mapped implementation
       if (styles && Object.keys(styles).length) {
-        this.classList = new MappedClassList(styles, element);
-      } else {
-        this.classList = this.element.classList;
+        Object.defineProperty(element, 'classList', {
+          value: new MappedClassList(styles, element),
+          enumerable: true,
+          writable: false,
+          configurable: true
+        });
       }
 
     }
@@ -2599,39 +2833,15 @@
 
     on(type, handler, options) {
 
-      // element.addEventListener shorthand which accepts a plain object of multiple event -> handlers
+      // element.addEventListener convenience method which accepts a plain object of multiple event -> handlers
       // since we're always binding to the root element, we facilitate event delegation. handlers can internally compare e.target to refs or children.
 
       if (arguments.length === 1 && type && type.constructor === Object) {
         for (const eventType in type) {
-          this.element.addEventListener(eventType, type[eventType]);
+          this.element.addEventListener(eventType, type[eventType], handler && typeof handler === 'object' ? handler : {});
         }
       } else if (typeof handler === 'function') {
         this.element.addEventListener(type, handler, options || {});
-      } else {
-        throw new TypeError(`Can't bind event listener(s) because of invalid arguments.`);
-      }
-
-    }
-
-    once(type, handler, options) {
-
-      if (arguments.length === 1 && type && type.constructor === Object) {
-        for (const eventType in type) {
-          this.element.addEventListener(eventType, type[eventType], options ? Object.assign(options, {
-            once: true
-          }) : {
-            once: true
-          });
-        }
-        return type;
-      } else if (typeof handler === 'function') {
-        this.element.addEventListener(type, handler, options ? Object.assign(options, {
-          once: true
-        }) : {
-          once: true
-        });
-        return handler;
       } else {
         throw new TypeError(`Can't bind event listener(s) because of invalid arguments.`);
       }
@@ -2656,79 +2866,76 @@
 
   // # Public API: Cue.Component [function]
 
-  defineProperty(Cue, 'Component', {
-
-    value: function(name, config) {
-
-      // Component Registration function
-
-      if (typeof name !== 'string') {
-        throw new TypeError(`Can't create Cue-Component. First argument must be name of type string but is of type "${typeof name}".`);
-      } else if (typeof config !== 'function') {
-        throw new TypeError(`Can't create Cue-Component. Second argument must be module of type function but is of type "${typeof config}".`);
-      } else if (CUE_UI_MODULES.has(name)) {
-        throw new Error(`A UI Component has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
-      }
-
-      let module = null;
-
-      CUE_UI_MODULES.set(name, function ComponentConstructor(state) {
-
-        module || (module = setupModule(config));
-        const element = module.template.cloneNode(true);
-        module.initialize && module.initialize.call(new UI(element, module.components, module.styles, module.keyframes), state);
-        return element;
-
-      });
-
-    }
-
+  defineProperty(Cue, 'UI', {
+    value: registerUIModule
   });
 
-  // # Private Registration Utils:
+  function registerUIModule(name, moduleInitializer) {
 
-  function setupModule(config) {
-
-    const module = config(CUE_UI_PROTO);
-
-    if (!module || module.constructor !== Object) {
-      throw new TypeError(`Can't create Component Module because the configuration function does not return a plain object.`);
+    if (typeof name !== 'string') {
+      throw new TypeError(`Can't create Cue-UI Module. First argument must be name of type string but is of type "${typeof name}".`);
+    } else if (!moduleInitializer || (typeof moduleInitializer !== 'function' && moduleInitializer.constructor !== Object)) {
+      throw new TypeError(`Can't create Cue-UI Module. Second argument must be module initializer function or configuration object but is of type "${typeof moduleInitializer}".`);
+    } else if (CUE_UI_MODULES.has(name)) {
+      throw new Error(`A UI Module has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
     }
 
-    if (!module.template || !module.template.element) {
-      throw new TypeError(`Component Module requires "template" object that specifies an "element" like: "template.element === DOMString || DOMNode || DOMSelector".`);
+    let module = null;
+
+    const ComponentConstructor = state => {
+
+      // lazily initialize the module
+      module || (module = setupUIModule(moduleInitializer));
+
+      // create new UI Component Instance
+      const component = new CueComponent(
+        module.template.cloneNode(true),
+        module.imports,
+        module.styles,
+        module.keyframes
+      );
+
+      // initialize
+      if (module.initialize) {
+        module.initialize.call(component, state);
+      }
+
+      // return dom element for compositing
+      return component.element;
+
+    };
+
+    CUE_UI_MODULES.set(name, ComponentConstructor);
+
+    return ComponentConstructor;
+
+  }
+
+  function setupUIModule(moduleInitializer) { // runs only once per module
+
+    // initializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
+    const CONFIG = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_UI_PROTO) : moduleInitializer;
+
+    if (!CONFIG || CONFIG.constructor !== Object) {
+      throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);
     }
 
-    // create template element
-    const template = createTemplateRootElement(module.template.element);
-
-    // Note: we're flattening the module object hierarchy by lifting styles, keyframes and components from module.template directly to module:
-
-    // create css rules, swap classNames with component-scoped names on template element
-    if (module.template.styles) {
-      module.styles = scopeStylesToComponent(module.template.styles, template);
+    if (!CONFIG.template) {
+      throw new TypeError(`UI Module requires "template" property that specifies a DOM Element. // expect(template).toEqual(HTMLString || Selector || DOMNode).`);
     }
 
-    // create css keyframes and swap keyframe names with component-scoped names
-    if (module.template.keyframes) {
-      module.keyframes = scopeKeyframesToComponent(module.template.keyframes);
-    }
+    const templateNode = createTemplateRootElement(CONFIG.template);
 
-    if (module.template.components) {
-      module.components = module.template.components;
-    }
-
-    // reassign template so that it directly refers to the actual template Node
-    module.template = template;
-
-    // Module Lifecycle Methods default to NOOP
-    //module.initialize || (module.initialize = NOOP);
-    module.didMount || (module.didMount = NOOP);
-    module.didUpdate || (module.didUpdate = NOOP);
-    module.willUnmount || (module.willUnmount = NOOP);
-
-    // return module object of shape: {template: DOMNode, lifecycleMethods: ...functions, [styles: nameMap, keyframes: nameMap, components: object]}
-    return module;
+    return {
+      template: templateNode,
+      imports: CONFIG.imports || null,
+      styles: CONFIG.styles ? scopeStylesToComponent(CONFIG.styles, templateNode) : null,
+      keyframes: CONFIG.keyframes ? scopeKeyframesToComponent(CONFIG.keyframes) : null,
+      initialize: CONFIG.initialize || null,
+      didMount: CONFIG.didMount || NOOP,
+      didUpdate: CONFIG.didUpdate || NOOP,
+      willUnmount: CONFIG.willUnmount || NOOP
+    };
 
   }
 
@@ -2759,107 +2966,7 @@
 
   }
 
-  // EXAMPLE:
-
-  /*
-
-  Cue.Component('CountryView', Module => ({
-
-    template: { // required
-
-      element: (
-        `<div class="countryView">
-          <h2 class="heading"></h2>
-          <div class="list"></div>
-        </div>`
-      ),
-
-      components: {
-        countryThumbnail: Module.import('CountryThumbnail'),
-        countryInfoBox: Module.import('CountryInfoBox')
-      },
-
-      styles: {
-        countryView: {
-          display: 'flex',
-          ':before': {
-            content: '::'
-          }
-        }
-      },
-
-      keyframes: {
-        bounceUp: {
-          0: {
-            top: '0px',
-            marginBottom: '12px'
-          },
-          100: {
-            top: '25px',
-            marginBottom: '36px'
-          }
-        }
-      }
-
-    },
-
-    initialize(model) { // required
-
-      const {element, classList} = this;
-      const {countryList, heading, main} = this.refs();
-      const {Thumbnail, InfoBox} = this.components;
-
-      // REACTION RENDERING
-
-      this.observe(model, {
-
-        name: o => {
-          element.textContent = o.value;
-        },
-
-        countries: o => {
-          this.setChildren({from: o.oldValue, to: o.newValue, create: Thumbnail});
-        }
-
-      });
-
-      // USER EVENTS
-
-      this.on({
-
-        click: e => model.counter++,
-
-        contextmenu: e => {
-
-          if (e.target === countryList) {
-            this.classList.toggle('countryView');
-          } else {
-            model.title = 'Not clicked on target!';
-          }
-
-        },
-
-        keydown: Cue.throttle(e => {
-
-          if (e.shiftKey) {
-
-          }
-
-        }, 250)
-
-      });
-
-    },
-
-    didMount() {},
-
-    didUpdate() {},
-
-    willUnmount() {}
-
-  }));
-
-   */
+  let CUE_ROOT_STATE = null;
 
   let CUE_ROOT_COMPONENT_PARENT = document.body;
   let CUE_ROOT_COMPONENT = null;
@@ -2869,11 +2976,11 @@
     RootState: {
 
       get() {
-        return STORE.ROOT;
+        return CUE_ROOT_STATE;
       },
 
       set(data) {
-        STORE.ROOT = Observable.create(data, STORE, 'ROOT');
+        CUE_ROOT_STATE = data;
       }
 
     },
@@ -2899,7 +3006,7 @@
       set(domElement) {
 
         if (!domElement || !(domElement instanceof Element || domElement.nodeName)) {
-          throw new TypeError(`RootComponentParent must be a DOM Element but is of type ${typeof domElement}`);
+          throw new TypeError(`RootComponentParent must be a DOM Element but is ${JSON.stringify(domElement)}`);
         }
 
         CUE_ROOT_COMPONENT_PARENT = domElement;
@@ -2908,27 +3015,25 @@
 
     },
 
-    import: {
+    importState: {
 
-      value: function(type, name) {
+      value: function(name) {
+        return CUE_STATE_PROTO.import(name);
+      }
 
-        if (type === 'state') {
-          return CUE_STATE_PROTO.import(name);
-        }
+    },
 
-        if (type === 'component') {
-          return CUE_UI_PROTO.import(name);
-        }
+    importComponent: {
 
-        throw new ReferenceError(`Can't import "${name}" from "${type}" modules because no such component has been registered.`);
-
+      value: function(name) {
+        return CUE_UI_PROTO.import(name);
       }
 
     },
 
     start: {
 
-      value: function() {
+      value: function(initialProps) {
 
         if (!this.RootState) {
           throw new Error(`Application can't start because no RootState has been defined.`);
@@ -2938,9 +3043,11 @@
           throw new Error(`Application can't start because no RootComponent has been defined.`);
         }
 
-        const rootState = typeof this.RootState === 'function' ? this.RootState() : this.RootState;
+        const rootState = typeof this.RootState === 'function' ? this.RootState(initialProps) : this.RootState;
 
-        CUE_ROOT_COMPONENT_PARENT.appendChild(this.RootComponent(rootState));
+        STORE.ROOT = Observable.create(rootState, STORE, 'ROOT');
+
+        CUE_ROOT_COMPONENT_PARENT.appendChild(this.RootComponent(STORE.ROOT));
 
       }
 

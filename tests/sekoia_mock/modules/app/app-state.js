@@ -1,32 +1,40 @@
 Cue.State('App', Module => ({
 
-  model: {
-    some: 'static data',
-    a({computed, property}) {
-      return `${computed} by destructuring the required ${property}`;
+  imports: {
+    //Limbs: Module.import('Character.Limbs')
+  },
+
+  props: { // default values
+    name: '',
+    secondsPassed: 0,
+    health: 100,
+    stamina: 100,
+    limbs: [],
+    isDead({health}) {
+      return health <= 0;
+    },
+    canFight({stamina}) {
+      return stamina > 0;
     }
   },
 
-  components: {
-    stuff: 'toImport...'
+  initialize(props) {
+
+    this.name = props.name;
+
   },
 
-  actions: {
-    doSomething(payload) {
-      if (this.a === undefined) {
-        this.some = 'something else.'
-      } else {
-        this.totallyNew = [];
-        this.totallyNew.push(payload);
-      }
-    }
-  },
+  // these actions (+ overridable default actions) live on the prototype
+  startTicker() {
 
-  factory(model, props) {
-    // model === default data values + computed properties (on shared prototype).
-    // can validate props here...
-    // we can return the static data or a new copy of it.
-    return Object.assign(Object.create(this.model), props);
+    console.log('ticker in state starting. "this":', this);
+
+    // TODO: "this" refers to a plain data object -> "this" has to be swapped out as soon as the object is turned into an observable.
+    // TODO: based on the API design, refactor the entire state handling to become much more efficient (+ we're pre separating default from computed props which can be useful!)
+    //setInterval(() => {
+    //  this.secondsPassed++;
+    //}, 1000);
+
   }
 
 }));

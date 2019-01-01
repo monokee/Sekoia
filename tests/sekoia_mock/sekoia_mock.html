@@ -10,104 +10,26 @@
   </style>
 </head>
 <body>
+
 <script src="../../build/cue.js"></script>
+
+<script src="modules/app/app-state.js"></script>
+<script src="modules/app/app-view.js"></script>
+
 <script type="text/javascript">
-
-  Cue.Component('AppView', Module => ({
-
-    template: {
-
-      element: (
-        `<div class="app">
-           <div ref="header" class="header"></div>
-           <div ref="body" class="body"></div>
-           <div ref="footer" class="footer"></div>
-         </div>`
-      ),
-
-      components: {
-        //Header: Module.import('HeaderView'),
-        //Body: Module.import('BodyView'),
-        //Footer: Module.import('FooterView')
-      },
-
-      styles: {
-        app: {
-          width: '100vw',
-          height: '100vh',
-          margin: 0,
-          background: '#101215',
-          color: '#ebebeb',
-          fontFamily: 'Roboto, sans-serif',
-          fontWeight: 400,
-          userSelect: 'none'
-        },
-        body: {
-          background: 'rgb(0,115,255)',
-          width: '50%',
-          height: '50%',
-          borderRadius: '2em',
-          ':hover': {
-            background: 'rgb(0,115,155)'
-          }
-        },
-        toggled: {
-          background: '#202225'
-        }
-      }
-
-    },
-
-    initialize(appState) {
-
-      const {element, classList} = this;
-
-      const {header, body, footer} = this.getRefs();
-
-      this.on('click', e => {
-
-        e.preventDefault();
-
-        if (e.target === header) {
-          appState.title = Math.random();
-        }
-
-        if (e.target === body) {
-          appState.toggleState = appState.toggleState ? 0 : 1;
-        }
-
-      });
-
-      this.observe(appState, {
-        title(o) {
-          header.textContent = o.value;
-        },
-        toggleState(o) {
-          if (o.value === 0) {
-            classList.remove('toggled');
-          } else {
-            classList.add('toggled');
-          }
-        }
-      });
-
-    }
-
-  }));
 
   Cue.App(App => {
 
-    App.RootState = {
-      title: 'My Name is Timmy!',
-      toggleState: 0
-    };
+    App.RootState = App.importState('App');
+    App.RootComponent = App.importComponent('App');
 
-    App.RootComponent = App.import('component', 'AppView');
-
-    App.start();
+    App.start({
+      name: 'color.io v.0.001 (2019 lets do this!)'
+    });
 
   });
 
 </script>
+
 </body>
 </html>

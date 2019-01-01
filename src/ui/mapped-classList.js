@@ -3,51 +3,55 @@
 // Useful when a component has generated unique, component-scoped classNames
 // but we want to work with the user-defined classNames in our high-level code.
 
+const __mappedClassNames__ = Symbol('ClassName Map');
+const __elementClassList__ = Symbol('Original ClassList');
+
 class MappedClassList {
 
   constructor(map, element) {
 
     if (!map) {
-      throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object or a Map but is ${JSON.stringify(map)}.`);
+      throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object, 2D Array or a Map but is ${JSON.stringify(map)}.`);
     } else if (map.constructor === Object) {
       map = new Map(Object.entries(map));
     } else if (Array.isArray(map)) {
       map = new Map(map);
     }
-
+    
+    // internalize map and original classList
     Object.defineProperties(this, {
-      __map__: {
+      [__mappedClassNames__]: {
         value: map
       },
-      __org__: {
-        value: element.classList
+      [__elementClassList__]: {
+        value: element.classList // internal reference to original classList.
       }
     });
 
   }
 
   item(index) {
-    return this.__org__.item(index);
+    return this[__elementClassList__].item(index);
   }
 
   contains(token) {
-    return this.__org__.contains(this.__map__.get(token) || token);
+    return this[__elementClassList__].contains(this[__mappedClassNames__].get(token) || token);
   }
 
   add(token) {
-    this.__org__.add(this.__map__.get(token) || token);
+    this[__elementClassList__].add(this[__mappedClassNames__].get(token) || token);
   }
 
   remove(token) {
-    this.__org__.remove(this.__map__.get(token) || token);
+    this[__elementClassList__].remove(this[__mappedClassNames__].get(token) || token);
   }
 
   replace(existingToken, newToken) {
-    this.__org__.replace((this.__map__.get(existingToken) || existingToken), (this.__map__.get(newToken) || newToken));
+    this[__elementClassList__].replace((this[__mappedClassNames__].get(existingToken) || existingToken), (this[__mappedClassNames__].get(newToken) || newToken));
   }
 
   toggle(token) {
-    this.__org__.toggle(this.__map__.get(token) || token);
+    this[__elementClassList__].toggle(this[__mappedClassNames__].get(token) || token);
   }
 
 }

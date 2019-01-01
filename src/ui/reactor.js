@@ -115,7 +115,7 @@ class Reactor {
   observeProperties(propHandlers, autorun) {
 
     if (!this.source) throw new ReferenceError(`Can't observe because no observation source has been assigned to observer!`);
-    if (typeof propHandlers !== 'object') throw new TypeError(`Can't observe properties because the propHandler is not a pojo of type {property: function}`);
+    if (typeof propHandlers !== 'object') throw new TypeError(`Can't observe properties because the propHandler is not a pojo with shape: {property: function}`);
 
     if (!this.source[_IS_OBSERVABLE_]) {
       this.source = Observable.create(this.source);

@@ -85,7 +85,9 @@ class Derivative {
 
     try {
       // at installation time, the computation will likely request dependencies that are still undefined.
-      // this would throw in many cases but since we don't care at this point about the actual value but only the property the derivative depends on, we can safely ignore the error.
+      // this would throw in many cases but since we don't care at this point about the actual value but only the property names the derivative depends on, we can safely ignore the error.
+      // this.parent is both "this" context and first argument because:
+      // As a convention, derivatives should destructure dependencies from first argument instead of using "this" to ensure all dependencies are reached even if computation body contains conditionals.
       this.computation.call(this.parent, this.parent);
 
     } catch (e) {}
@@ -146,6 +148,7 @@ class Derivative {
 }
 
 // Derivative Handling
+// TODO: can be simplified. we already separate computed props from mutable defaults for Component instantiation.
 function setupDerivatives(data, model, derivedProperties) {
 
   const props = Object.keys(data);

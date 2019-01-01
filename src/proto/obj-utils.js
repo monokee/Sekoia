@@ -11,7 +11,7 @@ assign(CUE_PROTO, {
 
       for (let i = 0, v; i < o.length; i++) {
         v = o[i];
-        clone[i] = typeof v === 'object' ? this.deepClone(v) : v[i];
+        clone[i] = typeof v === 'object' ? this.deepClone(v) : v;
       }
 
       return clone;
@@ -26,7 +26,7 @@ assign(CUE_PROTO, {
 
       for (i in o) {
         v = o[i];
-        clone[i] = typeof v === 'object' ? this.deepClone(v) : v[i];
+        clone[i] = typeof v === 'object' ? this.deepClone(v) : v;
       }
 
       return clone;

@@ -1,79 +1,76 @@
 
 // # Public API: Cue.Component [function]
 
-defineProperty(Cue, 'Component', {
-
-  value: function (name, config) {
-
-    // Component Registration function
-
-    if (typeof name !== 'string') {
-      throw new TypeError(`Can't create Cue-Component. First argument must be name of type string but is of type "${typeof name}".`);
-    } else if (typeof config !== 'function') {
-      throw new TypeError(`Can't create Cue-Component. Second argument must be module of type function but is of type "${typeof config}".`);
-    } else if (CUE_UI_MODULES.has(name)) {
-      throw new Error(`A UI Component has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
-    }
-
-    let module = null;
-
-    CUE_UI_MODULES.set(name, function ComponentConstructor(state) {
-
-      module || (module = setupModule(config));
-      const element = module.template.cloneNode(true);
-      module.initialize && module.initialize.call(new UI(element, module.components, module.styles, module.keyframes), state);
-      return element;
-
-    });
-
-  }
-
+defineProperty(Cue, 'UI', {
+  value: registerUIModule
 });
 
-// # Private Registration Utils:
+function registerUIModule(name, moduleInitializer) {
 
-function setupModule(config) {
-
-  const module = config(CUE_UI_PROTO);
-
-  if (!module || module.constructor !== Object) {
-    throw new TypeError(`Can't create Component Module because the configuration function does not return a plain object.`);
+  if (typeof name !== 'string') {
+    throw new TypeError(`Can't create Cue-UI Module. First argument must be name of type string but is of type "${typeof name}".`);
+  } else if (!moduleInitializer || (typeof moduleInitializer !== 'function' && moduleInitializer.constructor !== Object)) {
+    throw new TypeError(`Can't create Cue-UI Module. Second argument must be module initializer function or configuration object but is of type "${typeof moduleInitializer}".`);
+  } else if (CUE_UI_MODULES.has(name)) {
+    throw new Error(`A UI Module has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
   }
 
-  if (!module.template || !module.template.element) {
-    throw new TypeError(`Component Module requires "template" object that specifies an "element" like: "template.element === DOMString || DOMNode || DOMSelector".`);
+  let module = null;
+
+  const ComponentConstructor = state => {
+
+    // lazily initialize the module
+    module || (module = setupUIModule(moduleInitializer));
+
+    // create new UI Component Instance
+    const component = new CueComponent(
+      module.template.cloneNode(true),
+      module.imports,
+      module.styles,
+      module.keyframes
+    );
+
+    // initialize
+    if (module.initialize) {
+      module.initialize.call(component, state);
+    }
+
+    // return dom element for compositing
+    return component.element;
+
+  };
+
+  CUE_UI_MODULES.set(name, ComponentConstructor);
+
+  return ComponentConstructor;
+  
+}
+
+function setupUIModule(moduleInitializer) { // runs only once per module
+
+  // initializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
+  const CONFIG = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_UI_PROTO) : moduleInitializer;
+
+  if (!CONFIG || CONFIG.constructor !== Object) {
+    throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);
   }
 
-  // create template element
-  const template = createTemplateRootElement(module.template.element);
-
-  // Note: we're flattening the module object hierarchy by lifting styles, keyframes and components from module.template directly to module:
-
-  // create css rules, swap classNames with component-scoped names on template element
-  if (module.template.styles) {
-    module.styles = scopeStylesToComponent(module.template.styles, template);
+  if (!CONFIG.template) {
+    throw new TypeError(`UI Module requires "template" property that specifies a DOM Element. // expect(template).toEqual(HTMLString || Selector || DOMNode).`);
   }
 
-  // create css keyframes and swap keyframe names with component-scoped names
-  if (module.template.keyframes) {
-    module.keyframes = scopeKeyframesToComponent(module.template.keyframes);
-  }
+  const templateNode = createTemplateRootElement(CONFIG.template);
 
-  if (module.template.components) {
-    module.components = module.template.components;
-  }
-
-  // reassign template so that it directly refers to the actual template Node
-  module.template = template;
-
-  // Module Lifecycle Methods default to NOOP
-  //module.initialize || (module.initialize = NOOP);
-  module.didMount || (module.didMount = NOOP);
-  module.didUpdate || (module.didUpdate = NOOP);
-  module.willUnmount || (module.willUnmount = NOOP);
-
-  // return module object of shape: {template: DOMNode, lifecycleMethods: ...functions, [styles: nameMap, keyframes: nameMap, components: object]}
-  return module;
+  return {
+    template: templateNode,
+    imports: CONFIG.imports || null,
+    styles: CONFIG.styles ? scopeStylesToComponent(CONFIG.styles, templateNode): null,
+    keyframes: CONFIG.keyframes ? scopeKeyframesToComponent(CONFIG.keyframes) : null,
+    initialize: CONFIG.initialize || null,
+    didMount: CONFIG.didMount || NOOP,
+    didUpdate: CONFIG.didUpdate || NOOP,
+    willUnmount: CONFIG.willUnmount || NOOP
+  };
 
 }
 
@@ -98,108 +95,3 @@ function createTemplateRootElement(x) {
   }
 
 }
-
-
-
-
-// EXAMPLE:
-
-/*
-
-Cue.Component('CountryView', Module => ({
-
-  template: { // required
-
-    element: (
-      `<div class="countryView">
-        <h2 class="heading"></h2>
-        <div class="list"></div>
-      </div>`
-    ),
-
-    components: {
-      countryThumbnail: Module.import('CountryThumbnail'),
-      countryInfoBox: Module.import('CountryInfoBox')
-    },
-
-    styles: {
-      countryView: {
-        display: 'flex',
-        ':before': {
-          content: '::'
-        }
-      }
-    },
-
-    keyframes: {
-      bounceUp: {
-        0: {
-          top: '0px',
-          marginBottom: '12px'
-        },
-        100: {
-          top: '25px',
-          marginBottom: '36px'
-        }
-      }
-    }
-
-  },
-
-  initialize(model) { // required
-
-    const {element, classList} = this;
-    const {countryList, heading, main} = this.refs();
-    const {Thumbnail, InfoBox} = this.components;
-
-    // REACTION RENDERING
-
-    this.observe(model, {
-
-      name: o => {
-        element.textContent = o.value;
-      },
-
-      countries: o => {
-        this.setChildren({from: o.oldValue, to: o.newValue, create: Thumbnail});
-      }
-
-    });
-
-    // USER EVENTS
-
-    this.on({
-
-      click: e => model.counter++,
-
-      contextmenu: e => {
-
-        if (e.target === countryList) {
-          this.classList.toggle('countryView');
-        } else {
-          model.title = 'Not clicked on target!';
-        }
-
-      },
-
-      keydown: Cue.throttle(e => {
-
-        if (e.shiftKey) {
-
-        }
-
-      }, 250)
-
-    });
-
-  },
-
-  didMount() {},
-
-  didUpdate() {},
-
-  willUnmount() {}
-
-}));
-
- */

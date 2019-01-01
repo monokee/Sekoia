@@ -12,8 +12,9 @@ gulp.task('build-lib', function() {
 
   const src = {
     core:     SOURCE_DIR + '/core',
-    plugins:  SOURCE_DIR + '/plugins',
     proto:    SOURCE_DIR + '/proto',
+    eventBus: SOURCE_DIR + '/eventBus',
+    plugins:  SOURCE_DIR + '/plugins',
     state:    SOURCE_DIR + '/state',
     ui:       SOURCE_DIR + '/ui',
     app:      SOURCE_DIR + '/app'
@@ -31,6 +32,9 @@ gulp.task('build-lib', function() {
       `${src.proto}/obj-utils.js`,
       `${src.proto}/array-utils.js`,
       `${src.proto}/fn-utils.js`
+    ],
+    eventBus: [
+      `${src.eventBus}/event-bus.js`
     ],
     plugins: [
       `${src.plugins}/index.js`,
@@ -64,7 +68,8 @@ gulp.task('build-lib', function() {
   gulp
     .src([
       ...modules.core, 
-      ...modules.proto, 
+      ...modules.proto,
+      ...modules.eventBus,
       ...modules.plugins, 
       ...modules.state, 
       ...modules.ui,

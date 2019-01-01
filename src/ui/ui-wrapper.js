@@ -1,25 +1,28 @@
 
-// UI Instance wrapper available as "this" in component lifecycle methods.
-// Provides access to the raw dom element, components, keyframes and styles
-// Exposes shorthands and utility methods that allow for efficient and convenient DOM querying, manipulation and event binding.
+// Cue UI Component Instance available as "this" in component lifecycle methods.
+// Provides access to the raw dom element, imports, keyframes and styles
+// Exposes shorthands and utility methods that allow for DOM and STATE querying, manipulation and binding.
 
-class UI {
+class CueComponent {
 
-  constructor(element, components, styles, keyframes) {
+  constructor(element, imports, styles, keyframes) {
 
     this.element = element;
 
-    this.components = components;
+    this.imports = imports;
 
     this.keyframes = keyframes;
     this.styles = styles;
 
-    // In case component-scope classes have been generated in a styles object, map default classNames to unique classNames internally.
-    // In all cases map classList directly to "this". Original classList is always available via this.element.classList
+    // In case component-scope classes have been generated in a styles object, we map default classNames to unique classNames internally.
+    // overwrite element.classList with mapped implementation
     if (styles && Object.keys(styles).length) {
-      this.classList = new MappedClassList(styles, element);
-    } else {
-      this.classList = this.element.classList;
+      Object.defineProperty(element, 'classList', {
+        value: new MappedClassList(styles, element),
+        enumerable: true,
+        writable: false,
+        configurable: true
+      });
     }
 
   }
@@ -114,6 +117,10 @@ class UI {
 
   observe(state, property, handler, autorun) {
 
+    // when calling observe on a piece of state, it will be converted to an observable.
+    // the dom element that is already wrapped into the component will be further wrapped into a Reactor. so now the Component has a Reactor which is the glue between the element and the state.
+    // the reactor
+
     // high level method which delegates a number of internal processes
     // which are required to bind an element to a state model so we can
     // auto-react with the element whenever a specified property value on the state model has changed.
@@ -153,31 +160,15 @@ class UI {
 
   on(type, handler, options) {
 
-    // element.addEventListener shorthand which accepts a plain object of multiple event -> handlers
+    // element.addEventListener convenience method which accepts a plain object of multiple event -> handlers
     // since we're always binding to the root element, we facilitate event delegation. handlers can internally compare e.target to refs or children.
 
     if (arguments.length === 1 && type && type.constructor === Object) {
       for (const eventType in type) {
-        this.element.addEventListener(eventType, type[eventType]);
+        this.element.addEventListener(eventType, type[eventType], handler && typeof handler === 'object' ? handler : {});
       }
     } else if (typeof handler === 'function') {
       this.element.addEventListener(type, handler, options || {});
-    } else {
-      throw new TypeError(`Can't bind event listener(s) because of invalid arguments.`);
-    }
-
-  }
-
-  once(type, handler, options) {
-
-    if (arguments.length === 1 && type && type.constructor === Object) {
-      for (const eventType in type) {
-        this.element.addEventListener(eventType, type[eventType], options ? Object.assign(options, {once: true}) : {once: true});
-      }
-      return type;
-    } else if (typeof handler === 'function') {
-      this.element.addEventListener(type, handler, options ? Object.assign(options, {once: true}) : {once: true});
-      return handler;
     } else {
       throw new TypeError(`Can't bind event listener(s) because of invalid arguments.`);
     }

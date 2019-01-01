@@ -5,6 +5,8 @@
       <w>autoinstall</w>
       <w>autorun</w>
       <w>bviously</w>
+      <w>composable</w>
+      <w>compositing</w>
       <w>cuer</w>
       <w>mutators</w>
       <w>namespacing</w>
@@ -12,8 +14,12 @@
       <w>noprefix</w>
       <w>ownpropertyname</w>
       <w>peasy</w>
+      <w>pojo</w>
+      <w>proxify</w>
       <w>recomputation</w>
       <w>rightclick</w>
+      <w>statik</w>
+      <w>stringified</w>
       <w>struct</w>
       <w>subsequence</w>
       <w>unflag</w>

@@ -21,7 +21,7 @@ class Observer {
   }
 
   react(observation) {
-    this.reaction.call(this.reactionTarget, observation);
+    this.reaction.call(this.reactionTarget, observation); // TODO: entire class is obsolete. reaction should be called with CueComponent as "this" not the domElement.
   }
 
 }
