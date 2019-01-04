@@ -352,9 +352,7 @@ function proxyGetTrap(target, prop) {
 
 function proxySetTrap(target, prop, value) {
 
-  if (this.derivedProperties.has(prop)) {
-    throw new Error(`Can not set property "${prop}" because it is derived. Derivatives have to be explicitly deleted before they can be redefined.`);
-  }
+  //TODO: set parent and ownPropertyName of values that are cue-states here.
 
   if (!isReacting && value !== this.valueCache.get(prop)) {
 
