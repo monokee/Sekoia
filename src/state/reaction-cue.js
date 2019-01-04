@@ -1,7 +1,7 @@
 
 // Reaction Handling
 
-function cue(type, prop, value, mutationDetails, observers, derivatives, stopPropagation) {
+function cueAll(prop, value, oldValue, observers, derivatives, stopPropagation) {
 
   // Collect observers and derivatives of the changed property and, recursively those of all of it's descendant derivatives
 
@@ -11,7 +11,11 @@ function cue(type, prop, value, mutationDetails, observers, derivatives, stopPro
     for (i = 0; i < observers.length; i++) {
       item = observers[i];
       if (MAIN_QUEUE.indexOf(item) === -1) {
-        MAIN_QUEUE.push(item, new Observation(type, prop, value, mutationDetails));
+        MAIN_QUEUE.push(item, {
+          property: prop,
+          value: value,
+          oldValue: oldValue
+        });
       }
     }
   }
@@ -24,15 +28,16 @@ function cue(type, prop, value, mutationDetails, observers, derivatives, stopPro
     }
 
     // recompute value and recurse
-    let result;
+    let previous, result;
 
     for (i = 0; i < l; i++) {
 
       item = derivatives[i];
-      result = item.value; // calls "getter" -> recomputes value
+      previous = item._value; // uses internal _value
+      result = item.value; // calls "getter" -> recomputes _value
 
       if (item.hasChanged) { // has value changed after recomputation -> recurse
-        cue('change', item.ownPropertyName, result, undefined, item.observers, item.derivatives, item.stopPropagation);
+        cueAll(item.ownPropertyName, result, previous, item.observers, item.derivatives, item.stopPropagation);
       }
 
     }
@@ -41,7 +46,7 @@ function cue(type, prop, value, mutationDetails, observers, derivatives, stopPro
 
 }
 
-function cueImmediate(type, prop, value, mutationDetails, observers, derivatives, stopPropagation) {
+function cueImmediate(prop, value, oldValue, observers, derivatives, stopPropagation) {
 
   // Collect immediate observers and derivatives of the changed property. Don't recurse over sub-derivatives just yet.
 
@@ -51,7 +56,11 @@ function cueImmediate(type, prop, value, mutationDetails, observers, derivatives
     for (i = 0; i < observers.length; i++) {
       item = observers[i];
       if (MAIN_QUEUE.indexOf(item) === -1) {
-        MAIN_QUEUE.push(item, new Observation(type, prop, value, mutationDetails));
+        MAIN_QUEUE.push(item, {
+          property: prop,
+          value: value,
+          oldValue: oldValue
+        });
       }
     }
   }
@@ -66,11 +75,12 @@ function cueImmediate(type, prop, value, mutationDetails, observers, derivatives
 
 function cueAccumulated(derivatives) {
 
-  for (let i = 0, item, result; i < derivatives.length; i++) {
+  for (let i = 0, item, previous, result; i < derivatives.length; i++) {
     item = derivatives[i];
+    previous = item._value; // internal
     result = item.value; // calls "getter" -> recomputes value
     if (item.hasChanged) {
-      cue('change', item.ownPropertyName, result, undefined, item.observers, item.derivatives, item.stopPropagation);
+      cueAll(item.ownPropertyName, result, previous, item.observers, item.derivatives, item.stopPropagation);
     }
   }
 
