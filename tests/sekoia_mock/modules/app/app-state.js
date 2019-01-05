@@ -29,7 +29,7 @@ Cue.State('App', Module => ({
 
     console.log('ticker in state starting. "this":', this);
 
-    // TODO: "this" refers to a plain data object -> "this" has to be swapped out as soon as the object is turned into an observable.
+    // TODO: "this" refers to a plain data object -> "this" has to be swapped out as soon as the object is turned into an observe.
     // TODO: based on the API design, refactor the entire state handling to become much more efficient (+ we're pre separating default from computed props which can be useful!)
     //setInterval(() => {
     //  this.secondsPassed++;

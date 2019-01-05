@@ -1,27 +1,20 @@
 
-// # CUE PUBLIC API:
 
 // Registered State Modules
 const CUE_STATE_MODULES = new Map();
-// State Module Type Identifier
-const CUE_STATE_TYPE_ID = 'model';
-
-// # STATE INTERNAL API:
 
 // #State Variables
 let isReacting = false; // is a reaction currently in process?
 let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
 let derivativeToConnect = null; // Installer payload for derivatives
 
-// Helpers
-const createShallowClone = CUE_PROTO.shallowClone;
-const isShallowEqual = CUE_PROTO.shallowCompare;
-
 // Traversal Directions
 const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
 
 // Meta Keys used for closure scope lookup && safely extending foreign objects
+// TODO: deprecate many
+const __CUE__ = Symbol('🍑');
 const _UID_ = Symbol('UniqueID');
 const _IS_OBSERVABLE_ = Symbol('IsValueObservable');
 const _IS_DERIVATIVE_ = Symbol('IsValueDerived');
@@ -42,6 +35,7 @@ const _SOURCE_DATA_ = Symbol('SourceData');
 const _PROXY_MODEL_ = Symbol('ProxyModel');
 
 // Root Store
+// TODO: possibly deprecate
 const STORE = { ROOT: undefined };
 
 // Reaction Queue

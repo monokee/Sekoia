@@ -977,7 +977,7 @@
       if (derivativeToConnect !== null) {
 
         // if the derivative depends on a property that is an "object" and the object is not itself a derivative
-        // we have to turn that object into an observable so that it can propagate changes to the derivative
+        // we have to turn that object into an observe so that it can propagate changes to the derivative
         const dep = _get(target, prop);
 
         if (typeof dep === 'object' && dep !== null && !dep[_IS_OBSERVABLE_] && !dep[_IS_DERIVATIVE_]) {
@@ -1782,10 +1782,10 @@
 
     const StateConstructor = props => {
 
-      // lazily initialize the module
+      // lazily initialize the modules
       module || (module = setupStateModule(moduleInitializer));
 
-      if (module.static) { // static indicates that all calls to this module should return the same pointer to the underlying data model (not a new instance)
+      if (module.static) { // static indicates that all calls to this modules should return the same pointer to the underlying data model (not a new instance)
 
         statik || (statik = assign(create(module.actions), module.defaults, module.computed));
 
@@ -2025,13 +2025,13 @@
 
       if (typeof value === 'object' && value !== null) {
 
-        // changes to immediate children of objects bubble to the parent so any nested objects must be made observable as well
+        // changes to immediate children of objects bubble to the parent so any nested objects must be made observe as well
         if (value[_IS_OBSERVABLE_]) {
           plainData = value[_SOURCE_DATA_];
         } else if (value[_PROXY_MODEL_]) {
           this.source[property] = value[_PROXY_MODEL_];
         } else if (!derivative) {
-          // unobserved object that is not a derivative. make it observable
+          // unobserved object that is not a derivative. make it observe
           Observable.create(value, this.source, property);
         }
 
@@ -2154,7 +2154,7 @@
 
       // If no more ObserverArrays (after the previous deletion)
       if (source_observers.size === 0) {
-        // dispose the observable because nothing is being observed anymore
+        // dispose the observe because nothing is being observed anymore
         this.source.dispose();
         this.source = undefined;
         this.sourceParent = undefined;
@@ -2771,7 +2771,7 @@
       // "update" is a function that updates existing elements. It requires two arguments: (domElement, newData). How the newData is rendered into the domElement is specified explicitly in the function body.
       // "update" defaults to noop because in most cases property / attribute updates are handled by children themselves
       // "update" is only required for non-reactive or primitive children in data array
-      // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observable reactive state module
+      // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive state modules
 
       // fast path clear all
       if (to.length === 0) {
@@ -2884,7 +2884,7 @@
 
     const ComponentConstructor = state => {
 
-      // lazily initialize the module
+      // lazily initialize the modules
       module || (module = setupUIModule(moduleInitializer));
 
       // create new UI Component Instance
@@ -2911,7 +2911,7 @@
 
   }
 
-  function setupUIModule(moduleInitializer) { // runs only once per module
+  function setupUIModule(moduleInitializer) { // runs only once per modules
 
     // initializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
     const CONFIG = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_UI_PROTO) : moduleInitializer;

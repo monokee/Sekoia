@@ -81,13 +81,13 @@ class Reactor {
 
     if (typeof value === 'object' && value !== null) {
 
-      // changes to immediate children of objects bubble to the parent so any nested objects must be made observable as well
+      // changes to immediate children of objects bubble to the parent so any nested objects must be made observe as well
       if (value[_IS_OBSERVABLE_]) {
         plainData = value[_SOURCE_DATA_];
       } else if (value[_PROXY_MODEL_]) {
         this.source[property] = value[_PROXY_MODEL_];
       } else if (!derivative) {
-        // unobserved object that is not a derivative. make it observable
+        // unobserved object that is not a derivative. make it observe
         Observable.create(value, this.source, property);
       }
 
@@ -210,7 +210,7 @@ class Reactor {
 
     // If no more ObserverArrays (after the previous deletion)
     if (source_observers.size === 0) {
-      // dispose the observable because nothing is being observed anymore
+      // dispose the observe because nothing is being observed anymore
       this.source.dispose();
       this.source = undefined;
       this.sourceParent = undefined;

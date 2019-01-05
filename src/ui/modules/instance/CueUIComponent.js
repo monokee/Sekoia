@@ -3,7 +3,7 @@
 // Provides access to the raw dom element, imports, keyframes and styles
 // Exposes shorthands and utility methods that allow for DOM and STATE querying, manipulation and binding.
 
-class CueComponent {
+class CueUIComponent {
 
   constructor(element, imports, styles, keyframes) {
 
@@ -94,7 +94,7 @@ class CueComponent {
     // "update" is a function that updates existing elements. It requires two arguments: (domElement, newData). How the newData is rendered into the domElement is specified explicitly in the function body.
     // "update" defaults to noop because in most cases property / attribute updates are handled by children themselves
     // "update" is only required for non-reactive or primitive children in data array
-    // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observable reactive state module
+    // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive state modules
 
     // fast path clear all
     if (to.length === 0) {
@@ -117,7 +117,7 @@ class CueComponent {
 
   observe(state, property, handler, autorun) {
 
-    // when calling observe on a piece of state, it will be converted to an observable.
+    // when calling observe on a piece of state, it will be converted to an observe.
     // the dom element that is already wrapped into the component will be further wrapped into a Reactor. so now the Component has a Reactor which is the glue between the element and the state.
     // the reactor
 
