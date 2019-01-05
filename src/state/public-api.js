@@ -1,4 +1,5 @@
 
+// Committed via PHPStorm. (Yeah!)
 // Public API: Cue.State [function]
 defineProperty(Cue, 'State', {
   value: registerStateModule
