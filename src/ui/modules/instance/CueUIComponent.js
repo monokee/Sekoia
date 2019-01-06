@@ -117,13 +117,13 @@ class CueUIComponent {
 
   observe(state, property, handler, autorun) {
 
-    // when calling observe on a piece of state, it will be converted to an observe.
     // the dom element that is already wrapped into the component will be further wrapped into a Reactor. so now the Component has a Reactor which is the glue between the element and the state.
-    // the reactor
 
     // high level method which delegates a number of internal processes
     // which are required to bind an element to a state model so we can
     // auto-react with the element whenever a specified property value on the state model has changed.
+
+    // TODO: use a more loosely coupled event system -> at least for reactions. tighter coupling for derivatives is okay but this is a mess!
 
     const reactor = REACTORS.get(this.element) || (
       REACTORS.set(
