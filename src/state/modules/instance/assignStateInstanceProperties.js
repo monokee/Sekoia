@@ -12,7 +12,8 @@ function assignStateInstanceProperties(stateInstance) {
       observersOf: new Map(),
       derivativesOf: new Map(),
       derivedProperties: new Map(),
-      attemptCue: attemptCue
+      attemptCue: attemptCue,
+      subscribe: subscribeToStateInstance
     },
     configurable: true
   });

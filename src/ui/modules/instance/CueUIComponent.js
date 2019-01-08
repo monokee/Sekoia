@@ -115,27 +115,53 @@ class CueUIComponent {
 
   }
 
-  observe(state, property, handler, autorun) {
+  observe(state, property, handler, autorun = true) {
 
-    // the dom element that is already wrapped into the component will be further wrapped into a Reactor. so now the Component has a Reactor which is the glue between the element and the state.
+    const stateInstance = state[__CUE__];
+    const reactions = stateInstance.observersOf;
 
-    // high level method which delegates a number of internal processes
-    // which are required to bind an element to a state model so we can
-    // auto-react with the element whenever a specified property value on the state model has changed.
+    if (typeof property === 'string' && typeof handler === 'function') {
 
-    // TODO: use a more loosely coupled event system -> at least for reactions. tighter coupling for derivatives is okay but this is a mess!
+      stateInstance.subscribe(property, handler);
 
-    const reactor = REACTORS.get(this.element) || (
-      REACTORS.set(
-        this.element,
-        new Reactor(this.element).attachTo(state)
-      ).get(this.element)
-    );
+      if (autorun === true) {
+        handler({
+          property: property,
+          value: state[property],
+          oldValue: state[property]
+        });
+      }
 
-    if (typeof property === 'object' && property) {
-      reactor.observeProperties(property, typeof handler === 'boolean' ? handler : true);
-    } else {
-      reactor.observeProperty(property, handler, autorun || true);
+    } else if (property.constructor === Object && property !== null) {
+
+      const _autorun = typeof handler === 'boolean' ? handler : autorun;
+
+      let prop, hndlr;
+
+      for (prop in property) {
+
+        hndlr = property[prop];
+
+        if (typeof hndlr !== 'function') {
+          throw new TypeError(`Property change reaction for "${prop}" is not a function...`);
+        }
+
+        if (reactions.has(prop)) {
+          reactions.get(prop).push(hndlr);
+        } else {
+          reactions.set(prop, [ hndlr ]);
+        }
+
+        if (_autorun === true) {
+          hndlr({
+            property: prop,
+            value: state[prop],
+            oldValue: state[prop]
+          });
+        }
+
+      }
+
     }
 
   }
