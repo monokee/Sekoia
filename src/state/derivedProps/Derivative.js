@@ -126,13 +126,6 @@ class Derivative {
 
     let i;
 
-    this.parent[_DERIVED_PROPERTIES_].delete(this.ownPropertyName);
-
-    this.parent[_DERIVATIVES_OF_].forEach((prop, derivatives) => {
-      i = derivatives.indexOf(this);
-      if (i > -1) derivatives.splice(i, 1);
-    });
-
     // clear anything that could potentially hold on to strong pointers
     this.valueCache = undefined;
     this.observers = undefined;

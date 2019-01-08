@@ -4,63 +4,42 @@ function proxySetHandler(target, prop, value) {
   if (!isReacting) {
 
     const instance = target[__CUE__];
+    const oldValue = instance.valueCache.get(prop);
 
-    if (typeof value === 'object' && value !== null) {
+    if (value) {
 
-      const nestedState = value[__CUE__];
+      const nestedInstance = value[__CUE__];
 
-      if (nestedState && nestedState.parent === null) {
-        nestedState.parent = target;
-        nestedState.ownPropertyName = prop;
-      }
-
-      const oldValue = instance.valueCache.get(prop);
-
-      if (!areShallowEqual(value, oldValue)) {
-
-        if (instance.attemptCue(prop, value, oldValue)) {
-
-        } else if (instance.parent.attemptCue.call(instance.parent, instance.ownPropertyName, instance.parent, instance.parent)) {
-
-        }
-
+      if (nestedInstance && nestedInstance.parent === null) {
+        nestedInstance.parent = target;
+        nestedInstance.ownPropertyName = prop;
       }
 
     }
 
-  }
+    if (value !== oldValue) {
 
-  // TODO: if value and cachedValue are pojo or array, shallow compare
-  // if
+      let inQueue = instance.attemptCue(prop, value, oldValue);
 
-  if (!isReacting && value !== this.valueCache.get(prop)) {
-
-    _set(target, prop, value);
-    this.valueCache.set(prop, value ? value[_SOURCE_DATA_] || value : value);
-
-    // attemptCue property observers + derivatives + check for required extension
-    // Note: "attemptCue" will add existing observers + derivatives to MAIN_QUEUE and return true. if there was nothing to add it returns false
-    if (this.attemptCue('set', prop, value, undefined)) {
-
-      if (this.attemptCueParent) {
-        this.attemptCueParent('setChild', this.ownPropertyName, target, {childProperty: prop, mutationType: 'set'});
+      if (instance.parent !== null) {
+        const oldTarget = Array.isArray(target) ? target.slice() : Object.assign({}, target);
+        inQueue += instance.parent.attemptCue.call(instance.parent, instance.ownPropertyName, target, oldTarget);
       }
 
-      if (!isAccumulating) {
-        react();
-      }
+      _set(target, prop, value);
+      instance.valueCache.set(prop, value);
 
-      return true;
-
-    } else if (this.attemptCueParent && this.attemptCueParent('setChild', this.ownPropertyName, target, {childProperty: prop, mutationType: 'set'})) {
-
-      if (!isAccumulating) {
+      if (inQueue > 0 && !isAccumulating) {
         react();
       }
 
       return true;
 
     }
+
+  } else {
+
+    console.warn(`Setting of "${prop}" ignored. Don't mutate state in a reaction. Refactor to computed properties instead.`);
 
   }
 

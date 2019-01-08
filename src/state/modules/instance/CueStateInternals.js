@@ -80,6 +80,16 @@ class CueStateInternals {
 
   }
 
+  removeDerivative(prop) {
+    const derivative = this.derivedProperties.get(prop);
+    derivative.dispose(true);
+    this.derivedProperties.delete(prop);
+    this.derivativesOf.forEach((prop, derivatives) => {
+      const i = derivatives.indexOf(derivative);
+      if (i > -1) derivatives.splice(i, 1);
+    });
+  }
+
   attemptCue(prop, value, oldValue) {
 
     const drv = this.derivativesOf.get(prop);
@@ -93,11 +103,11 @@ class CueStateInternals {
         cueAll(prop, value, oldValue, obs, drv, false);
       }
 
-      return true;
+      return 1;
 
     } else {
 
-      return false;
+      return 0;
 
     }
 
