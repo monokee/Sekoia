@@ -1,5 +1,5 @@
 
-function addComputedsActionsAndImportsToFactoryPrototype(stateFactory, module) {
+function extendStateFactoryPrototype(stateFactory, module) {
 
   let key;
 

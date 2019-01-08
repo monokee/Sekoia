@@ -13,7 +13,7 @@ function createStateFactoryInitializer(name, initializer) {
     const StateFactory = createStateFactory(module);
 
     // Add modules properties to StateFactory.prototype
-    addComputedsActionsAndImportsToFactoryPrototype(StateFactory, module);
+    extendStateFactoryPrototype(StateFactory, module);
 
     // Overwrite this initialization function with the StateFactory
     CUE_STATE_MODULES.set(name, StateFactory);

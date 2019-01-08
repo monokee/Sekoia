@@ -118,42 +118,36 @@ class CueUIComponent {
   observe(state, property, handler, autorun = true) {
 
     const stateInstance = state[__CUE__];
-    const reactions = stateInstance.observersOf;
 
-    if (typeof property === 'string' && typeof handler === 'function') {
+    if (typeof property === 'string') {
 
-      stateInstance.subscribe(property, handler);
+      const boundHandler = stateInstance.addChangeReaction(property, handler, this);
 
       if (autorun === true) {
-        handler({
+        boundHandler({
           property: property,
           value: state[property],
           oldValue: state[property]
         });
       }
 
+      return boundHandler;
+
     } else if (property.constructor === Object && property !== null) {
 
       const _autorun = typeof handler === 'boolean' ? handler : autorun;
+      const boundHandlers = {};
 
-      let prop, hndlr;
+      let prop, boundHandler;
 
       for (prop in property) {
 
-        hndlr = property[prop];
+        boundHandler = stateInstance.addChangeReaction(prop, property[prop], this);
 
-        if (typeof hndlr !== 'function') {
-          throw new TypeError(`Property change reaction for "${prop}" is not a function...`);
-        }
-
-        if (reactions.has(prop)) {
-          reactions.get(prop).push(hndlr);
-        } else {
-          reactions.set(prop, [ hndlr ]);
-        }
+        boundHandlers[prop] = boundHandler;
 
         if (_autorun === true) {
-          hndlr({
+          boundHandler({
             property: prop,
             value: state[prop],
             oldValue: state[prop]
@@ -162,24 +156,26 @@ class CueUIComponent {
 
       }
 
+      return boundHandlers;
+
     }
 
   }
 
-  unobserve(property) {
+  unobserve(state, property, handler) {
 
-    const reactor = REACTORS.get(this.element);
+    const stateInstance = state[__CUE__];
 
-    if (reactor) {
+    if (typeof property === 'string') {
 
-      if (typeof property === 'object' && property) {
-        reactor.unobserveProperties(property);
-      } else {
-        reactor.unobserveProperty(property);
+      stateInstance.removeChangeReaction(property, handler);
+
+    } else if (property.constructor === Object && property !== null) {
+
+      for (const prop in property) {
+        stateInstance.removeChangeReaction(prop, property[prop]);
       }
 
-    } else {
-      throw new ReferenceError(`Can't unobserve because element is not observing any state.`);
     }
 
   }
