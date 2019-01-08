@@ -1,7 +1,37 @@
 
-function proxySetTrap(target, prop, value) {
+function proxySetHandler(target, prop, value) {
 
-  //TODO: set parent and ownPropertyName of values that are cue-states here.
+  if (!isReacting) {
+
+    const instance = target[__CUE__];
+
+    if (typeof value === 'object' && value !== null) {
+
+      const nestedState = value[__CUE__];
+
+      if (nestedState && nestedState.parent === null) {
+        nestedState.parent = target;
+        nestedState.ownPropertyName = prop;
+      }
+
+      const oldValue = instance.valueCache.get(prop);
+
+      if (!areShallowEqual(value, oldValue)) {
+
+        if (instance.attemptCue(prop, value, oldValue)) {
+
+        } else if (instance.parent.attemptCue.call(instance.parent, instance.ownPropertyName, instance.parent, instance.parent)) {
+
+        }
+
+      }
+
+    }
+
+  }
+
+  // TODO: if value and cachedValue are pojo or array, shallow compare
+  // if
 
   if (!isReacting && value !== this.valueCache.get(prop)) {
 

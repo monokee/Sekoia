@@ -20,7 +20,7 @@ function createStateFactory(module) {
 
       StateFactory.prototype = Object.create(Array.prototype);
       Object.setPrototypeOf(statik, StateFactory.prototype);
-      statik.push.apply(statik, deepCloneStateDefaults(module.defaults));
+      statik.push.apply(statik, deepCloneArray(module.defaults));
       CueStateInternals.assignTo(statik);
       statik = wrapStateInProxy(statik);
 
@@ -29,7 +29,7 @@ function createStateFactory(module) {
       StateFactory = props => {
         let instance = [];
         Object.setPrototypeOf(instance, StateFactory.prototype);
-        instance.push.apply(instance, deepCloneStateDefaults(module.defaults));
+        instance.push.apply(instance, deepCloneArray(module.defaults));
         CueStateInternals.assignTo(instance);
         instance = wrapStateInProxy(instance);
         if (module.initialize) {
@@ -60,28 +60,37 @@ function createStateFactory(module) {
       };
 
       StateFactory.prototype = {};
-      statik = Object.assign(
-        Object.create(StateFactory.prototype),
-        deepCloneStateDefaults(module.defaults)
+
+      statik = wrapStateInProxy(
+        CueStateInternals.assignTo(
+          Object.assign(
+            Object.create(StateFactory.prototype),
+            deepClonePlainObject(module.defaults)
+          )
+        )
       );
-      CueStateInternals.assignTo(statik);
-      statik = wrapStateInProxy(statik);
 
     } else {
 
       StateFactory = props => {
-        let instance = Object.assign(
-          Object.create(StateFactory.prototype),
-          deepCloneStateDefaults(module.defaults)
+
+        const instance = wrapStateInProxy( // wrap in proxy
+          CueStateInternals.assignTo( // add __CUE__ instance
+            Object.assign( // core object:
+              Object.create(StateFactory.prototype), // extends factory proto
+              deepClonePlainObject(module.defaults) // is deep clone of defaults
+            )
+          )
         );
-        CueStateInternals.assignTo(instance);
-        instance = wrapStateInProxy(instance);
+
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;
           module.initialize.call(instance, props);
           instance[__CUE__].isInitializing = false;
         }
+
         return instance;
+
       };
 
       StateFactory.prototype = {};

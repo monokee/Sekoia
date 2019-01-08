@@ -1,5 +1,5 @@
 
-function proxyDeleteTrap(target, prop) {
+function proxyDeleteHandler(target, prop) {
 
   if (!isReacting) {
 

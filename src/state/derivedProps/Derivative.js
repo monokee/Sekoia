@@ -14,9 +14,8 @@ class Derivative {
     this.derivatives = []; // other derivatives that depend on this derivative. Allows for downwards traversal.
     this.superDerivatives = []; // if derivative is derived from other derivative(s), set superDerivative(s). Allows for upwards traversal.
 
-    this.dependencyValues = Object.create(null); // property-value cache
-
-    this.observers = []; // collection of observers observing this property
+    this.valueCache = Object.create(null); // property-value cache
+    
     this.stopPropagation = false; // flag for the last observed derivative in a dependency branch (optimization)
 
     this.intermediate = undefined; // intermediate computation result
@@ -36,7 +35,7 @@ class Derivative {
     if (this.needsUpdate) {
 
       // recompute
-      this.intermediate = this.computation.call(null, this.dependencyValues);
+      this.intermediate = this.computation.call(null, this.valueCache);
 
       // compare to previous value (shallow compare objects)
       if (this._value && typeof this._value === 'object' && this.intermediate && typeof this.intermediate === 'object') {
@@ -71,7 +70,7 @@ class Derivative {
   updateProperty(property, value) {
     // update a single dependency of the derivative.
     // the passed value is guaranteed to have changed
-    this.dependencyValues[property] = value;
+    this.valueCache[property] = value;
     // because a dependency has been updated, we need to recompute
     // this.value the next time it is requested.
     this.needsUpdate = true;
@@ -95,12 +94,30 @@ class Derivative {
     derivativeToConnect = null;
 
   }
+  
+  addDependency(prop) {
+    if (this.dependencies.indexOf(prop) === -1) {
+      this.dependencies.push(prop);
+    }
+  }
+  
+  addSubDerivative(derivative) {
+    if (this.derivatives.indexOf(derivative) === -1) {
+      this.derivatives.push(derivative);
+    }
+  }
+  
+  addSuperDerivative(derivative) {
+    if (this.superDerivatives.indexOf(derivative) === -1) {
+      this.superDerivatives.push(derivative);
+    }
+  }
 
   refreshCache(source) {
     // pulls in all dependency values
     for (let i = 0, k; i < this.dependencies.length; i++) {
       k = this.dependencies[i];
-      this.dependencyValues[k] = source[k];
+      this.valueCache[k] = source[k];
     }
     this.needsUpdate = true;
   }
@@ -117,7 +134,7 @@ class Derivative {
     });
 
     // clear anything that could potentially hold on to strong pointers
-    this.dependencyValues = undefined;
+    this.valueCache = undefined;
     this.observers = undefined;
     this.intermediate = undefined;
     this._value = undefined;

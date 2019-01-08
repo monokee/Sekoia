@@ -1,19 +1,18 @@
 
 class CueStateInternals {
 
-  static assignTo(stateInstance) {
+  static assignTo(stateInstance, parent, ownPropertyName) {
     return Object.defineProperty(stateInstance, __CUE__, {
-      value: new this(),
+      value: new this(parent, ownPropertyName),
       configurable: true
     });
   }
 
-  constructor() {
+  constructor(parent = null, ownPropertyName = '') {
     this.uid = Symbol();
-    this.parent = null;
-    this.ownPropertyName = '';
+    this.parent = parent;
+    this.ownPropertyName = ownPropertyName;
     this.isInitializing = false;
-    this.fnCache = new Map();
     this.valueCache = new Map();
     this.observersOf = new Map();
     this.derivativesOf = new Map();
@@ -57,6 +56,26 @@ class CueStateInternals {
 
     } else {
       console.warn(`Can't unobserve property "${property}" because no reaction has been registered for it.`);
+    }
+
+  }
+
+  installDerivativeOf(prop, derivative) {
+
+    if (this.derivativesOf.has(prop)) {
+      this.derivativesOf.get(prop).push(derivative);
+    } else {
+      this.derivativesOf.set(prop, [ derivative ]);
+    }
+
+    // add the property key to the derivatives' dependencies
+    derivative.addDependency(prop);
+
+    // if the property is a derivative itself:
+    if (this.derivedProperties.has(prop)) {
+      const sourceDerivative = this.derivedProperties.get(prop);
+      sourceDerivative.addSubDerivative(derivative);
+      derivative.addSuperDerivative(sourceDerivative);
     }
 
   }

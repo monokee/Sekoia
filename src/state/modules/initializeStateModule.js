@@ -1,6 +1,9 @@
 
 function initializeStateModule(moduleInitializer) {
 
+  // creates a reusable Module. A Module is a blueprint
+  // from which factories can create instances of State.
+
   const config = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_STATE_PROTO) : moduleInitializer;
 
   if (!config || config.constructor !== Object) {
