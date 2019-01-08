@@ -1,5 +1,5 @@
 
-function deepCloneStateInstance(o) {
+function deepCloneStateDefaults(o) {
 
   // Deep cloning for plain Arrays and Objects
 

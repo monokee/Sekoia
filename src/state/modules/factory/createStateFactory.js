@@ -20,8 +20,8 @@ function createStateFactory(module) {
 
       StateFactory.prototype = Object.create(Array.prototype);
       Object.setPrototypeOf(statik, StateFactory.prototype);
-      statik.push.apply(statik, deepCloneStateInstance(module.defaults));
-      assignStateInstanceProperties(statik);
+      statik.push.apply(statik, deepCloneStateDefaults(module.defaults));
+      CueStateInternals.assignTo(statik);
       statik = wrapStateInProxy(statik);
 
     } else {
@@ -29,8 +29,8 @@ function createStateFactory(module) {
       StateFactory = props => {
         let instance = [];
         Object.setPrototypeOf(instance, StateFactory.prototype);
-        instance.push.apply(instance, deepCloneStateInstance(module.defaults));
-        assignStateInstanceProperties(instance);
+        instance.push.apply(instance, deepCloneStateDefaults(module.defaults));
+        CueStateInternals.assignTo(instance);
         instance = wrapStateInProxy(instance);
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;
@@ -60,15 +60,21 @@ function createStateFactory(module) {
       };
 
       StateFactory.prototype = {};
-      statik = Object.assign(Object.create(StateFactory.prototype), deepCloneStateInstance(module.defaults));
-      assignStateInstanceProperties(statik);
+      statik = Object.assign(
+        Object.create(StateFactory.prototype),
+        deepCloneStateDefaults(module.defaults)
+      );
+      CueStateInternals.assignTo(statik);
       statik = wrapStateInProxy(statik);
 
     } else {
 
       StateFactory = props => {
-        let instance = Object.assign(Object.create(StateFactory.prototype), deepCloneStateInstance(module.defaults));
-        assignStateInstanceProperties(instance);
+        let instance = Object.assign(
+          Object.create(StateFactory.prototype),
+          deepCloneStateDefaults(module.defaults)
+        );
+        CueStateInternals.assignTo(instance);
         instance = wrapStateInProxy(instance);
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;

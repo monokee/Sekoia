@@ -8,9 +8,7 @@ class CueUIComponent {
   constructor(element, imports, styles, keyframes) {
 
     this.element = element;
-
     this.imports = imports;
-
     this.keyframes = keyframes;
     this.styles = styles;
 
