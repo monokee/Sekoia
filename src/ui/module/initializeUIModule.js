@@ -1,5 +1,5 @@
 
-function initializeUIModule(moduleInitializer) { // runs only once per modules
+function initializeUIModule(moduleInitializer) { // runs only once per module
 
   // initializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
   const CONFIG = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_UI_PROTO) : moduleInitializer;

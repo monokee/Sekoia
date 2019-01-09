@@ -92,7 +92,7 @@ class CueUIComponent {
     // "update" is a function that updates existing elements. It requires two arguments: (domElement, newData). How the newData is rendered into the domElement is specified explicitly in the function body.
     // "update" defaults to noop because in most cases property / attribute updates are handled by children themselves
     // "update" is only required for non-reactive or primitive children in data array
-    // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive state modules
+    // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive state module
 
     // fast path clear all
     if (to.length === 0) {

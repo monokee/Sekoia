@@ -5,7 +5,7 @@ function createComponentFactory(initializer) {
 
   return state => {
 
-    // lazily initialize the modules
+    // lazily initialize the module
     module || (module = initializeUIModule(initializer));
 
     // create new UI Component Instance

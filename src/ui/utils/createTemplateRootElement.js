@@ -10,7 +10,7 @@ function createTemplateRootElement(x) {
       case '.': return document.getElementsByClassName(x.substring(1))[0];
       case '#': return document.getElementById(x.substring(1));
       case '[': return document.querySelectorAll(x)[0];
-      default:  return document.createTextNode(x);
+      default:  throw new TypeError(`Can't create template from string because it's not html markup or a valid selector.`);
     }
 
   } else if (x instanceof Element) {

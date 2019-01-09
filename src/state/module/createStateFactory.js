@@ -7,7 +7,7 @@ function createStateFactory(module) {
 
     if (module.static) {
 
-      let statik = [];
+      let statik;
 
       StateFactory = props => {
         if (module.initialize) {
@@ -19,25 +19,37 @@ function createStateFactory(module) {
       };
 
       StateFactory.prototype = Object.create(Array.prototype);
-      Object.setPrototypeOf(statik, StateFactory.prototype);
-      statik.push.apply(statik, deepCloneArray(module.defaults));
-      CueStateInternals.assignTo(statik);
-      statik = createProxy(statik);
+
+      statik = createProxy(
+        CueStateInternals.assignTo(
+          appendToArray(
+            Object.setPrototypeOf([], StateFactory.prototype),
+            deepCloneArray(module.defaults)
+          )
+        )
+      );
 
     } else {
 
       StateFactory = props => {
-        let instance = [];
-        Object.setPrototypeOf(instance, StateFactory.prototype);
-        instance.push.apply(instance, deepCloneArray(module.defaults));
-        CueStateInternals.assignTo(instance);
-        instance = createProxy(instance);
+
+        const instance = createProxy(
+          CueStateInternals.assignTo(
+            appendToArray(
+              Object.setPrototypeOf([], StateFactory.prototype),
+              deepCloneArray(module.defaults)
+            )
+          )
+        );
+
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;
           module.initialize.call(instance, props);
           instance[__CUE__].isInitializing = false;
         }
+
         return instance;
+
       };
 
       StateFactory.prototype = Object.create(Array.prototype);
