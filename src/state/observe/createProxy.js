@@ -1,5 +1,5 @@
 
-function wrapStateInProxy(stateInstance) {
+function createProxy(stateInstance) {
 
   return new Proxy(stateInstance, {
     get: proxyGetHandler,

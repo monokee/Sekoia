@@ -22,7 +22,7 @@ function createStateFactory(module) {
       Object.setPrototypeOf(statik, StateFactory.prototype);
       statik.push.apply(statik, deepCloneArray(module.defaults));
       CueStateInternals.assignTo(statik);
-      statik = wrapStateInProxy(statik);
+      statik = createProxy(statik);
 
     } else {
 
@@ -31,7 +31,7 @@ function createStateFactory(module) {
         Object.setPrototypeOf(instance, StateFactory.prototype);
         instance.push.apply(instance, deepCloneArray(module.defaults));
         CueStateInternals.assignTo(instance);
-        instance = wrapStateInProxy(instance);
+        instance = createProxy(instance);
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;
           module.initialize.call(instance, props);
@@ -61,7 +61,7 @@ function createStateFactory(module) {
 
       StateFactory.prototype = {};
 
-      statik = wrapStateInProxy(
+      statik = createProxy(
         CueStateInternals.assignTo(
           Object.assign(
             Object.create(StateFactory.prototype),
@@ -74,7 +74,7 @@ function createStateFactory(module) {
 
       StateFactory = props => {
 
-        const instance = wrapStateInProxy( // wrap in proxy
+        const instance = createProxy( // wrap in proxy
           CueStateInternals.assignTo( // add __CUE__ instance
             Object.assign( // core object:
               Object.create(StateFactory.prototype), // extends factory proto
