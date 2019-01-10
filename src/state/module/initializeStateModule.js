@@ -61,8 +61,11 @@ function initializeStateModule(moduleInitializer) {
 
   // TODO: Create static dependency graph for derived properties in the module.
   // this dependency graph is a map of {key: property names ->TO-> value: an array of virtual derivatives which are being derived from the key property name.}
-  // for setup we can either: json.stringify the arguments object and parse properties from this
-  // or (probably the better approach) create a proxy just for derivative setup, with a special get handler that installs the properties into the virtual derivatives (just like the current implementation, but pre-instantiation time)
+  // for setup we can create a proxy just for derivative setup, with a special get handler that installs the properties
+  // into the virtual derivatives (just like the current implementation, but pre-instantiation time)
+  // We should account for unordered dependencies and traverse the derivatives and properties as implemented in current
+  // "setupDerivatives" loop.
+  // When a module is instantiated, we create instances of derivatives with their dependency graph already set up.
 
   // Collect all methods except "initialize" on action object
   for (prop in config) {
