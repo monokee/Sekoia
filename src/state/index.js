@@ -6,7 +6,14 @@ const CUE_STATE_MODULES = new Map();
 // #State Variables
 let isReacting = false; // is a reaction currently in process?
 let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
-let derivativeToConnect = null; // Installer payload for derivatives
+
+// Global derivative installer payload
+const DERIVATIVE_INSTALLER = {
+  derivative: null,
+  allProperties: null,
+  dependencyGraph: null,
+  derivedProperties: null
+};
 
 // Traversal Directions
 const TRAVERSE_DOWN = -1;

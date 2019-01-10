@@ -10,11 +10,6 @@ function proxyGetHandler(target, prop) {
     return target;
   }
 
-  if (derivativeToConnect !== null) {
-    target[__CUE__].installDerivativeOf(prop, derivativeToConnect);
-    return;
-  }
-
   const value = _get(target, prop);
 
   if (!value || value[__CUE__]) {

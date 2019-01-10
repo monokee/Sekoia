@@ -18,9 +18,9 @@ function initializeStateModule(moduleInitializer) {
 
   const module = {
     defaults: type === 'array' ? [] : {},
-    derivatives: {
-      computations: new Map(), // derivedPropertyName -> computationFunction
-      dependencies: new Map()  // anyPropertyName -> [ ...vDerivatives = { derivedPropertyName: string, computation: function, subDerivatives: [...derivedPropertyNames], superDerivatives: [...derivedPropertyNames] } ]
+    computed: {
+      derivedProperties: new Map(),
+      dependencyGraph: new Map()
     },
     initialize: undefined,
     actions: {},
@@ -28,16 +28,20 @@ function initializeStateModule(moduleInitializer) {
     imports: config.imports,
   };
 
-  // Split props into default and computed properties
-
+  // 1. Split props into default and computed properties
   let prop, i, val;
-
   if (type === 'array') {
 
     for (i = 0; i < config.props.length; i++) {
       val = config.props[i];
       if (typeof val === 'function') {
-        module.derivatives.computations.set(i, val);
+        module.computed.derivedProperties.set(i, {
+          ownPropertyName: i,
+          computation: val,
+          sourceProperties: [],
+          subDerivatives: [],
+          superDerivatives: []
+        });
       } else {
         module.defaults.push(val);
       }
@@ -50,7 +54,13 @@ function initializeStateModule(moduleInitializer) {
       val = config.props[prop];
 
       if (typeof val === 'function') {
-        module.derivatives.computations.set(prop, val);
+        module.computed.derivedProperties.set(prop, {
+          ownPropertyName: prop,
+          computation: val,
+          sourceProperties: [],
+          subDerivatives: [],
+          superDerivatives: []
+        });
       } else {
         module.defaults[prop] = val;
       }
@@ -59,15 +69,13 @@ function initializeStateModule(moduleInitializer) {
 
   }
 
-  // TODO: Create static dependency graph for derived properties in the module.
-  // this dependency graph is a map of {key: property names ->TO-> value: an array of virtual derivatives which are being derived from the key property name.}
-  // for setup we can create a proxy just for derivative setup, with a special get handler that installs the properties
-  // into the virtual derivatives (just like the current implementation, but pre-instantiation time)
-  // We should account for unordered dependencies and traverse the derivatives and properties as implemented in current
-  // "setupDerivatives" loop.
-  // When a module is instantiated, we create instances of derivatives with their dependency graph already set up.
+  // 2. Install dependencies of derivatives by connecting properties
+  installDependencies(config.props, module);
 
-  // Collect all methods except "initialize" on action object
+  // 3. Resolve dependencies and sort derivatives topologically
+  module.computed.derivedProperties = OrderedDerivatives.from(module.computed.derivedProperties);
+
+  // 4. Collect all methods except "initialize" on action object
   for (prop in config) {
 
     val = config[prop];

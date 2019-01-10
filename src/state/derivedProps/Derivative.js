@@ -1,5 +1,6 @@
 
-// Derived Property
+// Derived Property Instance
+// TODO: needs to inherit dependency graph from Module!
 class Derivative {
 
   constructor(parent, ownPropertyName, computation) {
@@ -10,8 +11,8 @@ class Derivative {
     this.ownPropertyName = ownPropertyName;
     this.computation = computation; // the function that computes a result from data points on the source
 
-    this.dependencies = []; // property names this derivative depends on
-    this.derivatives = []; // other derivatives that depend on this derivative. Allows for downwards traversal.
+    this.sourceProperties = []; // property names this derivative depends on
+    this.subDerivatives = []; // other derivatives that depend on this derivative. Allows for downwards traversal.
     this.superDerivatives = []; // if derivative is derived from other derivative(s), set superDerivative(s). Allows for upwards traversal.
 
     this.valueCache = Object.create(null); // property-value cache

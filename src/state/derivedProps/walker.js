@@ -26,9 +26,9 @@ function unflagAllSuperDerivativesOf(derivative) {
 
 function flagDeepestObservedSubDerivativesOf(derivative, inclusive = true) {
   derivative.stopPropagation = inclusive; // can be self
-  if (derivative.derivatives.length) {
-    for (let i = 0, subDerivative; i < derivative.derivatives.length; i++) {
-      subDerivative = derivative.derivatives[i];
+  if (derivative.subDerivatives.length) {
+    for (let i = 0, subDerivative; i < derivative.subDerivatives.length; i++) {
+      subDerivative = derivative.subDerivatives[i];
       if (subDerivative.observers.length) {
         derivative.stopPropagation = false;
         flagDeepestObservedSubDerivativesOf(subDerivative);
