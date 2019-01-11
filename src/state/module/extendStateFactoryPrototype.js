@@ -7,39 +7,26 @@ function extendStateFactoryPrototype(stateFactory, module) {
 
   let key;
 
-  // Computed Properties as Getters
+  // Computed Properties
   for (key in module.computed) {
     Object.defineProperty(stateFactory.prototype, key, {
-      get() {
-        return this[__CUE__].derivedProperties.get(key).value
+      get() { // forward requests to Derivative.value getter
+        return this[__CUE__].derivedProperties.get(key).value;
       },
-      configurable: true
+      configurable: true,
+      enumerable: true
     });
   }
 
   // Actions
   for (key in module.actions) {
-    Object.defineProperty(stateFactory.prototype, key, {
-      value: module.actions[key],
-      configurable: true
-    });
+    stateFactory.prototype[key] = module.actions[key];
   }
 
-  // Other Properties shared on the Prototype
-  Object.defineProperties(stateFactory.prototype, {
+  // Imports
+  stateFactory.prototype.imports = module.imports;
 
-    // public
-    imports: {
-      value: module.imports,
-      configurable: true
-    },
-
-    // private
-    [__INTERCEPTED_METHODS__]: {
-      value: new Map(),
-      configurable: true
-    }
-
-  });
+  // (private) intercepted method cache
+  stateFactory.prototype[__INTERCEPTED_METHODS__] = new Map();
 
 }

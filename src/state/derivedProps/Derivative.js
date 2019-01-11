@@ -2,16 +2,15 @@
 // Derived Property Instance
 class Derivative {
 
-  constructor(parent, ownPropertyName, computation, sourceProperties) {
+  constructor(ownPropertyName, computation, sourceProperties) {
 
-    this.parent = parent; // TODO: not sure we need this
-    this.ownPropertyName = ownPropertyName; // same as above...
-
+    this.ownPropertyName = ownPropertyName;
     this.computation = computation; // the function that computes a result from data points on the source
     this.sourceProperties = sourceProperties; // property names this derivative depends on
 
     this.subDerivatives = []; // other derivatives that depend on this derivative. Allows for downwards traversal.
     this.superDerivatives = []; // if derivative is derived from other derivative(s), set superDerivative(s). Allows for upwards traversal.
+    this.observers = [];
 
     this.valueCache = Object.create(null); // property-value cache
 
@@ -60,18 +59,6 @@ class Derivative {
     this.needsUpdate = true;
   }
 
-  addSubDerivative(derivative) {
-    if (this.subDerivatives.indexOf(derivative) === -1) {
-      this.subDerivatives.push(derivative);
-    }
-  }
-  
-  addSuperDerivative(derivative) {
-    if (this.superDerivatives.indexOf(derivative) === -1) {
-      this.superDerivatives.push(derivative);
-    }
-  }
-
   fillCache(source) {
     // pulls in all dependency values from source object
     for (let i = 0, k; i < this.sourceProperties.length; i++) {
@@ -93,7 +80,7 @@ class Derivative {
 
     // remove self from any superDerivatives
     for (i = 0; i < this.superDerivatives.length; i++) {
-      this.superDerivatives[i].derivatives = this.superDerivatives[i].derivatives.filter(d => d !== this);
+      this.superDerivatives[i].subDerivatives = this.superDerivatives[i].subDerivatives.filter(d => d !== this);
       // reset end of observation
       flagClosestObservedSuperDerivativesOf(this.superDerivatives[i], true);
     }

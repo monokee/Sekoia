@@ -78,9 +78,7 @@ const CUE_APP_PROTO = create(CUE_PROTO, {
 
       const rootState = typeof this.RootState === 'function' ? this.RootState(initialProps) : this.RootState;
 
-      STORE.ROOT = Observable.create(rootState, STORE, 'ROOT');
-
-      CUE_ROOT_COMPONENT_PARENT.appendChild(this.RootComponent(STORE.ROOT));
+      CUE_ROOT_COMPONENT_PARENT.appendChild(this.RootComponent(createProxy(StateInternals.assignTo(rootState))));
 
     }
 

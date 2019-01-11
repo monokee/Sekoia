@@ -17,7 +17,7 @@ function proxyGetHandler(target, prop) {
   }
 
   if (isArray(value) || value.constructor === Object) {
-    return createProxy(StateInstance.assignTo(value, target, prop));
+    return createProxy(StateInternals.assignTo(value, target, prop));
   }
 
   if (ARRAY_MUTATORS.has(prop) && typeof value === 'function') {

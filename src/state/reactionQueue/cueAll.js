@@ -35,7 +35,7 @@ function cueAll(prop, value, oldValue, observers, derivatives, stopPropagation) 
       result = item.value; // calls "getter" -> recomputes _value
 
       if (item.hasChanged) { // has value changed after recomputation -> recurse
-        cueAll(item.ownPropertyName, result, previous, item.observers, item.derivatives, item.stopPropagation);
+        cueAll(item.ownPropertyName, result, previous, item.observers, item.subDerivatives, item.stopPropagation);
       }
 
     }

@@ -20,13 +20,13 @@ function createStateFactory(module) {
 
       StateFactory.prototype = Object.create(Array.prototype);
 
-      statik = createProxy(StateInstance.create('array', StateFactory, module));
+      statik = createProxy(createStateInstance('array', StateFactory, module));
 
     } else {
 
       StateFactory = props => {
 
-        const instance = createProxy(StateInstance.create('array', StateFactory, module));
+        const instance = createProxy(createStateInstance('array', StateFactory, module));
 
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;
@@ -59,13 +59,13 @@ function createStateFactory(module) {
 
       StateFactory.prototype = {};
 
-      statik = createProxy(StateInstance.create('object', StateFactory, module));
+      statik = createProxy(createStateInstance('object', StateFactory, module));
 
     } else {
 
       StateFactory = props => {
 
-        const instance = createProxy(StateInstance.create('object', StateFactory, module));
+        const instance = createProxy(createStateInstance('object', StateFactory, module));
 
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;
