@@ -1,18 +1,18 @@
 
-assign(CUE_PROTO, {
+oAssign(CUE_PROTO, {
 
   flattenArray(multiDimensionalArray) {
-    return multiDimensionalArray.reduce((x, y) => x.concat(Array.isArray(y) ? this.flattenArray(y) : y), []);
+    return multiDimensionalArray.reduce((x, y) => x.concat(isArray(y) ? this.flattenArray(y) : y), []);
   },
 
   insertAtEvery(array, item, step) {
 
     // Insert an item every step items.
-    step = Math.max(step, 1);
+    step = MAX(step, 1);
 
     const sl = array.length; // source length
-    const tl = Math.floor(sl + (sl / step)); // target length
-    const cl = Math.floor(tl / step); // target chunk length
+    const tl = FLOOR(sl + (sl / step)); // target length
+    const cl = FLOOR(tl / step); // target chunk length
 
     let newArray = [];
 
@@ -28,7 +28,7 @@ assign(CUE_PROTO, {
 
       } else {
 
-        const tail = Math.max(tl - newArray.length, 0);
+        const tail = MAX(tl - newArray.length, 0);
         newArray = newArray.concat(array.slice(sl - tail, sl + 1));
         break;
 
@@ -43,7 +43,7 @@ assign(CUE_PROTO, {
   },
 
   removeAtEvery(array, step) {
-    let i = Math.floor(array.length / step);
+    let i = FLOOR(array.length / step);
     while (i--) array.splice((i + 1) * step - 1, 1);
     return this;
   },
@@ -55,7 +55,7 @@ assign(CUE_PROTO, {
 
   mergeArrays(array1, array2, at = array1.length) {
 
-    at = Math.min(Math.max(at, 0), array1.length);
+    at = MIN(MAX(at, 0), array1.length);
 
     const il = array2.length;
     const tl = array1.length - at;
@@ -78,7 +78,7 @@ assign(CUE_PROTO, {
     let a = 0, b = 0, c = 0, d = 0;
 
     for (let i = 1; i < ol; i++) {
-      a = i * s; b = Math.floor(a); c = Math.ceil(a); d = a - b;
+      a = i * s; b = FLOOR(a); c = CEIL(a); d = a - b;
       array[i] = array[b] + (array[c] - array[b]) * d;
     }
 
@@ -91,7 +91,7 @@ assign(CUE_PROTO, {
   closestValueInArray(array, val) {
     // get closest match to value in array
     return array.reduce((prev, curr) => {
-      return (Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+      return (ABS(curr - val) < ABS(prev - val) ? curr : prev);
     });
   },
 

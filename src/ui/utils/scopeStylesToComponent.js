@@ -16,12 +16,12 @@ function scopeStylesToComponent(styles, template) {
       if (classRule[0] === ':' || classRule[0] === ' ') {
         pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName}${classRule} {}`, CUE_UI_STYLESHEET.cssRules.length);
         pseudoRuleStyle = CUE_UI_STYLESHEET.cssRules[pseudoRuleIndex].style;
-        Object.assign(pseudoRuleStyle, classRules[classRule]);
+        oAssign(pseudoRuleStyle, classRules[classRule]);
         delete classRules[classRule];
       }
     }
 
-    Object.assign(ruleStyle, classRules);
+    oAssign(ruleStyle, classRules);
     styles[className] = uniqueClassName;
 
     if (template) {

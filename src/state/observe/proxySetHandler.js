@@ -22,7 +22,7 @@ function proxySetHandler(target, prop, value) {
       let inQueue = instance.attemptCue(prop, value, oldValue);
 
       if (instance.parent !== null) {
-        const oldTarget = Array.isArray(target) ? target.slice() : Object.assign({}, target);
+        const oldTarget = isArray(target) ? target.slice() : oAssign({}, target);
         inQueue += instance.parent.attemptCue.call(instance.parent, instance.ownPropertyName, target, oldTarget);
       }
 

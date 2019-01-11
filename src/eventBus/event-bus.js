@@ -40,7 +40,7 @@
 
   // Public API
 
-  defineProperties(Cue, {
+  oDefineProperties(Cue, {
 
     on: {
       

@@ -9,7 +9,7 @@ function createComponentFactory(initializer) {
     module || (module = initializeUIModule(initializer));
 
     // create new UI Component Instance
-    const component = new CueComponent(
+    const component = new CueUIComponent(
       module.template.cloneNode(true),
       module.imports,
       module.styles,

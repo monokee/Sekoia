@@ -1,5 +1,5 @@
 
-assign(CUE_PROTO, {
+oAssign(CUE_PROTO, {
 
   createUID() {
 
@@ -22,7 +22,7 @@ assign(CUE_PROTO, {
   camelCase(dashed_string) {
     const c = document.createElement('div');
     c.setAttribute(`data-${dashed_string}`, '');
-    return Object.keys(c.dataset)[0];
+    return oKeys(c.dataset)[0];
   },
 
   dashedCase(camelString) {

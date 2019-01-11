@@ -1,6 +1,6 @@
 
 // Cue-State Prototype Object extends Cue-Prototype Object
-const CUE_STATE_PROTO = create(CUE_PROTO, {
+const CUE_STATE_PROTO = oCreate(CUE_PROTO, {
 
   import: {
     value: function(name) {

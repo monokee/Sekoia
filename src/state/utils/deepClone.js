@@ -7,7 +7,7 @@ function deepCloneObjectOrArray(o) {
     return deepClonePlainObject(o);
   }
 
-  if (Array.isArray(o)) {
+  if (isArray(o)) {
     return deepCloneArray(o);
   }
 

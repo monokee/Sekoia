@@ -4,7 +4,7 @@ let CUE_ROOT_STATE = null;
 let CUE_ROOT_COMPONENT_PARENT = document.body;
 let CUE_ROOT_COMPONENT = null;
 
-const CUE_APP_PROTO = create(CUE_PROTO, {
+const CUE_APP_PROTO = oCreate(CUE_PROTO, {
 
   RootState: {
 

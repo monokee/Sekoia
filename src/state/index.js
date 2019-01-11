@@ -23,10 +23,6 @@ const TRAVERSE_UP = 1;
 const __CUE__ = Symbol('🍑');
 const __TARGET__ = Symbol('Target Object');
 const __INTERCEPTED_METHODS__ = Symbol('Intercepted Methods');
-const _IS_DERIVATIVE_ = Symbol('IsValueDerived');
-
-// Root Store
-const STORE = { ROOT: undefined };
 
 // Reaction Queue
 const MAIN_QUEUE = [];

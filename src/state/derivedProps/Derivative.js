@@ -12,7 +12,7 @@ class Derivative {
     this.superDerivatives = []; // if derivative is derived from other derivative(s), set superDerivative(s). Allows for upwards traversal.
     this.observers = [];
 
-    this.valueCache = Object.create(null); // property-value cache
+    this.valueCache = oCreate(null); // property-value cache
 
     this.intermediate = undefined; // intermediate computation result
     this._value = undefined; // current computation result

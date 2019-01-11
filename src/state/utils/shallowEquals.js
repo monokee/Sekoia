@@ -29,8 +29,8 @@ function areShallowEqual(a, b) {
 
 function arePlainObjectsShallowEqual(a, b) {
 
-  const keysA = objKeys(a);
-  const keysB = objKeys(b);
+  const keysA = oKeys(a);
+  const keysB = oKeys(b);
 
   if (keysA.length !== keysB.length) {
     return false;

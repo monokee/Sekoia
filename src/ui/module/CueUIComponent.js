@@ -14,8 +14,8 @@ class CueUIComponent {
 
     // In case component-scope classes have been generated in a styles object, we map default classNames to unique classNames internally.
     // overwrite element.classList with mapped implementation
-    if (styles && Object.keys(styles).length) {
-      Object.defineProperty(element, 'classList', {
+    if (styles && oKeys(styles).length) {
+      oDefineProperty(element, 'classList', {
         value: new MappedClassList(styles, element),
         enumerable: true,
         writable: false,

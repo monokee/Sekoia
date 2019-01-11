@@ -1,5 +1,5 @@
 
-assign(CUE_PROTO, {
+oAssign(CUE_PROTO, {
 
   deepClone(o) {
 
@@ -44,7 +44,7 @@ assign(CUE_PROTO, {
     }
 
     if (o.constructor === Object) {
-      return Object.assign({}, o);
+      return oAssign({}, o);
     }
 
   },
@@ -64,9 +64,9 @@ assign(CUE_PROTO, {
 
       if (typeA === typeof b) { // same type (can be object and array!)
 
-        const bIsArray = Array.isArray(b);
+        const bIsArray = isArray(b);
 
-        if (Array.isArray(a) && bIsArray) { // array::array
+        if (isArray(a) && bIsArray) { // array::array
 
           if (a.length !== b.length) { // length mismatch
             return false;
@@ -108,8 +108,8 @@ assign(CUE_PROTO, {
     // Plain Objects
     if (a.constructor === Object && b.constructor === Object) {
 
-      const keysA = objKeys(a);
-      const keysB = objKeys(b);
+      const keysA = oKeys(a);
+      const keysB = oKeys(b);
 
       if (keysA.length !== keysB.length) {
         return false;

@@ -1,6 +1,6 @@
 
 // Public API: Cue.State [function]
-defineProperty(Cue, 'State', {
+oDefineProperty(Cue, 'State', {
   value: function(name, moduleInitializer) {
 
     if (typeof name !== 'string') {

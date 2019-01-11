@@ -2,7 +2,7 @@
 function installDependencies(props, { computed }) {
 
   // set the current installer payload
-  Object.assign(DERIVATIVE_INSTALLER, {
+  oAssign(DERIVATIVE_INSTALLER, {
     allProperties: props,
     dependencyGraph: computed.dependencyGraph,
     derivedProperties: computed.entities

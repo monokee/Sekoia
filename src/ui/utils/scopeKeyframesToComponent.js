@@ -16,7 +16,7 @@ function scopeKeyframesToComponent(keyframes) {
       framesSheet.appendRule(`${percent}% {}`);
       index = framesSheet.cssRules.length - 1;
       style = framesSheet.cssRules[index].style;
-      Object.assign(style, frames[percent]);
+      oAssign(style, frames[percent]);
     }
 
     keyframes[name] = uniqueName;

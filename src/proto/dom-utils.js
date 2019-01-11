@@ -1,6 +1,6 @@
 
 //TODO: most likely obsolete -> replaced by UI Prototype
-assign(CUE_PROTO, {
+oAssign(CUE_PROTO, {
   
   createElement(tagName, options, target) {
 
@@ -242,7 +242,7 @@ assign(CUE_PROTO, {
     return Promise.all(nodes.map(node => {
       if (this.transitionEventTypes.end) {
         return new Promise(resolve => {
-          const handler = e => {
+          const handler = () => {
             node.removeEventListener(this.transitionEventTypes.end, handler);
             resolve();
           };

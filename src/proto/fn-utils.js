@@ -1,5 +1,5 @@
 
-assign(CUE_PROTO, {
+oAssign(CUE_PROTO, {
 
   throttle(func, rate = 250, scope = null) {
 

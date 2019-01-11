@@ -3,8 +3,8 @@ function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
 
   // 1. Create base instance
   const instance = type === 'object'
-    ? Object.assign(Object.create(factory.prototype), deepClonePlainObject(module.defaults))
-    : appendToArray(Object.setPrototypeOf([], factory.prototype), deepCloneArray(module.defaults));
+    ? oAssign(oCreate(factory.prototype), deepClonePlainObject(module.defaults))
+    : appendToArray(oSetPrototypeOf([], factory.prototype), deepCloneArray(module.defaults));
 
   // 2. Assign Internals (__CUE__)
   const internal = instance[__CUE__] = new StateInternals(_parent, _ownPropertyName);

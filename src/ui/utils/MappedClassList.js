@@ -14,12 +14,12 @@ class MappedClassList {
       throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object, 2D Array or a Map but is ${JSON.stringify(map)}.`);
     } else if (map.constructor === Object) {
       map = new Map(Object.entries(map));
-    } else if (Array.isArray(map)) {
+    } else if (isArray(map)) {
       map = new Map(map);
     }
     
     // internalize map and original classList
-    Object.defineProperties(this, {
+    oDefineProperties(this, {
       [__mappedClassNames__]: {
         value: map
       },

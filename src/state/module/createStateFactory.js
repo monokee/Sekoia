@@ -3,7 +3,7 @@ function createStateFactory(module) {
 
   let StateFactory;
 
-  if (Array.isArray(module.defaults)) {
+  if (isArray(module.defaults)) {
 
     if (module.static) {
 
@@ -18,7 +18,7 @@ function createStateFactory(module) {
         return statik;
       };
 
-      StateFactory.prototype = Object.create(Array.prototype);
+      StateFactory.prototype = oCreate(Array.prototype);
 
       statik = createProxy(createStateInstance('array', StateFactory, module));
 
@@ -38,7 +38,7 @@ function createStateFactory(module) {
 
       };
 
-      StateFactory.prototype = Object.create(Array.prototype);
+      StateFactory.prototype = oCreate(Array.prototype);
 
     }
 

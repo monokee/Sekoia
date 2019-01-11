@@ -1,5 +1,5 @@
 
-defineProperty(Cue, 'UI', {
+oDefineProperty(Cue, 'UI', {
 
   value: function (name, moduleInitializer) {
 

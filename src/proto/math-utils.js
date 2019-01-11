@@ -1,5 +1,5 @@
 
-assign(CUE_PROTO, {
+oAssign(CUE_PROTO, {
 
   clamp(min, max, val) {
     return MAX(min, MIN(max, val));

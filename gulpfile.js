@@ -41,26 +41,63 @@ gulp.task('build-lib', function() {
       `${src.plugins}/public-api.js`,
     ],
     state: [
+
       `${src.state}/index.js`,
-      `${src.state}/state-proto.js`,
-      `${src.state}/observable.js`,
-      `${src.state}/observer.js`,
-      `${src.state}/derivatives.js`,
-      `${src.state}/reaction-cue.js`,
+      `${src.state}/proto.js`,
+
+      `${src.state}/utils/*.js`,
+
+      `${src.state}/derivedProps/Derivative.js`,
+      `${src.state}/derivedProps/OrderedDerivatives.js`,
+      `${src.state}/derivedProps/installDependencies.js`,
+      `${src.state}/derivedProps/dependencyGetInterceptor.js`,
+      `${src.state}/derivedProps/branchWalkers.js`,
+
+      `${src.state}/observe/createProxy.js`,
+      `${src.state}/observe/proxyGetHandler.js`,
+      `${src.state}/observe/proxySetHandler.js`,
+      `${src.state}/observe/proxyDeleteHandler.js`,
+      `${src.state}/observe/createInterceptedArrayMutator.js`,
+
+      `${src.state}/reactionQueue/cueAll.js`,
+      `${src.state}/reactionQueue/cueImmediate.js`,
+      `${src.state}/reactionQueue/cueAccumulated.js`,
+      `${src.state}/reactionQueue/react.js`,
+
+      `${src.state}/module/StateInternals.js`,
+      `${src.state}/module/createStateInstance.js`,
+      `${src.state}/module/createStateFactory.js`,
+      `${src.state}/module/extendStateFactoryPrototype.js`,
+      `${src.state}/module/initializeStateModule.js`,
+      `${src.state}/module/createStateFactoryInitializer.js`,
+
       `${src.state}/public-api.js`
+
     ],
     ui: [
+
       `${src.ui}/index.js`,
-      `${src.ui}/ui-proto.js`,
-      `${src.ui}/reactor.js`,
-      `${src.ui}/mapped-classList.js`,
-      `${src.ui}/scoped-css.js`,
-      `${src.ui}/reconcile.js`,
-      `${src.ui}/ui-wrapper.js`,
+      `${src.ui}/proto.js`,
+
+      `${src.ui}/utils/MappedClassList.js`,
+      `${src.ui}/utils/CueStylesheet.js`,
+      `${src.ui}/utils/createUniqueClassName.js`,
+      `${src.ui}/utils/replaceClassNameInElement.js`,
+      `${src.ui}/utils/scopeStylesToComponent.js`,
+      `${src.ui}/utils/scopeKeyframesToComponent.js`,
+      `${src.ui}/utils/createTemplateRootElement.js`,
+      `${src.ui}/utils/reconcile.js`,
+      `${src.ui}/utils/longestIncreasingSubsequence.js`,
+
+      `${src.ui}/module/CueUIComponent.js`,
+      `${src.ui}/module/initializeUIModule.js`,
+      `${src.ui}/module/createComponentFactory.js`,
+
       `${src.ui}/public-api.js`
+
     ],
     app: [
-      `${src.app}/app-proto.js`,
+      `${src.app}/proto.js`,
       `${src.app}/public-api.js`,
     ]
   };
