@@ -20,27 +20,13 @@ function createStateFactory(module) {
 
       StateFactory.prototype = Object.create(Array.prototype);
 
-      statik = createProxy(
-        CueStateInternals.assignTo(
-          appendToArray(
-            Object.setPrototypeOf([], StateFactory.prototype),
-            deepCloneArray(module.defaults)
-          )
-        )
-      );
+      statik = createProxy(StateInstance.create('array', StateFactory, module));
 
     } else {
 
       StateFactory = props => {
 
-        const instance = createProxy(
-          CueStateInternals.assignTo(
-            appendToArray(
-              Object.setPrototypeOf([], StateFactory.prototype),
-              deepCloneArray(module.defaults)
-            )
-          )
-        );
+        const instance = createProxy(StateInstance.create('array', StateFactory, module));
 
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;
@@ -73,27 +59,13 @@ function createStateFactory(module) {
 
       StateFactory.prototype = {};
 
-      statik = createProxy(
-        CueStateInternals.assignTo(
-          Object.assign(
-            Object.create(StateFactory.prototype),
-            deepClonePlainObject(module.defaults)
-          )
-        )
-      );
+      statik = createProxy(StateInstance.create('object', StateFactory, module));
 
     } else {
 
       StateFactory = props => {
 
-        const instance = createProxy( // wrap in proxy
-          CueStateInternals.assignTo( // add __CUE__ instance
-            Object.assign( // core object:
-              Object.create(StateFactory.prototype), // extends factory proto
-              deepClonePlainObject(module.defaults) // is deep clone of defaults
-            )
-          )
-        );
+        const instance = createProxy(StateInstance.create('object', StateFactory, module));
 
         if (module.initialize) {
           instance[__CUE__].isInitializing = true;

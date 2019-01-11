@@ -19,8 +19,8 @@ function initializeStateModule(moduleInitializer) {
   const module = {
     defaults: type === 'array' ? [] : {},
     computed: {
-      derivedProperties: new Map(),
-      dependencyGraph: new Map()
+      entities: new Map(), // key -> vDerivative (resolved & ordered)
+      dependencyGraph: new Map() // key -> [...vDerivatives] (unordered)
     },
     initialize: undefined,
     actions: {},
@@ -35,7 +35,7 @@ function initializeStateModule(moduleInitializer) {
     for (i = 0; i < config.props.length; i++) {
       val = config.props[i];
       if (typeof val === 'function') {
-        module.computed.derivedProperties.set(i, {
+        module.computed.entities.set(i, {
           ownPropertyName: i,
           computation: val,
           sourceProperties: [],
@@ -54,7 +54,7 @@ function initializeStateModule(moduleInitializer) {
       val = config.props[prop];
 
       if (typeof val === 'function') {
-        module.computed.derivedProperties.set(prop, {
+        module.computed.entities.set(prop, {
           ownPropertyName: prop,
           computation: val,
           sourceProperties: [],
@@ -73,7 +73,7 @@ function initializeStateModule(moduleInitializer) {
   installDependencies(config.props, module);
 
   // 3. Resolve dependencies and sort derivatives topologically
-  module.computed.derivedProperties = OrderedDerivatives.from(module.computed.derivedProperties);
+  module.computed.entities = OrderedDerivatives.from(module.computed.entities);
 
   // 4. Collect all methods except "initialize" on action object
   for (prop in config) {

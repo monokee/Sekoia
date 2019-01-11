@@ -10,7 +10,9 @@ function extendStateFactoryPrototype(stateFactory, module) {
   // Computed Properties as Getters
   for (key in module.computed) {
     Object.defineProperty(stateFactory.prototype, key, {
-      get() { return this[__CUE__].derivedProperties.get(key).value },
+      get() {
+        return this[__CUE__].derivedProperties.get(key).value
+      },
       configurable: true
     });
   }

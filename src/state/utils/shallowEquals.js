@@ -2,19 +2,28 @@
 function areShallowEqual(a, b) {
 
   // One-level shallow, ordered equality check
+  if (a === b) return true;
 
-  // Plain Objects
-  if (a.constructor === Object && b.constructor === Object) {
-    return arePlainObjectsShallowEqual(a, b);
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+
+    // Plain Arrays
+    const arrayA = isArray(a);
+    const arrayB = isArray(b);
+
+    if (arrayA !== arrayB) return false;
+    if (arrayA && arrayB) return areArraysShallowEqual(a, b);
+
+    // Plain Objects
+    const objA = a.constructor === Object;
+    const objB = b.constructor === Object;
+
+    if (objA !== objB) return false;
+    if (objA && objB) return arePlainObjectsShallowEqual(a, b);
+
   }
 
-  // Plain Arrays
-  if (isArray(a) && isArray(b)) {
-    return areArraysShallowEqual(a, b);
-  }
-
-  // Primitives, Maps, Sets, Data, RegExp etc strictly compared
-  return a === b;
+  // Primitives, Maps, Sets, Date, RegExp etc strictly compared
+  return a !== a && b !== b;
 
 }
 

@@ -5,7 +5,7 @@ function installDependencies(props, { computed }) {
   Object.assign(DERIVATIVE_INSTALLER, {
     allProperties: props,
     dependencyGraph: computed.dependencyGraph,
-    derivedProperties: computed.derivedProperties
+    derivedProperties: computed.entities
   });
 
   // intercept get requests to props object to grab sourceProperties
@@ -14,7 +14,7 @@ function installDependencies(props, { computed }) {
   });
 
   // call each computation which will trigger the intercepted get requests
-  computed.derivedProperties.forEach(derivative => {
+  computed.entities.forEach(derivative => {
 
     DERIVATIVE_INSTALLER.derivative = derivative;
 

@@ -1,28 +1,24 @@
 
 // Derived Property Instance
-// TODO: needs to inherit dependency graph from Module!
 class Derivative {
 
-  constructor(parent, ownPropertyName, computation) {
+  constructor(parent, ownPropertyName, computation, sourceProperties) {
 
-    this[_IS_DERIVATIVE_] = true; // id
+    this.parent = parent; // TODO: not sure we need this
+    this.ownPropertyName = ownPropertyName; // same as above...
 
-    this.parent = parent; // the source of the data for the computation
-    this.ownPropertyName = ownPropertyName;
     this.computation = computation; // the function that computes a result from data points on the source
+    this.sourceProperties = sourceProperties; // property names this derivative depends on
 
-    this.sourceProperties = []; // property names this derivative depends on
     this.subDerivatives = []; // other derivatives that depend on this derivative. Allows for downwards traversal.
     this.superDerivatives = []; // if derivative is derived from other derivative(s), set superDerivative(s). Allows for upwards traversal.
 
     this.valueCache = Object.create(null); // property-value cache
-    
-    this.stopPropagation = false; // flag for the last observed derivative in a dependency branch (optimization)
 
     this.intermediate = undefined; // intermediate computation result
     this._value = undefined; // current computation result
 
-    this.readyToInstall = false; // flag indicating that all dependencies are resolved so we can compute initial value (required only at installation time)
+    this.stopPropagation = false; // flag for the last observed derivative in a dependency branch (optimization)
     this.needsUpdate = false; // flag indicating that one or many dependencies have been updated (required by this.value getter)
     this.hasChanged = false; // flag indicating that the computation has yielded a new result (required for dependency traversal)
 
@@ -38,25 +34,12 @@ class Derivative {
       // recompute
       this.intermediate = this.computation.call(null, this.valueCache);
 
-      // compare to previous value (shallow compare objects)
-      if (this._value && typeof this._value === 'object' && this.intermediate && typeof this.intermediate === 'object') {
-
-        if (isShallowEqual(this._value, this.intermediate)) {
-          this.hasChanged = false;
-        } else {
-          this._value = this.intermediate;
-          this.hasChanged = true;
-        }
-
-      } else if (this.intermediate !== this._value) {
-
+      // compare to previous value
+      if (areShallowEqual(this._value, this.intermediate)) {
+        this.hasChanged = false;
+      } else {
         this._value = this.intermediate;
         this.hasChanged = true;
-
-      } else {
-
-        this.hasChanged = false;
-
       }
 
       // computation is up to date (until it gets invalidated by changing a dependency again...)
@@ -77,34 +60,9 @@ class Derivative {
     this.needsUpdate = true;
   }
 
-  connect() {
-    // running the computation will trigger "get" handlers on the parent model for any properties that the computation depends on
-    // the "get" handler checks if there is a derivative to install, and if so, it adds the derivative as a dependency of the triggered property
-    // and it adds all triggered properties to this derivatives' source properties.
-    derivativeToConnect = this;
-
-    try {
-      // at installation time, the computation will likely request dependencies that are still undefined.
-      // this would throw in many cases but since we don't care at this point about the actual value but only the property names the derivative depends on, we can safely ignore the error.
-      // this.parent is both "this" context and first argument because:
-      // As a convention, derivatives should destructure dependencies from first argument instead of using "this" to ensure all dependencies are reached even if computation body contains conditionals.
-      this.computation.call(this.parent, this.parent);
-
-    } catch (e) {}
-
-    derivativeToConnect = null;
-
-  }
-  
-  addDependency(prop) {
-    if (this.dependencies.indexOf(prop) === -1) {
-      this.dependencies.push(prop);
-    }
-  }
-  
   addSubDerivative(derivative) {
-    if (this.derivatives.indexOf(derivative) === -1) {
-      this.derivatives.push(derivative);
+    if (this.subDerivatives.indexOf(derivative) === -1) {
+      this.subDerivatives.push(derivative);
     }
   }
   
@@ -114,10 +72,10 @@ class Derivative {
     }
   }
 
-  refreshCache(source) {
-    // pulls in all dependency values
-    for (let i = 0, k; i < this.dependencies.length; i++) {
-      k = this.dependencies[i];
+  fillCache(source) {
+    // pulls in all dependency values from source object
+    for (let i = 0, k; i < this.sourceProperties.length; i++) {
+      k = this.sourceProperties[i];
       this.valueCache[k] = source[k];
     }
     this.needsUpdate = true;
@@ -141,8 +99,8 @@ class Derivative {
     }
 
     // dispose all sub-derivatives
-    for (i = 0; i < this.derivatives.length; i++) {
-      this.derivatives[i].dispose(false); // false -> downwards recursion form root of removal
+    for (i = 0; i < this.subDerivatives.length; i++) {
+      this.subDerivatives[i].dispose(false); // false -> downwards recursion form root of removal
     }
 
     // if root of removal, reset end of propagation downwards from parent node branches.

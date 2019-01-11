@@ -1,5 +1,47 @@
 
-class CueStateInternals {
+class StateInstance {
+
+  static create(type, factory, module, _parent, _ownPropertyName) {
+
+    // 1. Create base instance
+    const instance = type === 'object'
+      ? Object.assign(Object.create(factory.prototype), deepClonePlainObject(module.defaults))
+      : appendToArray(Object.setPrototypeOf([], factory.prototype), deepCloneArray(module.defaults));
+
+    // 2. Assign __CUE__ private extension
+    Object.defineProperty(instance, __CUE__, {
+      value: new this(_parent, _ownPropertyName),
+      configurable: true
+    });
+
+    const internal = instance[__CUE__];
+
+    // 3. Create Derivatives from module blueprints
+
+    // 3.1. turn all vDerivatives into Derivative instances
+    module.computed.entities.forEach(vDerivative => {
+      internal.derivedProperties.set(vDerivative.ownPropertyName, new Derivative(vDerivative.computation, vDerivative.sourceProperties));
+    });
+
+    // 3.2. loop over all vDerivatives again
+    module.computed.entities.forEach(vDerivative => {
+
+      // 3.2.1. get corresponding actual derivative
+      const derivative = internal.derivedProperties.get(vDerivative.ownPropertyName);
+
+      // 3.2.2. install all subDerivatives of actual derivative
+      for (let i = 0; i < vDerivative.subDerivatives.length; i++) {
+        derivative.subDerivatives.push(internal.derivedProperties.get(vDerivative.subDerivatives[i].ownPropertyName));
+      }
+
+      // 3.2.3. install all superDerivatives of actual derivative
+      for (let i = 0; i < vDerivative.superDerivatives.length; i++) {
+        derivative.superDerivatives.push(internal.derivedProperties.get(vDerivative.superDerivatives[i].ownPropertyName));
+      }
+
+    });
+
+  }
 
   static assignTo(stateInstance, parent, ownPropertyName) {
     return Object.defineProperty(stateInstance, __CUE__, {
@@ -9,14 +51,29 @@ class CueStateInternals {
   }
 
   constructor(parent = null, ownPropertyName = '') {
-    this.uid = Symbol();
+
     this.parent = parent;
     this.ownPropertyName = ownPropertyName;
+
     this.isInitializing = false;
+
+    this.props = {
+      propA: {
+        currentValue: 123,
+        observers: [],
+        derivations: [],
+        derivative: null
+      },
+      propB: {
+
+      }
+    };
+
     this.valueCache = new Map();
     this.observersOf = new Map();
     this.derivativesOf = new Map();
     this.derivedProperties = new Map();
+
   }
 
   addChangeReaction(property, handler, scope = null) {
