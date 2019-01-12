@@ -18,7 +18,7 @@ oAssign(CUE_PROTO, {
 
     }
 
-    if (o.constructor === Object) {
+    if (o.constructor === OBJ) {
 
       const clone = {};
 
@@ -43,7 +43,7 @@ oAssign(CUE_PROTO, {
       return o.slice();
     }
 
-    if (o.constructor === Object) {
+    if (o.constructor === OBJ) {
       return oAssign({}, o);
     }
 
@@ -106,7 +106,7 @@ oAssign(CUE_PROTO, {
     // One-level shallow, ordered equality check
 
     // Plain Objects
-    if (a.constructor === Object && b.constructor === Object) {
+    if (a.constructor === OBJ && b.constructor === OBJ) {
 
       const keysA = oKeys(a);
       const keysB = oKeys(b);

@@ -1,6 +1,7 @@
 
 // Public API: Cue.State [function]
-oDefineProperty(Cue, 'State', {
+OBJ.defineProperty(Cue, 'State', {
+
   value: function(name, moduleInitializer) {
 
     if (typeof name !== 'string') {
@@ -16,4 +17,5 @@ oDefineProperty(Cue, 'State', {
     return StateFactoryInitializer;
 
   }
+
 });

@@ -60,14 +60,10 @@ Cue.UI('App', Component => ({
     this.on({
       click: e => {
         appState.startTicker();
-        console.log('ticker started!');
       },
       contextmenu: e => {
         e.preventDefault();
         console.log('right-click', e.target);
-      },
-      keyup: e => {
-        console.log('keydown', e.which);
       }
     });
 

@@ -1,28 +1,28 @@
 
 function createComponentFactory(initializer) {
 
-  let module = null;
+  let component = null;
 
   return state => {
 
-    // lazily initialize the module
-    module || (module = initializeUIModule(initializer));
+    // lazily initialize the component
+    component || (component = initializeUIComponent(initializer));
 
     // create new UI Component Instance
-    const component = new CueUIComponent(
-      module.template.cloneNode(true),
-      module.imports,
-      module.styles,
-      module.keyframes
+    const instance = new ComponentInstance(
+      component.template.cloneNode(true),
+      component.imports,
+      component.styles,
+      component.keyframes
     );
 
     // initialize
-    if (module.initialize) {
-      module.initialize.call(component, state);
+    if (component.initialize) {
+      component.initialize.call(instance, state);
     }
 
     // return dom element for compositing
-    return component.element;
+    return instance.element;
 
   };
 

@@ -18,6 +18,30 @@
 
 <script type="text/javascript">
 
+  // if cue was a constructor we could create an app context whenever a new app is instantiated
+  const app = new Cue({
+    state: 'App.State',
+    component: 'App.UI',
+    didMount() {
+
+    },
+    didUpdate() {
+
+    },
+    willDispose() {
+
+    }
+  });
+
+  app.mount({
+    initial: 'props...'
+  });
+
+  app.set('props...');
+  app.get('...props');
+
+  app.dispose();
+
   Cue.App(App => {
 
     App.RootState = App.importState('App');

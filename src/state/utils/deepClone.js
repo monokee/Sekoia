@@ -3,7 +3,7 @@ function deepCloneObjectOrArray(o) {
 
   // Deep cloning for plain Objects and Arrays
 
-  if (o && o.constructor === Object) {
+  if (o && o.constructor === OBJ) {
     return deepClonePlainObject(o);
   }
 

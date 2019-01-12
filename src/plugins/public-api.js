@@ -1,6 +1,6 @@
 
 // Public Plugin API
-oDefineProperties(Cue, {
+OBJ.defineProperties(Cue, {
 
   Plugin: {
 

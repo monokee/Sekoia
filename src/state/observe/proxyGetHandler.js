@@ -16,7 +16,7 @@ function proxyGetHandler(target, prop) {
     return value;
   }
 
-  if (isArray(value) || value.constructor === Object) {
+  if (isArray(value) || value.constructor === OBJ) {
     return createProxy(StateInternals.assignTo(value, target, prop));
   }
 

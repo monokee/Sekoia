@@ -2,7 +2,8 @@
 class StateInternals {
 
   static assignTo(stateInstance, parent, ownPropertyName) {
-    return stateInstance[__CUE__] = new this(parent, ownPropertyName);
+    stateInstance[__CUE__] = new this(parent, ownPropertyName);
+    return stateInstance;
   }
 
   constructor(parent = null, ownPropertyName = '') {

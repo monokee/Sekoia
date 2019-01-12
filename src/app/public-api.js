@@ -1,7 +1,7 @@
 
 let appRegistered = false;
 
-oDefineProperty(Cue, 'App', {
+OBJ.defineProperty(Cue, 'App', {
 
   value: function(initialize) {
 

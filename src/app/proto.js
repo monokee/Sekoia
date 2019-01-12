@@ -68,17 +68,24 @@ const CUE_APP_PROTO = oCreate(CUE_PROTO, {
 
     value: function(initialProps) {
 
-      if (!this.RootState) {
+      if (!CUE_ROOT_STATE) {
         throw new Error(`Application can't start because no RootState has been defined.`);
       }
 
-      if (!this.RootComponent) {
+      if (typeof CUE_ROOT_COMPONENT !== 'function') {
         throw new Error(`Application can't start because no RootComponent has been defined.`);
       }
 
-      const rootState = typeof this.RootState === 'function' ? this.RootState(initialProps) : this.RootState;
-
-      CUE_ROOT_COMPONENT_PARENT.appendChild(this.RootComponent(createProxy(StateInternals.assignTo(rootState))));
+      CUE_ROOT_COMPONENT_PARENT.appendChild(
+        CUE_ROOT_COMPONENT(
+          createProxy(
+            StateInternals.assignTo(typeof CUE_ROOT_STATE === 'function'
+              ? CUE_ROOT_STATE(initialProps)
+              : CUE_ROOT_STATE
+            )
+          )
+        )
+      );
 
     }
 

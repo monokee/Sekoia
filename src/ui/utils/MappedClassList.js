@@ -12,8 +12,8 @@ class MappedClassList {
 
     if (!map) {
       throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object, 2D Array or a Map but is ${JSON.stringify(map)}.`);
-    } else if (map.constructor === Object) {
-      map = new Map(Object.entries(map));
+    } else if (map.constructor === OBJ) {
+      map = new Map(oEntries(map));
     } else if (isArray(map)) {
       map = new Map(map);
     }

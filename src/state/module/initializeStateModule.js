@@ -6,11 +6,11 @@ function initializeStateModule(moduleInitializer) {
 
   const config = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_STATE_PROTO) : moduleInitializer;
 
-  if (!config || config.constructor !== Object) {
+  if (!config || config.constructor !== OBJ) {
     throw new TypeError(`Can't create State Module because the config function does not return a plain object.`);
   }
 
-  const type = isArray(config.props) ? 'array' : config.props && config.props.constructor === Object ? 'object' : 'illegal';
+  const type = isArray(config.props) ? 'array' : config.props && config.props.constructor === OBJ ? 'object' : 'illegal';
 
   if (type === 'illegal') {
     throw new TypeError(`State Module requires "props" object (plain object or array) containing default and optional computed properties.`);

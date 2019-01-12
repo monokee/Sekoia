@@ -11,7 +11,6 @@ let isAccumulating = false; // are we accumulating observers and derivatives bec
 const DERIVATIVE_INSTALLER = {
   derivative: null,
   allProperties: null,
-  dependencyGraph: null,
   derivedProperties: null
 };
 

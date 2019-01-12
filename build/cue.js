@@ -4,45 +4,47 @@
    *
    * 🍑 Cue.js - Data Driven UI
    *
-   * @author Jonathan M. Ochmann for VisionColor
-   * Copyright 2018-2020 Patchflyer GmbH
+   * @author Jonathan M. Ochmann for color.io
+   * Copyright 2019 Patchflyer GmbH
    *
    */
 
-  const _CUE_VERSION_ = 0.8;
-
-  console.log(`%c🍑 Cue.js - Version ${_CUE_VERSION_}`, 'color: rgb(0, 140, 255)');
+  const _CUE_VERSION_ = 0.9;
 
   // Global Library Singleton
-  const Cue = global.Cue = {};
+  const Cue = {};
 
   // Cue Scoped Utils and Helpers (available anywhere in the library)
-
-  // NoOp method
   const NOOP = () => {};
 
   // All mutating array methods
   const ARRAY_MUTATORS = new Set(['copyWithin', 'fill', 'pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift']);
 
+  // Builtins
+  const OBJ = Object;
+  const ARR = Array;
+  const MTH = Math;
+
   // Static Object/Array Helpers
-  const oAssign = Object.assign;
-  const oCreate = Object.create;
-  const oDefineProperty = Object.defineProperty;
-  const oDefineProperties = Object.defineProperties;
-  const oSetPrototypeOf = Object.setPrototypeOf;
-  const oKeys = Object.keys;
-  const isArray = Array.isArray;
+  const oAssign = OBJ.assign;
+  const oCreate = OBJ.create;
+  const oDefineProperty = OBJ.defineProperty;
+  const oDefineProperties = OBJ.defineProperties;
+  const oSetPrototypeOf = OBJ.setPrototypeOf;
+  const oKeys = OBJ.keys;
+  const oEntries = OBJ.entries;
+  const isArray = ARR.isArray;
 
   // Static Math Helpers
-  const MAX = Math.max;
-  const MIN = Math.min;
-  const RANDOM = Math.random;
-  const ABS = Math.abs;
-  const POW = Math.pow;
-  const ROUND = Math.round;
-  const FLOOR = Math.floor;
-  const CEIL = Math.ceil;
-  const PI = Math.PI;
+  const MAX = MTH.max;
+  const MIN = MTH.min;
+  const RANDOM = MTH.random;
+  const ABS = MTH.abs;
+  const POW = MTH.pow;
+  const ROUND = MTH.round;
+  const FLOOR = MTH.floor;
+  const CEIL = MTH.ceil;
+  const PI = MTH.PI;
   const DEG2RAD = PI / 180;
   const RAD2DEG = 180 / PI;
 
@@ -205,7 +207,7 @@
 
       }
 
-      if (o.constructor === Object) {
+      if (o.constructor === OBJ) {
 
         const clone = {};
 
@@ -230,7 +232,7 @@
         return o.slice();
       }
 
-      if (o.constructor === Object) {
+      if (o.constructor === OBJ) {
         return oAssign({}, o);
       }
 
@@ -293,7 +295,7 @@
       // One-level shallow, ordered equality check
 
       // Plain Objects
-      if (a.constructor === Object && b.constructor === Object) {
+      if (a.constructor === OBJ && b.constructor === OBJ) {
 
         const keysA = oKeys(a);
         const keysB = oKeys(b);
@@ -624,7 +626,7 @@
 
         value: function(type, handler, scope) {
 
-          if (type && type.constructor === Object) {
+          if (type && type.constructor === OBJ) {
             _scope = typeof handler === 'object' ? handler : null;
             addEvents(type, _scope, false);
           } else if (typeof type === 'string' && typeof handler === 'function') {
@@ -642,7 +644,7 @@
 
         value: function(type, handler, scope) {
 
-          if (type && type.constructor === Object) {
+          if (type && type.constructor === OBJ) {
             _scope = typeof handler === 'object' ? handler : null;
             addEvents(type, _scope, true);
           } else if (typeof type === 'string' && typeof handler === 'function') {
@@ -717,7 +719,7 @@
   };
 
   // Public Plugin API
-  oDefineProperties(Cue, {
+  OBJ.defineProperties(Cue, {
 
     Plugin: {
 
@@ -818,7 +820,6 @@
   const DERIVATIVE_INSTALLER = {
     derivative: null,
     allProperties: null,
-    dependencyGraph: null,
     derivedProperties: null
   };
 
@@ -861,7 +862,7 @@
 
     // Deep cloning for plain Objects and Arrays
 
-    if (o && o.constructor === Object) {
+    if (o && o.constructor === OBJ) {
       return deepClonePlainObject(o);
     }
 
@@ -914,8 +915,8 @@
       if (arrayA && arrayB) return areArraysShallowEqual(a, b);
 
       // Plain Objects
-      const objA = a.constructor === Object;
-      const objB = b.constructor === Object;
+      const objA = a.constructor === OBJ;
+      const objB = b.constructor === OBJ;
 
       if (objA !== objB) return false;
       if (objA && objB) return arePlainObjectsShallowEqual(a, b);
@@ -1132,8 +1133,7 @@
     // set the current installer payload
     oAssign(DERIVATIVE_INSTALLER, {
       allProperties: props,
-      dependencyGraph: computed.dependencyGraph,
-      derivedProperties: computed.entities
+      derivedProperties: computed
     });
 
     // intercept get requests to props object to grab sourceProperties
@@ -1142,7 +1142,7 @@
     });
 
     // call each computation which will trigger the intercepted get requests
-    computed.entities.forEach(derivative => {
+    computed.forEach(derivative => {
 
       DERIVATIVE_INSTALLER.derivative = derivative;
 
@@ -1281,7 +1281,7 @@
       return value;
     }
 
-    if (isArray(value) || value.constructor === Object) {
+    if (isArray(value) || value.constructor === OBJ) {
       return createProxy(StateInternals.assignTo(value, target, prop));
     }
 
@@ -1506,9 +1506,9 @@
 
     const l = MAIN_QUEUE.length;
 
-    // MAIN_QUEUE contains tuples of [observer, changedValue, changedProperty]
-    for (let i = 0; i < l; i += 3) {
-      MAIN_QUEUE[i].react(MAIN_QUEUE[i + 1], MAIN_QUEUE[i + 2]);
+    // MAIN_QUEUE contains pairs of i: reactionHandler(), i+1: payload{property, value, oldValue}
+    for (let i = 0; i < l; i += 2) {
+      MAIN_QUEUE[i](MAIN_QUEUE[i + 1]);
     }
 
     // empty the queue
@@ -1521,7 +1521,8 @@
   class StateInternals {
 
     static assignTo(stateInstance, parent, ownPropertyName) {
-      return stateInstance[__CUE__] = new this(parent, ownPropertyName);
+      stateInstance[__CUE__] = new this(parent, ownPropertyName);
+      return stateInstance;
     }
 
     constructor(parent = null, ownPropertyName = '') {
@@ -1812,11 +1813,11 @@
 
     const config = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_STATE_PROTO) : moduleInitializer;
 
-    if (!config || config.constructor !== Object) {
+    if (!config || config.constructor !== OBJ) {
       throw new TypeError(`Can't create State Module because the config function does not return a plain object.`);
     }
 
-    const type = isArray(config.props) ? 'array' : config.props && config.props.constructor === Object ? 'object' : 'illegal';
+    const type = isArray(config.props) ? 'array' : config.props && config.props.constructor === OBJ ? 'object' : 'illegal';
 
     if (type === 'illegal') {
       throw new TypeError(`State Module requires "props" object (plain object or array) containing default and optional computed properties.`);
@@ -1930,7 +1931,8 @@
   }
 
   // Public API: Cue.State [function]
-  oDefineProperty(Cue, 'State', {
+  OBJ.defineProperty(Cue, 'State', {
+
     value: function(name, moduleInitializer) {
 
       if (typeof name !== 'string') {
@@ -1946,6 +1948,7 @@
       return StateFactoryInitializer;
 
     }
+
   });
 
   // Registered UI Components
@@ -1978,8 +1981,8 @@
 
       if (!map) {
         throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object, 2D Array or a Map but is ${JSON.stringify(map)}.`);
-      } else if (map.constructor === Object) {
-        map = new Map(Object.entries(map));
+      } else if (map.constructor === OBJ) {
+        map = new Map(oEntries(map));
       } else if (isArray(map)) {
         map = new Map(map);
       }
@@ -2458,7 +2461,7 @@
   // Provides access to the raw dom element, imports, keyframes and styles
   // Exposes shorthands and utility methods that allow for DOM and STATE querying, manipulation and binding.
 
-  class CueUIComponent {
+  class ComponentInstance {
 
     constructor(element, imports, styles, keyframes) {
 
@@ -2591,7 +2594,7 @@
 
         return boundHandler;
 
-      } else if (property.constructor === Object && property !== null) {
+      } else if (property.constructor === OBJ && property !== null) {
 
         const _autorun = typeof handler === 'boolean' ? handler : autorun;
         const boundHandlers = {};
@@ -2628,7 +2631,7 @@
 
         stateInstance.removeChangeReaction(property, handler);
 
-      } else if (property.constructor === Object && property !== null) {
+      } else if (property.constructor === OBJ && property !== null) {
 
         for (const prop in property) {
           stateInstance.removeChangeReaction(prop, property[prop]);
@@ -2643,7 +2646,7 @@
       // element.addEventListener convenience method which accepts a plain object of multiple event -> handlers
       // since we're always binding to the root element, we facilitate event delegation. handlers can internally compare e.target to refs or children.
 
-      if (arguments.length === 1 && type && type.constructor === Object) {
+      if (arguments.length === 1 && type && type.constructor === OBJ) {
         for (const eventType in type) {
           this.element.addEventListener(eventType, type[eventType], handler && typeof handler === 'object' ? handler : {});
         }
@@ -2671,12 +2674,12 @@
 
   }
 
-  function initializeUIModule(moduleInitializer) { // runs only once per module
+  function initializeUIComponent(initializer) { // runs only once per module
 
-    // initializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
-    const CONFIG = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_UI_PROTO) : moduleInitializer;
+    // componentInitializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
+    const CONFIG = typeof initializer === 'function' ? initializer(CUE_UI_PROTO) : initializer;
 
-    if (!CONFIG || CONFIG.constructor !== Object) {
+    if (!CONFIG || CONFIG.constructor !== OBJ) {
       throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);
     }
 
@@ -2701,46 +2704,46 @@
 
   function createComponentFactory(initializer) {
 
-    let module = null;
+    let component = null;
 
     return state => {
 
-      // lazily initialize the module
-      module || (module = initializeUIModule(initializer));
+      // lazily initialize the component
+      component || (component = initializeUIComponent(initializer));
 
       // create new UI Component Instance
-      const component = new CueUIComponent(
-        module.template.cloneNode(true),
-        module.imports,
-        module.styles,
-        module.keyframes
+      const instance = new ComponentInstance(
+        component.template.cloneNode(true),
+        component.imports,
+        component.styles,
+        component.keyframes
       );
 
       // initialize
-      if (module.initialize) {
-        module.initialize.call(component, state);
+      if (component.initialize) {
+        component.initialize.call(instance, state);
       }
 
       // return dom element for compositing
-      return component.element;
+      return instance.element;
 
     };
 
   }
 
-  oDefineProperty(Cue, 'UI', {
+  OBJ.defineProperty(Cue, 'UI', {
 
-    value: function(name, moduleInitializer) {
+    value: function(name, componentInitializer) {
 
       if (typeof name !== 'string') {
         throw new TypeError(`Can't create Cue-UI Module. First argument must be name of type string but is of type "${typeof name}".`);
-      } else if (!moduleInitializer || (typeof moduleInitializer !== 'function' && moduleInitializer.constructor !== Object)) {
-        throw new TypeError(`Can't create Cue-UI Module. Second argument must be module initializer function or configuration object but is of type "${typeof moduleInitializer}".`);
+      } else if (!componentInitializer || (typeof componentInitializer !== 'function' && componentInitializer.constructor !== Object)) {
+        throw new TypeError(`Can't create Cue-UI Module. Second argument must be module initializer function or configuration object but is of type "${typeof componentInitializer}".`);
       } else if (CUE_UI_MODULES.has(name)) {
         throw new Error(`A UI Module has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
       }
 
-      const ComponentFactory = createComponentFactory(moduleInitializer);
+      const ComponentFactory = createComponentFactory(componentInitializer);
 
       CUE_UI_MODULES.set(name, ComponentFactory);
 
@@ -2819,17 +2822,24 @@
 
       value: function(initialProps) {
 
-        if (!this.RootState) {
+        if (!CUE_ROOT_STATE) {
           throw new Error(`Application can't start because no RootState has been defined.`);
         }
 
-        if (!this.RootComponent) {
+        if (typeof CUE_ROOT_COMPONENT !== 'function') {
           throw new Error(`Application can't start because no RootComponent has been defined.`);
         }
 
-        const rootState = typeof this.RootState === 'function' ? this.RootState(initialProps) : this.RootState;
-
-        CUE_ROOT_COMPONENT_PARENT.appendChild(this.RootComponent(createProxy(StateInternals.assignTo(rootState))));
+        CUE_ROOT_COMPONENT_PARENT.appendChild(
+          CUE_ROOT_COMPONENT(
+            createProxy(
+              StateInternals.assignTo(typeof CUE_ROOT_STATE === 'function' ?
+                CUE_ROOT_STATE(initialProps) :
+                CUE_ROOT_STATE
+              )
+            )
+          )
+        );
 
       }
 
@@ -2839,7 +2849,7 @@
 
   let appRegistered = false;
 
-  oDefineProperty(Cue, 'App', {
+  OBJ.defineProperty(Cue, 'App', {
 
     value: function(initialize) {
 
@@ -2854,4 +2864,16 @@
     }
 
   });
+
+  global || (global = window);
+
+  OBJ.defineProperty(global, 'Cue', {
+
+    value: Cue,
+    configurable: true
+
+  });
+
+  console.log(`%c🍑 Cue.js - Version ${_CUE_VERSION_}`, 'color: rgb(0, 140, 255)');
+
 }(window || this));

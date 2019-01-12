@@ -8,109 +8,111 @@ const NAME = 'cue';
 const SOURCE_DIR = 'src';
 const BUILD_DIR = 'build';
 
+const MODULES = {
+  proto:    SOURCE_DIR + '/proto',
+  eventBus: SOURCE_DIR + '/eventBus',
+  plugins:  SOURCE_DIR + '/plugins',
+  state:    SOURCE_DIR + '/state',
+  ui:       SOURCE_DIR + '/ui',
+  app:      SOURCE_DIR + '/app'
+};
+
+const FILES = {
+  index: [
+    `${SOURCE_DIR}/index.js`
+  ],
+  proto: [
+    `${MODULES.proto}/index.js`,
+    `${MODULES.proto}/math-utils.js`,
+    `${MODULES.proto}/string-utils.js`,
+    `${MODULES.proto}/obj-utils.js`,
+    `${MODULES.proto}/array-utils.js`,
+    `${MODULES.proto}/fn-utils.js`
+  ],
+  eventBus: [
+    `${MODULES.eventBus}/event-bus.js`
+  ],
+  plugins: [
+    `${MODULES.plugins}/index.js`,
+    `${MODULES.plugins}/public-api.js`,
+  ],
+  state: [
+
+    `${MODULES.state}/index.js`,
+    `${MODULES.state}/proto.js`,
+
+    `${MODULES.state}/utils/*.js`,
+
+    `${MODULES.state}/derivedProps/Derivative.js`,
+    `${MODULES.state}/derivedProps/OrderedDerivatives.js`,
+    `${MODULES.state}/derivedProps/installDependencies.js`,
+    `${MODULES.state}/derivedProps/dependencyGetInterceptor.js`,
+    `${MODULES.state}/derivedProps/branchWalkers.js`,
+
+    `${MODULES.state}/observe/createProxy.js`,
+    `${MODULES.state}/observe/proxyGetHandler.js`,
+    `${MODULES.state}/observe/proxySetHandler.js`,
+    `${MODULES.state}/observe/proxyDeleteHandler.js`,
+    `${MODULES.state}/observe/createInterceptedArrayMutator.js`,
+
+    `${MODULES.state}/reactionQueue/cueAll.js`,
+    `${MODULES.state}/reactionQueue/cueImmediate.js`,
+    `${MODULES.state}/reactionQueue/cueAccumulated.js`,
+    `${MODULES.state}/reactionQueue/react.js`,
+
+    `${MODULES.state}/module/StateInternals.js`,
+    `${MODULES.state}/module/createStateInstance.js`,
+    `${MODULES.state}/module/createStateFactory.js`,
+    `${MODULES.state}/module/extendStateFactoryPrototype.js`,
+    `${MODULES.state}/module/initializeStateModule.js`,
+    `${MODULES.state}/module/createStateFactoryInitializer.js`,
+
+    `${MODULES.state}/public-api.js`
+
+  ],
+  ui: [
+
+    `${MODULES.ui}/index.js`,
+    `${MODULES.ui}/proto.js`,
+
+    `${MODULES.ui}/utils/MappedClassList.js`,
+    `${MODULES.ui}/utils/CueStylesheet.js`,
+    `${MODULES.ui}/utils/createUniqueClassName.js`,
+    `${MODULES.ui}/utils/replaceClassNameInElement.js`,
+    `${MODULES.ui}/utils/scopeStylesToComponent.js`,
+    `${MODULES.ui}/utils/scopeKeyframesToComponent.js`,
+    `${MODULES.ui}/utils/createTemplateRootElement.js`,
+    `${MODULES.ui}/utils/reconcile.js`,
+    `${MODULES.ui}/utils/longestIncreasingSubsequence.js`,
+
+    `${MODULES.ui}/module/ComponentInstance.js`,
+    `${MODULES.ui}/module/initializeUIComponent.js`,
+    `${MODULES.ui}/module/createComponentFactory.js`,
+
+    `${MODULES.ui}/public-api.js`
+
+  ],
+  app: [
+    `${MODULES.app}/proto.js`,
+    `${MODULES.app}/public-api.js`,
+  ],
+  publicAPI: [
+    `${SOURCE_DIR}/public-api.js`
+  ]
+};
+
 gulp.task('build-lib', function() {
-
-  const src = {
-    core:     SOURCE_DIR + '/core',
-    proto:    SOURCE_DIR + '/proto',
-    eventBus: SOURCE_DIR + '/eventBus',
-    plugins:  SOURCE_DIR + '/plugins',
-    state:    SOURCE_DIR + '/state',
-    ui:       SOURCE_DIR + '/ui',
-    app:      SOURCE_DIR + '/app'
-  };
-  
-  const modules = {
-    core: [
-      `${src.core}/index.js`,
-      `${src.core}/utils.js`
-    ],
-    proto: [
-      `${src.proto}/index.js`,
-      `${src.proto}/math-utils.js`,
-      `${src.proto}/string-utils.js`,
-      `${src.proto}/obj-utils.js`,
-      `${src.proto}/array-utils.js`,
-      `${src.proto}/fn-utils.js`
-    ],
-    eventBus: [
-      `${src.eventBus}/event-bus.js`
-    ],
-    plugins: [
-      `${src.plugins}/index.js`,
-      `${src.plugins}/public-api.js`,
-    ],
-    state: [
-
-      `${src.state}/index.js`,
-      `${src.state}/proto.js`,
-
-      `${src.state}/utils/*.js`,
-
-      `${src.state}/derivedProps/Derivative.js`,
-      `${src.state}/derivedProps/OrderedDerivatives.js`,
-      `${src.state}/derivedProps/installDependencies.js`,
-      `${src.state}/derivedProps/dependencyGetInterceptor.js`,
-      `${src.state}/derivedProps/branchWalkers.js`,
-
-      `${src.state}/observe/createProxy.js`,
-      `${src.state}/observe/proxyGetHandler.js`,
-      `${src.state}/observe/proxySetHandler.js`,
-      `${src.state}/observe/proxyDeleteHandler.js`,
-      `${src.state}/observe/createInterceptedArrayMutator.js`,
-
-      `${src.state}/reactionQueue/cueAll.js`,
-      `${src.state}/reactionQueue/cueImmediate.js`,
-      `${src.state}/reactionQueue/cueAccumulated.js`,
-      `${src.state}/reactionQueue/react.js`,
-
-      `${src.state}/module/StateInternals.js`,
-      `${src.state}/module/createStateInstance.js`,
-      `${src.state}/module/createStateFactory.js`,
-      `${src.state}/module/extendStateFactoryPrototype.js`,
-      `${src.state}/module/initializeStateModule.js`,
-      `${src.state}/module/createStateFactoryInitializer.js`,
-
-      `${src.state}/public-api.js`
-
-    ],
-    ui: [
-
-      `${src.ui}/index.js`,
-      `${src.ui}/proto.js`,
-
-      `${src.ui}/utils/MappedClassList.js`,
-      `${src.ui}/utils/CueStylesheet.js`,
-      `${src.ui}/utils/createUniqueClassName.js`,
-      `${src.ui}/utils/replaceClassNameInElement.js`,
-      `${src.ui}/utils/scopeStylesToComponent.js`,
-      `${src.ui}/utils/scopeKeyframesToComponent.js`,
-      `${src.ui}/utils/createTemplateRootElement.js`,
-      `${src.ui}/utils/reconcile.js`,
-      `${src.ui}/utils/longestIncreasingSubsequence.js`,
-
-      `${src.ui}/module/CueUIComponent.js`,
-      `${src.ui}/module/initializeUIModule.js`,
-      `${src.ui}/module/createComponentFactory.js`,
-
-      `${src.ui}/public-api.js`
-
-    ],
-    app: [
-      `${src.app}/proto.js`,
-      `${src.app}/public-api.js`,
-    ]
-  };
   
   gulp
     .src([
-      ...modules.core, 
-      ...modules.proto,
-      ...modules.eventBus,
-      ...modules.plugins, 
-      ...modules.state, 
-      ...modules.ui,
-      ...modules.app
+      ...FILES.index,
+      ...FILES.proto,
+      ...FILES.eventBus,
+      ...FILES.plugins,
+      ...FILES.state,
+      ...FILES.ui,
+      ...FILES.app,
+      ...FILES.publicAPI
     ])
 
     .pipe(concat(`${NAME}.js`))

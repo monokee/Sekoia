@@ -40,13 +40,13 @@
 
   // Public API
 
-  oDefineProperties(Cue, {
+  OBJ.defineProperties(Cue, {
 
     on: {
       
       value: function(type, handler, scope) {
 
-        if (type && type.constructor === Object) {
+        if (type && type.constructor === OBJ) {
           _scope = typeof handler === 'object' ? handler : null;
           addEvents(type, _scope, false);
         } else if (typeof type === 'string' && typeof handler === 'function') {
@@ -64,7 +64,7 @@
       
       value: function(type, handler, scope) {
 
-        if (type && type.constructor === Object) {
+        if (type && type.constructor === OBJ) {
           _scope = typeof handler === 'object' ? handler : null;
           addEvents(type, _scope, true);
         } else if (typeof type === 'string' && typeof handler === 'function') {

@@ -14,8 +14,8 @@ function areShallowEqual(a, b) {
     if (arrayA && arrayB) return areArraysShallowEqual(a, b);
 
     // Plain Objects
-    const objA = a.constructor === Object;
-    const objB = b.constructor === Object;
+    const objA = a.constructor === OBJ;
+    const objB = b.constructor === OBJ;
 
     if (objA !== objB) return false;
     if (objA && objB) return arePlainObjectsShallowEqual(a, b);

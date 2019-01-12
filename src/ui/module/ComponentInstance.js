@@ -3,7 +3,7 @@
 // Provides access to the raw dom element, imports, keyframes and styles
 // Exposes shorthands and utility methods that allow for DOM and STATE querying, manipulation and binding.
 
-class CueUIComponent {
+class ComponentInstance {
 
   constructor(element, imports, styles, keyframes) {
 
@@ -131,7 +131,7 @@ class CueUIComponent {
 
       return boundHandler;
 
-    } else if (property.constructor === Object && property !== null) {
+    } else if (property.constructor === OBJ && property !== null) {
 
       const _autorun = typeof handler === 'boolean' ? handler : autorun;
       const boundHandlers = {};
@@ -168,7 +168,7 @@ class CueUIComponent {
 
       stateInstance.removeChangeReaction(property, handler);
 
-    } else if (property.constructor === Object && property !== null) {
+    } else if (property.constructor === OBJ && property !== null) {
 
       for (const prop in property) {
         stateInstance.removeChangeReaction(prop, property[prop]);
@@ -183,7 +183,7 @@ class CueUIComponent {
     // element.addEventListener convenience method which accepts a plain object of multiple event -> handlers
     // since we're always binding to the root element, we facilitate event delegation. handlers can internally compare e.target to refs or children.
 
-    if (arguments.length === 1 && type && type.constructor === Object) {
+    if (arguments.length === 1 && type && type.constructor === OBJ) {
       for (const eventType in type) {
         this.element.addEventListener(eventType, type[eventType], handler && typeof handler === 'object' ? handler : {});
       }
