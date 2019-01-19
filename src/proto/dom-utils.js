@@ -61,6 +61,58 @@ oAssign(CUE_PROTO, {
 
   },
 
+  select(x) {
+
+    if (typeof x === 'string') {
+
+      let node;
+
+      switch(x[0]) {
+        case '#':
+          node = document.getElementById(x.substring(1));
+          break;
+        case '.':
+          node = document.getElementsByClassName(x.substring(1));
+          break;
+        default:
+          node = document.querySelectorAll(x);
+          break;
+      }
+
+      if (node.nodeType !== Node.TEXT_NODE && node.length) {
+        return node.length > 1 ? Array.from(node) : node[0];
+      }
+
+      return node;
+
+    } else if (x && typeof x === 'object') {
+
+      if (x instanceof Element) {
+        return x;
+      }
+
+      if (Array.isArray(x)) {
+        return x.map(item => this.select(item));
+      }
+
+      if (x.constructor === Object) {
+        const o = {};
+        for (const item in x) o[item] = this.select(x[item]);
+        return o;
+      }
+
+      if (NodeList.prototype.isPrototypeOf(x) || HTMLCollection.prototype.isPrototypeOf(x)) {
+        return Array.from(x);
+      }
+
+    } else {
+
+      return null;
+
+    }
+
+  },
+
   nodify(x) {
 
     if (typeof x === 'string') {

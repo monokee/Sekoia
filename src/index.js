@@ -10,9 +10,6 @@
 
 const _CUE_VERSION_ = 0.9;
 
-// Global Library Singleton
-const Cue = {};
-
 // Cue Scoped Utils and Helpers (available anywhere in the library)
 const NOOP = ()=>{};
 
@@ -32,6 +29,7 @@ const oDefineProperties = OBJ.defineProperties;
 const oSetPrototypeOf = OBJ.setPrototypeOf;
 const oKeys = OBJ.keys;
 const oEntries = OBJ.entries;
+const oFreeze = OBJ.freeze;
 const isArray = ARR.isArray;
 
 // Static Math Helpers
@@ -52,3 +50,7 @@ const _set = Reflect.set;
 const _get = Reflect.get;
 const _apply = Reflect.apply;
 const _delete = Reflect.deleteProperty;
+
+// Generic Cue Prototype Object.
+// Extension point for Plugins and Module specific prototypes.
+const CUE_PROTO = {};

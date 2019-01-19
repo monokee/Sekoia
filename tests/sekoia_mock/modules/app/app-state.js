@@ -1,4 +1,4 @@
-Cue.State('App', Module => ({
+Cue.State('App-State', Module => ({
 
   imports: {
     //Limbs: Module.import('Character.Limbs')

@@ -13,44 +13,22 @@
 
 <script src="../../build/cue.js"></script>
 
+<script src="plugins/ui-sortable.js"></script>
+
 <script src="modules/app/app-state.js"></script>
 <script src="modules/app/app-view.js"></script>
 
 <script type="text/javascript">
 
-  // if cue was a constructor we could create an app context whenever a new app is instantiated
-  const app = new Cue({
-    state: 'App.State',
-    component: 'App.UI',
-    didMount() {
+  Cue.use('cue-ui-sortable');
 
-    },
-    didUpdate() {
-
-    },
-    willDispose() {
-
-    }
+  const app = Cue({
+    state: 'App-State',
+    ui: 'App-UI'
   });
 
-  app.mount({
-    initial: 'props...'
-  });
-
-  app.set('props...');
-  app.get('...props');
-
-  app.dispose();
-
-  Cue.App(App => {
-
-    App.RootState = App.importState('App');
-    App.RootComponent = App.importComponent('App');
-
-    App.start({
-      name: 'color.io v.0.001 (2019 lets do this!)'
-    });
-
+  app.mount(document.body, {
+    name: 'Example'
   });
 
 </script>

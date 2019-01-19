@@ -1,8 +1,7 @@
 
-// Public API: Cue.State [function]
-OBJ.defineProperty(Cue, 'State', {
+const CUE_STATE_API = {
 
-  value: function(name, moduleInitializer) {
+  State: (name, moduleInitializer) => {
 
     if (typeof name !== 'string') {
       throw new TypeError(`Can't create Cue State Module. First argument must be name of type string but is of type "${typeof name}".`);
@@ -18,4 +17,4 @@ OBJ.defineProperty(Cue, 'State', {
 
   }
 
-});
+};

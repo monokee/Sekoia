@@ -1,4 +1,4 @@
-Cue.UI('App', Component => ({
+Cue.UI('App-UI', Component => ({
 
   template: (
     `<div id="app" class="app">

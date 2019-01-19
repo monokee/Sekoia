@@ -11,9 +11,6 @@
 
   const _CUE_VERSION_ = 0.9;
 
-  // Global Library Singleton
-  const Cue = {};
-
   // Cue Scoped Utils and Helpers (available anywhere in the library)
   const NOOP = () => {};
 
@@ -54,10 +51,9 @@
   const _apply = Reflect.apply;
   const _delete = Reflect.deleteProperty;
 
-  // Main API exposed to Components.
-  // Also statically available via global Cue prototype.
-  // This is the main extension point for Plugins.
-  const CUE_PROTO = Cue.prototype = oCreate(null);
+  // Generic Cue Prototype Object.
+  // Extension point for Plugins and Module specific prototypes.
+  const CUE_PROTO = {};
 
   oAssign(CUE_PROTO, {
 
@@ -579,6 +575,8 @@
 
   });
 
+  const CUE_EVENT_BUS_API = {};
+
   { // Cue Event Bus
 
     const CUE_EVENTS = new Map();
@@ -619,73 +617,56 @@
     };
 
     // Public API
+    oAssign(CUE_EVENT_BUS_API, {
 
-    oDefineProperties(Cue, {
+      on: (type, handler, scope) => {
 
-      on: {
-
-        value: function(type, handler, scope) {
-
-          if (type && type.constructor === OBJ) {
-            _scope = typeof handler === 'object' ? handler : null;
-            addEvents(type, _scope, false);
-          } else if (typeof type === 'string' && typeof handler === 'function') {
-            _scope = typeof scope === 'object' ? scope : null;
-            addEvent(type, handler, _scope, false);
-          } else {
-            throw new TypeError(CUE_EVENTS_ARGS_ERROR);
-          }
-
+        if (type && type.constructor === OBJ) {
+          _scope = typeof handler === 'object' ? handler : null;
+          addEvents(type, _scope, false);
+        } else if (typeof type === 'string' && typeof handler === 'function') {
+          _scope = typeof scope === 'object' ? scope : null;
+          addEvent(type, handler, _scope, false);
+        } else {
+          throw new TypeError(CUE_EVENTS_ARGS_ERROR);
         }
 
       },
 
-      once: {
+      once: (type, handler, scope) => {
 
-        value: function(type, handler, scope) {
-
-          if (type && type.constructor === OBJ) {
-            _scope = typeof handler === 'object' ? handler : null;
-            addEvents(type, _scope, true);
-          } else if (typeof type === 'string' && typeof handler === 'function') {
-            _scope = typeof scope === 'object' ? scope : null;
-            addEvent(type, handler, _scope, true);
-          } else {
-            throw new TypeError(CUE_EVENTS_ARGS_ERROR);
-          }
-
+        if (type && type.constructor === OBJ) {
+          _scope = typeof handler === 'object' ? handler : null;
+          addEvents(type, _scope, true);
+        } else if (typeof type === 'string' && typeof handler === 'function') {
+          _scope = typeof scope === 'object' ? scope : null;
+          addEvent(type, handler, _scope, true);
+        } else {
+          throw new TypeError(CUE_EVENTS_ARGS_ERROR);
         }
 
       },
 
-      off: {
-
-        value: function(type) {
-          CUE_EVENTS.delete(type);
-        }
-
+      off: type => {
+        CUE_EVENTS.delete(type);
       },
 
-      trigger: {
+      trigger: (type, ...payload) => {
 
-        value: function(type, payload) {
+        if ((_events = CUE_EVENTS.get(type))) {
 
-          if ((_events = CUE_EVENTS.get(type))) {
-
-            for (let i = 0; i < _events.length; i++) {
-              _event = _events[i];
-              _event.handler.call(_event.scope, payload);
-              if (_event.once) _disposable.push(_event);
-            }
-
-            if (_disposable.length) {
-              CUE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
-              _disposable.length = 0;
-            }
-
-            _events = null;
-
+          for (let i = 0; i < _events.length; i++) {
+            _event = _events[i];
+            _event.handler.apply(_event.scope, payload);
+            if (_event.once) _disposable.push(_event);
           }
+
+          if (_disposable.length) {
+            CUE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
+            _disposable.length = 0;
+          }
+
+          _events = null;
 
         }
 
@@ -712,82 +693,24 @@
 
     plugin.installer.call(plugin.interface, CUE_PROTO, options);
     plugin.didInstall = true;
-    plugin.interface.onDidInstall();
+    plugin.interface.onDidInstall.call(plugin.interface, options);
 
     return plugin.interface;
 
   };
 
-  // Public Plugin API
-  OBJ.defineProperties(Cue, {
+  const CUE_PLUGINS_API = {
 
-    Plugin: {
+    Plugin: (name, installer, autoinstall) => {
 
-      value: function(name, installer, autoinstall) {
-
-        if (!isPluginNameValid(name)) {
-          throw new Error(`Plugin must be defined with a namespaced-name (vendor-plugin) of type string as the first argument.`);
-        }
-
-        // split name into vendor, plugin
-        const [vendor, plugin] = parsePluginName(name);
-
-        if (!installer && !autoinstall) { // return plugin interface when only name is provided (like getter)
-
-          const byVendor = CUE_PLUGINS.get(vendor);
-
-          if (byVendor) {
-
-            const thePlugin = byVendor.get(plugin);
-
-            if (thePlugin) {
-              return thePlugin;
-            }
-
-          }
-
-        } else { // register a new plugin when all arguments are provided (like setter)
-
-          if (typeof installer !== 'function') {
-            throw new Error(`Plugin must be defined with an installable function as the second argument.`);
-          }
-
-          const byVendor = CUE_PLUGINS.get(vendor) || CUE_PLUGINS.set(vendor, new Map()).get(vendor);
-
-          if (byVendor.has(plugin)) {
-            console.warn(`A plugin with name "${plugin}" has already been registered under "${vendor}". Skipping installation...`);
-            return byVendor.get(plugin).interface;
-          }
-
-          const thePlugin = {
-            installer: installer,
-            didInstall: false,
-            name: name,
-            interface: {
-              name: name,
-                onDidInstall() {}
-            }
-          };
-
-          byVendor.set(plugin, thePlugin);
-
-          return autoinstall ? installPlugin(thePlugin) : thePlugin.interface;
-
-        }
-
+      if (!isPluginNameValid(name)) {
+        throw new Error(`Plugin must be defined with a namespaced-name (vendor-plugin) of type string as the first argument.`);
       }
 
-    },
+      // split name into vendor, plugin
+      const [vendor, plugin] = parsePluginName(name);
 
-    use: {
-
-      value: function(pluginName, options) {
-
-        if (!isPluginNameValid(pluginName)) {
-          throw new Error(`pluginName must be a namespaced-string (vendor-plugin).`);
-        }
-
-        const [vendor, plugin] = parsePluginName(pluginName);
+      if (!installer && !autoinstall) { // return plugin interface when only name is provided (Handle Plugin() call like getter)
 
         const byVendor = CUE_PLUGINS.get(vendor);
 
@@ -796,18 +719,71 @@
           const thePlugin = byVendor.get(plugin);
 
           if (thePlugin) {
-            return installPlugin(thePlugin, options);
+            return thePlugin;
+          } else {
+            throw new Error(`No Plugin with name ${name} has been registered under "${vendor}".`);
           }
 
+        } else {
+          throw new Error(`No Plugin has been registered under "${byVendor}".`);
         }
 
-        throw new Error(`No Plugin registered under "${pluginName}".`);
+      } else { // register a new plugin when all arguments are provided (like setter)
+
+        if (typeof installer !== 'function') {
+          throw new Error(`Plugin must be defined with an installable function as the second argument.`);
+        }
+
+        const byVendor = CUE_PLUGINS.get(vendor) || CUE_PLUGINS.set(vendor, new Map()).get(vendor);
+
+        if (byVendor.has(plugin)) {
+          console.warn(`A plugin with name "${plugin}" has already been registered under "${vendor}". Skipping installation...`);
+          return byVendor.get(plugin).interface;
+        }
+
+        const thePlugin = {
+          installer: installer,
+          didInstall: false,
+          name: name,
+          interface: {
+            name: name,
+              onDidInstall() {}
+          }
+        };
+
+        byVendor.set(plugin, thePlugin);
+
+        return autoinstall ? installPlugin(thePlugin) : thePlugin.interface;
 
       }
 
+    },
+
+    use: (pluginName, options) => {
+
+      if (!isPluginNameValid(pluginName)) {
+        throw new Error(`pluginName must be a namespaced-string (vendor-plugin).`);
+      }
+
+      const [vendor, plugin] = parsePluginName(pluginName);
+
+      const byVendor = CUE_PLUGINS.get(vendor);
+
+      if (byVendor) {
+
+        const thePlugin = byVendor.get(plugin);
+
+        if (thePlugin) {
+          return installPlugin(thePlugin, options);
+        }
+
+      }
+
+      throw new Error(`No Plugin has been registered under "${pluginName}".`);
+
     }
 
-  });
+  };
 
   // Registered State Modules
   const CUE_STATE_MODULES = new Map();
@@ -1930,10 +1906,9 @@
 
   }
 
-  // Public API: Cue.State [function]
-  OBJ.defineProperty(Cue, 'State', {
+  const CUE_STATE_API = {
 
-    value: function(name, moduleInitializer) {
+    State: (name, moduleInitializer) => {
 
       if (typeof name !== 'string') {
         throw new TypeError(`Can't create Cue State Module. First argument must be name of type string but is of type "${typeof name}".`);
@@ -1949,7 +1924,7 @@
 
     }
 
-  });
+  };
 
   // Registered UI Components
   const CUE_UI_MODULES = new Map();
@@ -2731,9 +2706,9 @@
 
   }
 
-  OBJ.defineProperty(Cue, 'UI', {
+  const CUE_UI_API = {
 
-    value: function(name, componentInitializer) {
+    UI: (name, componentInitializer) => {
 
       if (typeof name !== 'string') {
         throw new TypeError(`Can't create Cue-UI Module. First argument must be name of type string but is of type "${typeof name}".`);
@@ -2751,128 +2726,88 @@
 
     }
 
-  });
+  };
 
-  let CUE_ROOT_STATE = null;
+  const CueInstanceProto = {
 
-  let CUE_ROOT_COMPONENT_PARENT = document.body;
-  let CUE_ROOT_COMPONENT = null;
+    mount(target = document.body, props = undefined) {
 
-  const CUE_APP_PROTO = oCreate(CUE_PROTO, {
-
-    RootState: {
-
-      get() {
-        return CUE_ROOT_STATE;
-      },
-
-      set(data) {
-        CUE_ROOT_STATE = data;
+      if (this.mounted === true) {
+        throw new Error('Cue instance already mounted.');
       }
+
+      target = typeof target === 'string' ? document.querySelector(target) : target instanceof Element ? target : null;
+      if (!target) throw new TypeError(`Target is not HTMLElement or Selector of element that is in the DOM.`);
+
+      const rootState = CUE_STATE_PROTO.import(this.state.module);
+      const rootComponent = CUE_UI_PROTO.import(this.ui.component);
+
+      this.state.instance = rootState(props);
+      this.ui.element = rootComponent(this.state.instance);
+
+      target.appendChild(this.ui.element);
+      this.lifeCycle.didMount.call(this);
+
+      this.mounted = true;
+
+      return this;
 
     },
 
-    RootComponent: {
+    unmount() {
 
-      get() {
-        return CUE_ROOT_COMPONENT;
-      },
-
-      set(component) {
-        CUE_ROOT_COMPONENT = component;
+      if (this.mounted === false) {
+        throw new Error(`Can't unmount Cue instance because it has not been mounted.`);
       }
 
-    },
+      this.lifeCycle.willUnmount.call(this);
+      this.ui.element.parentElement.removeChild(this.ui.element);
 
-    RootComponentParent: {
+      this.ui.element = null;
+      this.state.instance = null;
 
-      get() {
-        return CUE_ROOT_COMPONENT_PARENT;
-      },
+      this.mounted = false;
 
-      set(domElement) {
-
-        if (!domElement || !(domElement instanceof Element || domElement.nodeName)) {
-          throw new TypeError(`RootComponentParent must be a DOM Element but is ${JSON.stringify(domElement)}`);
-        }
-
-        CUE_ROOT_COMPONENT_PARENT = domElement;
-
-      }
-
-    },
-
-    importState: {
-
-      value: function(name) {
-        return CUE_STATE_PROTO.import(name);
-      }
-
-    },
-
-    importComponent: {
-
-      value: function(name) {
-        return CUE_UI_PROTO.import(name);
-      }
-
-    },
-
-    start: {
-
-      value: function(initialProps) {
-
-        if (!CUE_ROOT_STATE) {
-          throw new Error(`Application can't start because no RootState has been defined.`);
-        }
-
-        if (typeof CUE_ROOT_COMPONENT !== 'function') {
-          throw new Error(`Application can't start because no RootComponent has been defined.`);
-        }
-
-        CUE_ROOT_COMPONENT_PARENT.appendChild(
-          CUE_ROOT_COMPONENT(
-            createProxy(
-              StateInternals.assignTo(typeof CUE_ROOT_STATE === 'function' ?
-                CUE_ROOT_STATE(initialProps) :
-                CUE_ROOT_STATE
-              )
-            )
-          )
-        );
-
-      }
+      return this;
 
     }
 
-  });
-
-  let appRegistered = false;
-
-  OBJ.defineProperty(Cue, 'App', {
-
-    value: function(initialize) {
-
-      if (appRegistered) {
-        throw new Error(`An App has already been registered. You can only run a single Cue App per context.`);
-      }
-
-      appRegistered = true;
-
-      initialize(CUE_APP_PROTO);
-
-    }
-
-  });
+  };
 
   global || (global = window);
+  global.Cue = oAssign(function(config) {
 
-  OBJ.defineProperty(global, 'Cue', {
+      if (!config || config.constructor !== OBJ)
+        throw new TypeError('[Cue]: config is not an object.');
+      if (typeof config.state !== 'string')
+        throw new TypeError(`[Cue]: config.state is "${typeof config.state}" and not a name. Specify the name of a state module to use as the root state for the Cue instance.`);
+      if (typeof config.ui !== 'string')
+        throw new TypeError(`[Cue]: config.ui is "${typeof config.ui}" and not a name. Specify the name of a ui component to use as the root element for the Cue instance.`);
 
-    value: Cue,
-    configurable: true
+      return oAssign(oCreate(CueInstanceProto), {
+        state: {
+          module: config.state,
+          instance: null
+        },
+        ui: {
+          component: config.ui,
+          element: null
+        },
+        mounted: false,
+        lifeCycle: {
+          didMount: config.didMount || NOOP,
+          willUnmount: config.willUnmount || NOOP,
+        }
+      });
 
-  });
+    },
+
+    CUE_EVENT_BUS_API,
+    CUE_PLUGINS_API,
+    CUE_STATE_API,
+    CUE_UI_API
+
+  );
 
   console.log(`%c🍑 Cue.js - Version ${_CUE_VERSION_}`, 'color: rgb(0, 140, 255)');
 

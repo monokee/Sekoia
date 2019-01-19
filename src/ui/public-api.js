@@ -1,7 +1,7 @@
 
-OBJ.defineProperty(Cue, 'UI', {
+const CUE_UI_API = {
 
-  value: function (name, componentInitializer) {
+  UI: (name, componentInitializer) => {
 
     if (typeof name !== 'string') {
       throw new TypeError(`Can't create Cue-UI Module. First argument must be name of type string but is of type "${typeof name}".`);
@@ -19,4 +19,4 @@ OBJ.defineProperty(Cue, 'UI', {
 
   }
 
-});
+};

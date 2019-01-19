@@ -1,4 +1,6 @@
 
+const CUE_EVENT_BUS_API = {};
+
 { // Cue Event Bus
 
   const CUE_EVENTS = new Map();
@@ -39,76 +41,59 @@
   };
 
   // Public API
+  oAssign(CUE_EVENT_BUS_API, {
 
-  OBJ.defineProperties(Cue, {
+    on: (type, handler, scope) => {
 
-    on: {
-      
-      value: function(type, handler, scope) {
-
-        if (type && type.constructor === OBJ) {
-          _scope = typeof handler === 'object' ? handler : null;
-          addEvents(type, _scope, false);
-        } else if (typeof type === 'string' && typeof handler === 'function') {
-          _scope = typeof scope === 'object' ? scope : null;
-          addEvent(type, handler, _scope, false);
-        } else {
-          throw new TypeError(CUE_EVENTS_ARGS_ERROR);
-        }
-      
+      if (type && type.constructor === OBJ) {
+        _scope = typeof handler === 'object' ? handler : null;
+        addEvents(type, _scope, false);
+      } else if (typeof type === 'string' && typeof handler === 'function') {
+        _scope = typeof scope === 'object' ? scope : null;
+        addEvent(type, handler, _scope, false);
+      } else {
+        throw new TypeError(CUE_EVENTS_ARGS_ERROR);
       }
-      
+
     },
 
-    once: { 
-      
-      value: function(type, handler, scope) {
+    once: (type, handler, scope) => {
 
-        if (type && type.constructor === OBJ) {
-          _scope = typeof handler === 'object' ? handler : null;
-          addEvents(type, _scope, true);
-        } else if (typeof type === 'string' && typeof handler === 'function') {
-          _scope = typeof scope === 'object' ? scope : null;
-          addEvent(type, handler, _scope, true);
-        } else {
-          throw new TypeError(CUE_EVENTS_ARGS_ERROR);
-        }
-  
+      if (type && type.constructor === OBJ) {
+        _scope = typeof handler === 'object' ? handler : null;
+        addEvents(type, _scope, true);
+      } else if (typeof type === 'string' && typeof handler === 'function') {
+        _scope = typeof scope === 'object' ? scope : null;
+        addEvent(type, handler, _scope, true);
+      } else {
+        throw new TypeError(CUE_EVENTS_ARGS_ERROR);
       }
-    
+
     },
 
-    off: {
-      
-      value: function(type) {
-        CUE_EVENTS.delete(type);
-      }
-    
+    off: type => {
+      CUE_EVENTS.delete(type);
     },
 
-    trigger: {
-      
-      value: function(type, payload) {
-      
-        if ((_events = CUE_EVENTS.get(type))) {
+    trigger: (type, ...payload) => {
 
-          for (let i = 0; i < _events.length; i++) {
-            _event = _events[i];
-            _event.handler.call(_event.scope, payload);
-            if (_event.once) _disposable.push(_event);
-          }
-          
-          if (_disposable.length) {
-            CUE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
-            _disposable.length = 0;
-          }
-  
-          _events = null;
-          
+      if ((_events = CUE_EVENTS.get(type))) {
+
+        for (let i = 0; i < _events.length; i++) {
+          _event = _events[i];
+          _event.handler.apply(_event.scope, payload);
+          if (_event.once) _disposable.push(_event);
         }
-        
+
+        if (_disposable.length) {
+          CUE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
+          _disposable.length = 0;
+        }
+
+        _events = null;
+
       }
-    
+
     }
 
   });

@@ -11,10 +11,9 @@ const BUILD_DIR = 'build';
 const MODULES = {
   proto:    SOURCE_DIR + '/proto',
   eventBus: SOURCE_DIR + '/eventBus',
-  plugins:  SOURCE_DIR + '/plugins',
+  plugins:  SOURCE_DIR + '/plugin',
   state:    SOURCE_DIR + '/state',
-  ui:       SOURCE_DIR + '/ui',
-  app:      SOURCE_DIR + '/app'
+  ui:       SOURCE_DIR + '/ui'
 };
 
 const FILES = {
@@ -22,7 +21,6 @@ const FILES = {
     `${SOURCE_DIR}/index.js`
   ],
   proto: [
-    `${MODULES.proto}/index.js`,
     `${MODULES.proto}/math-utils.js`,
     `${MODULES.proto}/string-utils.js`,
     `${MODULES.proto}/obj-utils.js`,
@@ -92,11 +90,8 @@ const FILES = {
     `${MODULES.ui}/public-api.js`
 
   ],
-  app: [
-    `${MODULES.app}/proto.js`,
-    `${MODULES.app}/public-api.js`,
-  ],
   publicAPI: [
+    `${SOURCE_DIR}/proto.js`,
     `${SOURCE_DIR}/public-api.js`
   ]
 };
@@ -111,7 +106,6 @@ gulp.task('build-lib', function() {
       ...FILES.plugins,
       ...FILES.state,
       ...FILES.ui,
-      ...FILES.app,
       ...FILES.publicAPI
     ])
 
