@@ -19,7 +19,7 @@ const ARRAY_MUTATORS = new Set(['copyWithin','fill','pop','push','reverse','shif
 // Builtins
 const OBJ = Object;
 const ARR = Array;
-const MTH = Math;
+const OBJ_ID = '[object Object]';
 
 // Static Object/Array Helpers
 const oAssign = OBJ.assign;
@@ -27,23 +27,11 @@ const oCreate = OBJ.create;
 const oDefineProperty = OBJ.defineProperty;
 const oDefineProperties = OBJ.defineProperties;
 const oSetPrototypeOf = OBJ.setPrototypeOf;
+const oGetPrototypeOf = OBJ.getPrototypeOf;
+const oProtoToString = OBJ.prototype.toString;
 const oKeys = OBJ.keys;
 const oEntries = OBJ.entries;
-const oFreeze = OBJ.freeze;
 const isArray = ARR.isArray;
-
-// Static Math Helpers
-const MAX = MTH.max;
-const MIN = MTH.min;
-const RANDOM = MTH.random;
-const ABS = MTH.abs;
-const POW = MTH.pow;
-const ROUND = MTH.round;
-const FLOOR = MTH.floor;
-const CEIL = MTH.ceil;
-const PI = MTH.PI;
-const DEG2RAD = PI / 180;
-const RAD2DEG = 180 / PI;
 
 // Reflect methods
 const _set = Reflect.set;
@@ -51,6 +39,13 @@ const _get = Reflect.get;
 const _apply = Reflect.apply;
 const _delete = Reflect.deleteProperty;
 
-// Generic Cue Prototype Object.
-// Extension point for Plugins and Module specific prototypes.
-const CUE_PROTO = {};
+// Utility methods
+const isPlainObject = o => typeof o === 'object' && o !== null && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
+
+// Cue Library Object
+const __lib_core__ = {};
+const CUE_LIB = {
+  core: __lib_core__,
+  state: oCreate(__lib_core__), // extends core
+  ui: oCreate(__lib_core__)     // extends core
+};

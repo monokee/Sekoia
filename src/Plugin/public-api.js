@@ -7,10 +7,10 @@ const CUE_PLUGINS_API = {
       throw new Error(`Plugin must be defined with a namespaced-name (vendor-plugin) of type string as the first argument.`);
     }
 
-    // split name into vendor, plugin
+    // split name into vendor, Plugin
     const [vendor, plugin] = parsePluginName(name);
 
-    if (!installer && !autoinstall) { // return plugin interface when only name is provided (Handle Plugin() call like getter)
+    if (!installer && !autoinstall) { // return Plugin interface when only name is provided (Handle Plugin() call like getter)
 
       const byVendor = CUE_PLUGINS.get(vendor);
 
@@ -28,7 +28,7 @@ const CUE_PLUGINS_API = {
         throw new Error(`No Plugin has been registered under "${byVendor}".`);
       }
 
-    } else { // register a new plugin when all arguments are provided (like setter)
+    } else { // register a new Plugin when all arguments are provided (like setter)
 
       if (typeof installer !== 'function') {
         throw new Error(`Plugin must be defined with an installable function as the second argument.`);

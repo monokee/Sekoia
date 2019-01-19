@@ -2,7 +2,7 @@
 function initializeUIComponent(initializer) { // runs only once per module
 
   // componentInitializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
-  const CONFIG = typeof initializer === 'function' ? initializer(CUE_UI_PROTO) : initializer;
+  const CONFIG = typeof initializer === 'function' ? initializer.call(null, CUE_LIB.ui) : initializer;
 
   if (!CONFIG || CONFIG.constructor !== OBJ) {
     throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);

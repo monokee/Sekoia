@@ -10,8 +10,8 @@ const CueInstanceProto = {
     target = typeof target === 'string' ? document.querySelector(target) : target instanceof Element ? target : null;
     if (!target) throw new TypeError(`Target is not HTMLElement or Selector of element that is in the DOM.`);
 
-    const rootState = CUE_STATE_PROTO.import(this.state.module);
-    const rootComponent = CUE_UI_PROTO.import(this.ui.component);
+    const rootState = CUE_LIB.state.import(this.state.module);
+    const rootComponent = CUE_LIB.ui.import(this.ui.component);
 
     this.state.instance = rootState(props);
     this.ui.element = rootComponent(this.state.instance);

@@ -20,3 +20,5 @@ const CUE_UI_API = {
   }
 
 };
+
+CUE_UI_API.UI.isComponent = x => x instanceof ComponentInstance;

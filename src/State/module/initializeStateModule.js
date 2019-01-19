@@ -4,7 +4,7 @@ function initializeStateModule(moduleInitializer) {
   // creates a reusable Module. A Module is a blueprint
   // from which factories can create instances of State.
 
-  const config = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_STATE_PROTO) : moduleInitializer;
+  const config = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_LIB.state) : moduleInitializer;
 
   if (!config || config.constructor !== OBJ) {
     throw new TypeError(`Can't create State Module because the config function does not return a plain object.`);

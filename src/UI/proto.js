@@ -1,7 +1,7 @@
 
 // The CUE Proto Object (Inner-API) exposed to Cue.Component registration closures
-// inherits methods and properties from main CUE_PROTO object and thus has access to plugins and generic utilities
-const CUE_UI_PROTO = oCreate(CUE_PROTO, {
+// inherits methods and properties from main CUE_LIB.core object and thus has access to plugins and generic utilities
+const CUE_LIB.ui = oCreate(CUE_LIB.core, {
 
   import: {
     value: function(name) {

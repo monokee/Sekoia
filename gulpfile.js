@@ -9,30 +9,19 @@ const SOURCE_DIR = 'src';
 const BUILD_DIR = 'build';
 
 const MODULES = {
-  proto:    SOURCE_DIR + '/proto',
-  eventBus: SOURCE_DIR + '/eventBus',
-  plugins:  SOURCE_DIR + '/plugin',
-  state:    SOURCE_DIR + '/state',
-  ui:       SOURCE_DIR + '/ui'
+  eventBus: SOURCE_DIR + '/EventBus',
+  state:    SOURCE_DIR + '/State',
+  ui:       SOURCE_DIR + '/UI',
+  plugin:   SOURCE_DIR + '/Plugin',
+  library:  SOURCE_DIR + '/Library',
 };
 
 const FILES = {
   index: [
     `${SOURCE_DIR}/index.js`
   ],
-  proto: [
-    `${MODULES.proto}/math-utils.js`,
-    `${MODULES.proto}/string-utils.js`,
-    `${MODULES.proto}/obj-utils.js`,
-    `${MODULES.proto}/array-utils.js`,
-    `${MODULES.proto}/fn-utils.js`
-  ],
   eventBus: [
     `${MODULES.eventBus}/event-bus.js`
-  ],
-  plugins: [
-    `${MODULES.plugins}/index.js`,
-    `${MODULES.plugins}/public-api.js`,
   ],
   state: [
 
@@ -90,6 +79,17 @@ const FILES = {
     `${MODULES.ui}/public-api.js`
 
   ],
+  plugin: [
+    `${MODULES.plugin}/index.js`,
+    `${MODULES.plugin}/public-api.js`,
+  ],
+  library: [
+    `${MODULES.library}/math-utils.js`,
+    `${MODULES.library}/string-utils.js`,
+    `${MODULES.library}/obj-utils.js`,
+    `${MODULES.library}/array-utils.js`,
+    `${MODULES.library}/fn-utils.js`
+  ],
   publicAPI: [
     `${SOURCE_DIR}/proto.js`,
     `${SOURCE_DIR}/public-api.js`
@@ -101,11 +101,11 @@ gulp.task('build-lib', function() {
   gulp
     .src([
       ...FILES.index,
-      ...FILES.proto,
       ...FILES.eventBus,
-      ...FILES.plugins,
       ...FILES.state,
       ...FILES.ui,
+      ...FILES.plugin,
+      ...FILES.library,
       ...FILES.publicAPI
     ])
 

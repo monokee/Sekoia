@@ -11,7 +11,7 @@
 
   const _CUE_VERSION_ = 0.9;
 
-  // Cue Scoped Utils and Helpers (available anywhere in the library)
+  // Cue Scoped Utils and Helpers (available anywhere in the Library)
   const NOOP = () => {};
 
   // All mutating array methods
@@ -53,9 +53,9 @@
 
   // Generic Cue Prototype Object.
   // Extension point for Plugins and Module specific prototypes.
-  const CUE_PROTO = {};
+  const CUE_LIB.core = {};
 
-  oAssign(CUE_PROTO, {
+  oAssign(CUE_LIB.core, {
 
     clamp(min, max, val) {
       return MAX(min, MIN(max, val));
@@ -150,7 +150,7 @@
 
   });
 
-  oAssign(CUE_PROTO, {
+  oAssign(CUE_LIB.core, {
 
     createUID() {
 
@@ -184,7 +184,7 @@
 
   });
 
-  oAssign(CUE_PROTO, {
+  oAssign(CUE_LIB.core, {
 
     deepClone(o) {
 
@@ -356,7 +356,7 @@
 
   });
 
-  oAssign(CUE_PROTO, {
+  oAssign(CUE_LIB.core, {
 
     flattenArray(multiDimensionalArray) {
       return multiDimensionalArray.reduce((x, y) => x.concat(isArray(y) ? this.flattenArray(y) : y), []);
@@ -488,7 +488,7 @@
 
   });
 
-  oAssign(CUE_PROTO, {
+  oAssign(CUE_LIB.core, {
 
     throttle(func, rate = 250, scope = null) {
 
@@ -691,7 +691,7 @@
       return plugin.interface;
     }
 
-    plugin.installer.call(plugin.interface, CUE_PROTO, options);
+    plugin.installer.call(plugin.interface, CUE_LIB.core, options);
     plugin.didInstall = true;
     plugin.interface.onDidInstall.call(plugin.interface, options);
 
@@ -707,10 +707,10 @@
         throw new Error(`Plugin must be defined with a namespaced-name (vendor-plugin) of type string as the first argument.`);
       }
 
-      // split name into vendor, plugin
+      // split name into vendor, Plugin
       const [vendor, plugin] = parsePluginName(name);
 
-      if (!installer && !autoinstall) { // return plugin interface when only name is provided (Handle Plugin() call like getter)
+      if (!installer && !autoinstall) { // return Plugin interface when only name is provided (Handle Plugin() call like getter)
 
         const byVendor = CUE_PLUGINS.get(vendor);
 
@@ -728,7 +728,7 @@
           throw new Error(`No Plugin has been registered under "${byVendor}".`);
         }
 
-      } else { // register a new plugin when all arguments are provided (like setter)
+      } else { // register a new Plugin when all arguments are provided (like setter)
 
         if (typeof installer !== 'function') {
           throw new Error(`Plugin must be defined with an installable function as the second argument.`);
@@ -812,7 +812,7 @@
   const MAIN_QUEUE = [];
 
   // Cue-State Prototype Object extends Cue-Prototype Object
-  const CUE_STATE_PROTO = oCreate(CUE_PROTO, {
+  const CUE_LIB.state = oCreate(CUE_LIB.core, {
 
     import: {
       value: function(name) {
@@ -1787,7 +1787,7 @@
     // creates a reusable Module. A Module is a blueprint
     // from which factories can create instances of State.
 
-    const config = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_STATE_PROTO) : moduleInitializer;
+    const config = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_LIB.state) : moduleInitializer;
 
     if (!config || config.constructor !== OBJ) {
       throw new TypeError(`Can't create State Module because the config function does not return a plain object.`);
@@ -1930,8 +1930,8 @@
   const CUE_UI_MODULES = new Map();
 
   // The CUE Proto Object (Inner-API) exposed to Cue.Component registration closures
-  // inherits methods and properties from main CUE_PROTO object and thus has access to plugins and generic utilities
-  const CUE_UI_PROTO = oCreate(CUE_PROTO, {
+  // inherits methods and properties from main CUE_LIB.core object and thus has access to plugins and generic utilities
+  const CUE_LIB.ui = oCreate(CUE_LIB.core, {
 
     import: {
       value: function(name) {
@@ -2530,7 +2530,7 @@
       // "update" is a function that updates existing elements. It requires two arguments: (domElement, newData). How the newData is rendered into the domElement is specified explicitly in the function body.
       // "update" defaults to noop because in most cases property / attribute updates are handled by children themselves
       // "update" is only required for non-reactive or primitive children in data array
-      // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive state module
+      // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive State module
 
       // fast path clear all
       if (to.length === 0) {
@@ -2652,7 +2652,7 @@
   function initializeUIComponent(initializer) { // runs only once per module
 
     // componentInitializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
-    const CONFIG = typeof initializer === 'function' ? initializer(CUE_UI_PROTO) : initializer;
+    const CONFIG = typeof initializer === 'function' ? initializer(CUE_LIB.ui) : initializer;
 
     if (!CONFIG || CONFIG.constructor !== OBJ) {
       throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);
@@ -2739,8 +2739,8 @@
       target = typeof target === 'string' ? document.querySelector(target) : target instanceof Element ? target : null;
       if (!target) throw new TypeError(`Target is not HTMLElement or Selector of element that is in the DOM.`);
 
-      const rootState = CUE_STATE_PROTO.import(this.state.module);
-      const rootComponent = CUE_UI_PROTO.import(this.ui.component);
+      const rootState = CUE_LIB.state.import(this.state.module);
+      const rootComponent = CUE_LIB.ui.import(this.ui.component);
 
       this.state.instance = rootState(props);
       this.ui.element = rootComponent(this.state.instance);

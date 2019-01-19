@@ -92,7 +92,7 @@ class ComponentInstance {
     // "update" is a function that updates existing elements. It requires two arguments: (domElement, newData). How the newData is rendered into the domElement is specified explicitly in the function body.
     // "update" defaults to noop because in most cases property / attribute updates are handled by children themselves
     // "update" is only required for non-reactive or primitive children in data array
-    // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive state module
+    // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive State module
 
     // fast path clear all
     if (to.length === 0) {
@@ -207,6 +207,41 @@ class ComponentInstance {
       throw new TypeError(`Can't remove event listener(s) because of invalid arguments.`);
     }
 
+  }
+
+  insertNodeBefore(node, target) { // TODO: needs major refactor. These should mirror or improve on the DOM API. Selection from within a CUE instance should always select the CUE Component (not raw element) so that ops can be lifecycled!!
+    target.parentNode.insertBefore(node, target);
+    return this;
+  }
+
+  insertNodeAfter(node, target) {
+    target.parentNode.insertBefore(node, target.nextSibling);
+    return this;
+  }
+
+  insertNodeAt(node, index) {
+
+    const parent = node.parentNode, children = parent.children;
+
+    if (index >= children.length) {
+      parent.appendChild(node);
+    } else if (index <= 0) {
+      parent.insertBefore(node, parent.firstChild);
+    } else {
+      parent.insertBefore(node, children[index >= Array.from(children).indexOf(node) ? index + 1 : index]);
+    }
+
+    return this;
+
+  }
+
+  detachNode(node) {
+    return node.parentNode.removeChild(node);
+  }
+
+  removeNode(node) {
+    node.parentNode.removeChild(node);
+    return this;
   }
 
 }

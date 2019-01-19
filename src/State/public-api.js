@@ -18,3 +18,5 @@ const CUE_STATE_API = {
   }
 
 };
+
+CUE_STATE_API.State.isState = x => !!x[__CUE__];
