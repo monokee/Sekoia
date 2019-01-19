@@ -1,4 +1,5 @@
-Cue.Plugin('cue-ui-sortable', function(lib, options = {lockAxis: true, animationTime: 0.3}) {
+
+Cue.Plugin('cue-ui-sortable', (lib, options = {lockAxis: true, animationTime: 0.3}) => {
 
   /** ------------ Plugin Dependencies ------------ */
   const TweenLight = lib.core.TweenLight;
@@ -221,8 +222,6 @@ Cue.Plugin('cue-ui-sortable', function(lib, options = {lockAxis: true, animation
   });
 
   /** ------------ Plugin Extension Point ------------ */
-  return {
-    classify: classify // Very! bad and wrong example. lol
-  };
+  return {};
 
 }, false);

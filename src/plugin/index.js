@@ -2,10 +2,11 @@
 // Plugin Repository
 const CUE_PLUGINS = new Map();
 
+// Plugins can compose functionality onto the following inner proto objects:
 const CUE_PLUGIN_EXTENSION_POINTS = oFreeze({
-  core: CUE_PROTO,
-  state: CUE_STATE_PROTO,
-  ui: CUE_UI_PROTO
+  core: CUE_PROTO, // available in all modules
+  state: CUE_STATE_PROTO, // available in state modules
+  ui: CUE_UI_PROTO // available in ui modules
 });
 
 // Internal Methods
@@ -19,7 +20,7 @@ const installPlugin = (plugin, options) => {
     return plugin.extensionPoint;
   }
 
-  // the return value of the the plugin installer is the plugins extension point that can be extended by other plugins
+  // Plugins can be extended by other plugins by declaring extension points via the return value from their install function:
   plugin.extensionPoint = plugin.installer.call(null, CUE_PLUGIN_EXTENSION_POINTS, options);
   plugin.didInstall = true;
 
