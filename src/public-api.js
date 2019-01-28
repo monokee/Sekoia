@@ -1,6 +1,6 @@
 
 global || (global = window);
-global.Cue = oAssign(function(config) {
+const Cue = global.Cue = oAssign(function(config) {
 
     if (!config || config.constructor !== OBJ)
       throw new TypeError('[Cue]: config is not an object.');

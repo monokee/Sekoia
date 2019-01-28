@@ -57,7 +57,7 @@ Cue.UI('App-UI', Component => ({
     const classList = element.classList;
     const {top, bottom} = this.getRefs();
 
-    this.on({
+    this.on('.sidebarLeft', {
       click: e => {
         appState.startTicker();
       },
@@ -76,12 +76,6 @@ Cue.UI('App-UI', Component => ({
       }
     });
 
-  },
-
-  didMount() {},
-
-  didUpdate() {},
-
-  willUnmount() {}
+  }
 
 }));

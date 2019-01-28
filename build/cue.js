@@ -11,7 +11,7 @@
 
   const _CUE_VERSION_ = 0.9;
 
-  // Cue Scoped Utils and Helpers (available anywhere in the Library)
+  // Cue Scoped Utils and Helpers (available anywhere in the library)
   const NOOP = () => {};
 
   // All mutating array methods
@@ -20,7 +20,7 @@
   // Builtins
   const OBJ = Object;
   const ARR = Array;
-  const MTH = Math;
+  const OBJ_ID = '[object Object]';
 
   // Static Object/Array Helpers
   const oAssign = OBJ.assign;
@@ -28,22 +28,11 @@
   const oDefineProperty = OBJ.defineProperty;
   const oDefineProperties = OBJ.defineProperties;
   const oSetPrototypeOf = OBJ.setPrototypeOf;
+  const oGetPrototypeOf = OBJ.getPrototypeOf;
+  const oProtoToString = OBJ.prototype.toString;
   const oKeys = OBJ.keys;
   const oEntries = OBJ.entries;
   const isArray = ARR.isArray;
-
-  // Static Math Helpers
-  const MAX = MTH.max;
-  const MIN = MTH.min;
-  const RANDOM = MTH.random;
-  const ABS = MTH.abs;
-  const POW = MTH.pow;
-  const ROUND = MTH.round;
-  const FLOOR = MTH.floor;
-  const CEIL = MTH.ceil;
-  const PI = MTH.PI;
-  const DEG2RAD = PI / 180;
-  const RAD2DEG = 180 / PI;
 
   // Reflect methods
   const _set = Reflect.set;
@@ -51,529 +40,16 @@
   const _apply = Reflect.apply;
   const _delete = Reflect.deleteProperty;
 
-  // Generic Cue Prototype Object.
-  // Extension point for Plugins and Module specific prototypes.
-  const CUE_LIB.core = {};
-
-  oAssign(CUE_LIB.core, {
-
-    clamp(min, max, val) {
-      return MAX(min, MIN(max, val));
-    },
-
-    lerp(from, to, proportionFloat) {
-      return (1 - proportionFloat) * from + proportionFloat * to;
-    },
-
-    smoothStep(min, max, val) {
-      if (val <= min) return 0;
-      if (val >= max) return 1;
-      val = (val - min) / (max - min);
-      return val * val * (3 - 2 * val);
-    },
-
-    interpolateLinear(aMin, aMax, bMin, bMax, val) {
-      return bMin + (val - aMin) * (bMax - bMin) / (aMax - aMin);
-    },
-
-    createLinearInterpolator(aMin, aMax, bMin, bMax) {
-
-      // creates runtime optimized linear range interpolation functions for static ranges
-
-      if (!arguments.length) {
-
-        return this.interpolateLinear;
-
-      } else {
-
-        if (aMin === 0 && bMin > 0) {
-
-          return val => ((val * (bMax - bMin)) / aMax) + bMin;
-
-        } else if (bMin === 0 && aMin > 0) {
-
-          return val => (((val - aMin) * bMax) / (aMax - aMin));
-
-        } else if (aMin === 0 && bMin === 0) {
-
-          return v => (v * bMax) / bMax;
-
-        } else {
-
-          return this.interpolateLinear;
-
-        }
-
-      }
-
-    },
-
-    convertBits(sourceBits, targetBits, val) {
-      if (sourceBits < 32) {
-        if (targetBits < 32) {
-          return val * POW(2, targetBits) / POW(2, sourceBits);
-        } else {
-          return val / POW(2, sourceBits);
-        }
-      } else {
-        if (targetBits < 32) {
-          return ROUND(val * POW(2, targetBits));
-        } else {
-          return val;
-        }
-      }
-    },
-
-    randomIntegerBetween(min, max) {
-      return FLOOR(RANDOM() * (max - min + 1) + min);
-    },
-
-    randomFloatBetween(min, max) {
-      return RANDOM() * (max - min) + min;
-    },
-
-    isOddNumber(val) {
-      return val & 1;
-    },
-
-    isEvenNumber(val) {
-      return !(val & 1);
-    },
-
-    degreesToRadians(degrees) {
-      return degrees * DEG2RAD;
-    },
-
-    radiansToDegrees(radians) {
-      return radians * RAD2DEG;
-    }
-
-  });
-
-  oAssign(CUE_LIB.core, {
-
-    createUID() {
-
-      const letters = 'abcdefghijklmnopqrstuvwxyz';
-
-      let sessionCounter = 0;
-
-      return ((this.createUID = function createUID() {
-
-        let n, o = '';
-        const alphaHex = sessionCounter.toString(26).split('');
-        while ((n = alphaHex.shift())) o += letters[parseInt(n, 26)];
-        sessionCounter++;
-        return o;
-
-      }).call(this));
-
-    },
-
-    camelCase(dashed_string) {
-      const c = document.createElement('div');
-      c.setAttribute(`data-${dashed_string}`, '');
-      return oKeys(c.dataset)[0];
-    },
-
-    dashedCase(camelString) {
-      const c = document.createElement('div');
-      c.dataset[camelString] = '';
-      return c.attributes[0].name.substr(5);
-    }
-
-  });
-
-  oAssign(CUE_LIB.core, {
-
-    deepClone(o) {
-
-      // Deep cloning for plain Arrays and Objects
-
-      if (isArray(o)) {
-
-        const clone = [];
-
-        for (let i = 0, v; i < o.length; i++) {
-          v = o[i];
-          clone[i] = typeof v === 'object' ? this.deepClone(v) : v;
-        }
-
-        return clone;
-
-      }
-
-      if (o.constructor === OBJ) {
-
-        const clone = {};
-
-        let i, v;
-
-        for (i in o) {
-          v = o[i];
-          clone[i] = typeof v === 'object' ? this.deepClone(v) : v;
-        }
-
-        return clone;
-
-      }
-
-    },
-
-    shallowClone(o) {
-
-      // Shallow cloning for plain Arrays and Objects
-
-      if (isArray(o)) {
-        return o.slice();
-      }
-
-      if (o.constructor === OBJ) {
-        return oAssign({}, o);
-      }
-
-    },
-
-    deepCompare(a, b) {
-
-      // deeply compares primitives, plain arrays && plain objects by content value
-      // does not work for functions and object types other than plain old objects and arrays!
-
-      if (a === b) { // primitive value or pointer is equal
-
-        return true;
-
-      } else {
-
-        const typeA = typeof a;
-
-        if (typeA === typeof b) { // same type (can be object and array!)
-
-          const bIsArray = isArray(b);
-
-          if (isArray(a) && bIsArray) { // array::array
-
-            if (a.length !== b.length) { // length mismatch
-              return false;
-            } else {
-              for (let i = 0; i < a.length; i++) {
-                if (!this.deepCompare(a[i], b[i])) return false;
-              }
-              return true;
-            }
-
-          } else if (typeA === 'object' && !bIsArray) { // object::object
-
-            let k;
-            for (k in a) {
-              if (!this.deepCompare(a[k], b[k])) return false;
-            }
-            return true;
-
-          } else { // object::array || array::object
-
-            return false;
-
-          }
-
-        } else { // type mismatch
-
-          return false;
-
-        }
-
-      }
-
-    },
-
-    shallowCompare(a, b) {
-
-      // One-level shallow, ordered equality check
-
-      // Plain Objects
-      if (a.constructor === OBJ && b.constructor === OBJ) {
-
-        const keysA = oKeys(a);
-        const keysB = oKeys(b);
-
-        if (keysA.length !== keysB.length) {
-          return false;
-        }
-
-        for (let i = 0, k; i < keysA.length; i++) {
-          k = keysA[i];
-          if (keysB.indexOf(k) === -1 || a[k] !== b[k]) {
-            return false;
-          }
-        }
-
-        return true;
-
-      }
-
-      // Plain Arrays
-      if (isArray(a) && isArray(b)) {
-
-        if (a.length !== b.length) {
-          return false;
-        }
-
-        for (let i = 0; i < a.length; i++) {
-          if (a[i] !== b[i]) {
-            return false;
-          }
-        }
-
-        return true;
-
-      }
-
-      // Primitives, Maps, Sets, Data, RegExp and other Objects
-      // limited to strict equality comparison
-      return a === b;
-
-    },
-
-    mergeObjects(...objects) {
-
-      // merge multiple objects into first object
-
-      let i = 0,
-        l = objects.length,
-        key = '';
-
-      while (++i < l) {
-        for (key in objects[i]) {
-          if (objects[i].hasOwnProperty(key)) {
-            objects[0][key] = objects[i][key];
-          }
-        }
-      }
-
-      return objects[0];
-
-    }
-
-  });
-
-  oAssign(CUE_LIB.core, {
-
-    flattenArray(multiDimensionalArray) {
-      return multiDimensionalArray.reduce((x, y) => x.concat(isArray(y) ? this.flattenArray(y) : y), []);
-    },
-
-    insertAtEvery(array, item, step) {
-
-      // Insert an item every step items.
-      step = MAX(step, 1);
-
-      const sl = array.length; // source length
-      const tl = FLOOR(sl + (sl / step)); // target length
-      const cl = FLOOR(tl / step); // target chunk length
-
-      let newArray = [];
-
-      for (let x = 0; x < cl; x++) {
-
-        if (newArray.length + step < tl) {
-
-          for (let y = 0; y < step; y++) {
-            newArray.push(array[y + (x * step)]);
-          }
-
-          newArray.push(item);
-
-        } else {
-
-          const tail = MAX(tl - newArray.length, 0);
-          newArray = newArray.concat(array.slice(sl - tail, sl + 1));
-          break;
-
-        }
-
-      }
-
-      array = newArray;
-
-      return this;
-
-    },
-
-    removeAtEvery(array, step) {
-      let i = FLOOR(array.length / step);
-      while (i--) array.splice((i + 1) * step - 1, 1);
-      return this;
-    },
-
-    removeRangeFromArray(array, from, to) {
-      array.splice(from, to - from);
-      return this;
-    },
-
-    mergeArrays(array1, array2, at = array1.length) {
-
-      at = MIN(MAX(at, 0), array1.length);
-
-      const il = array2.length;
-      const tl = array1.length - at;
-      const tail = new Array(tl);
-
-      let i;
-      for (i = 0; i < tl; i++) tail[i] = array1[i + at];
-      for (i = 0; i < il; i++) array1[i + at] = array2[i];
-      for (i = 0; i < tl; i++) array1[i + il + at] = tail[i];
-
-      return this;
-
-    },
-
-    scaleArray(array, targetLength) {
-
-      // 1D Linear Interpolation
-      const il = array.length - 1,
-        ol = targetLength - 1,
-        s = il / ol;
-
-      let a = 0,
-        b = 0,
-        c = 0,
-        d = 0;
-
-      for (let i = 1; i < ol; i++) {
-        a = i * s;
-        b = FLOOR(a);
-        c = CEIL(a);
-        d = a - b;
-        array[i] = array[b] + (array[c] - array[b]) * d;
-      }
-
-      array[ol] = array[il];
-
-      return this;
-
-    },
-
-    closestValueInArray(array, val) {
-      // get closest match to value in array
-      return array.reduce((prev, curr) => {
-        return (ABS(curr - val) < ABS(prev - val) ? curr : prev);
-      });
-    },
-
-    closestSmallestValueInArray(array, value) {
-      const closest = this.closestValueInArray(array, value);
-      return value >= closest ? closest : array[array.indexOf(closest) - 1];
-    },
-
-    closestLargestValueInArray(array, value) {
-      const closest = this.closestValueInArray(array, value);
-      return value <= closest ? closest : array[array.indexOf(closest) + 1];
-    },
-
-    largestValueInArray(array) {
-      let max = -Infinity;
-      for (let i = 0; i < array.length; i++) {
-        if (array[i] > max) max = array[i];
-      }
-      return max === -Infinity ? void 0 : max;
-    },
-
-    smallestValueInArray(array) {
-      let min = Infinity;
-      for (let i = 0; i < array.length; i++) {
-        if (array[i] < min) min = array[i];
-      }
-      return min === Infinity ? void 0 : min;
-    }
-
-  });
-
-  oAssign(CUE_LIB.core, {
-
-    throttle(func, rate = 250, scope = null) {
-
-      // returns a function that will only be called every "rate" milliseconds
-
-      let now = 0.00,
-        last = 0.00;
-
-      return function(...rest) {
-        now = Date.now();
-        if (now > last + rate) {
-          func.apply(scope, rest);
-          last = now;
-        }
-      };
-
-    },
-
-    defer(func, delay = 250, scope = null) {
-
-      // returns a function that is only called "delay" milliseconds after its last invocation
-
-      let pending = null;
-
-      return function(...rest) {
-        clearTimeout(pending);
-        pending = setTimeout(() => {
-          func.apply(scope, rest);
-          pending = null;
-        }, delay);
-      };
-
-    },
-
-    createTaskWorker(handler) {
-
-      // Run processes in a different thread. Use postMessage interface in handler to call back to main thread.
-      // handler = function || object: {process: worker.onmessage fn, response: how the workers response is handled on the main thread, onError: ...}
-      //
-      // Example:
-      // const worker = createTaskWorker({
-      //   process: function({data}) { <- useful convention to destructure the event object as we're mainly interested in the data
-      //     this computation runs in worker thread. can work with data provided by main thread.
-      //     postMessage(data.toString()); <- this is passed to the response handler on the main thread via event.data
-      //   },
-      //   response: function({data}) {
-      //     runs on main thread in response to postMessage call from worker thread.
-      //     console.log(typeof data);
-      //   }
-      // });
-      //
-      // Start the worker:
-      // worker.process(1.234); // -> logs 'string'
-
-      const process = typeof handler === 'function' ? handler : handler.process ? handler.process : undefined;
-
-      const worker = new Worker(window.URL.createObjectURL(new Blob([
-      `(function() { onmessage = ${process.toString()} })()`
-    ], {
-        type: 'application/javascript'
-      })));
-
-      if (handler.response) worker.onmessage = handler.response;
-      if (handler.onError) worker.onerror = handler.onError;
-
-      return {
-        process: worker.postMessage.bind(worker), // starts the worker process
-        terminate: worker.terminate.bind(worker), // terminates the worker
-        set response(fn) { // defines main-thread response handler for worker
-          worker.onmessage = fn;
-        },
-        get response() {
-          return worker.onmessage;
-        },
-        set onError(fn) { // defines main-thread error handler for worker
-          worker.onerror = fn;
-        },
-        get onError() {
-          return worker.onerror;
-        }
-      };
-
-    }
-
-  });
+  // Utility methods
+  const isPlainObject = o => typeof o === 'object' && o !== null && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
+
+  // Cue Library Object
+  const __lib_core__ = {};
+  const CUE_LIB = {
+    core: __lib_core__,
+    state: oCreate(__lib_core__), // extends core
+    ui: oCreate(__lib_core__) // extends core
+  };
 
   const CUE_EVENT_BUS_API = {};
 
@@ -676,115 +152,6 @@
 
   }
 
-  // Plugin Repository
-  const CUE_PLUGINS = new Map();
-
-  // Internal Methods
-  const isPluginNameValid = name => typeof name === 'string' && name.length > 2 && name.indexOf('-') !== -1;
-
-  const parsePluginName = name => name.split('-');
-
-  const installPlugin = (plugin, options) => {
-
-    if (plugin.didInstall) {
-      console.warn(`"${plugin.name}" has already been installed. Installation ignored.`);
-      return plugin.interface;
-    }
-
-    plugin.installer.call(plugin.interface, CUE_LIB.core, options);
-    plugin.didInstall = true;
-    plugin.interface.onDidInstall.call(plugin.interface, options);
-
-    return plugin.interface;
-
-  };
-
-  const CUE_PLUGINS_API = {
-
-    Plugin: (name, installer, autoinstall) => {
-
-      if (!isPluginNameValid(name)) {
-        throw new Error(`Plugin must be defined with a namespaced-name (vendor-plugin) of type string as the first argument.`);
-      }
-
-      // split name into vendor, Plugin
-      const [vendor, plugin] = parsePluginName(name);
-
-      if (!installer && !autoinstall) { // return Plugin interface when only name is provided (Handle Plugin() call like getter)
-
-        const byVendor = CUE_PLUGINS.get(vendor);
-
-        if (byVendor) {
-
-          const thePlugin = byVendor.get(plugin);
-
-          if (thePlugin) {
-            return thePlugin;
-          } else {
-            throw new Error(`No Plugin with name ${name} has been registered under "${vendor}".`);
-          }
-
-        } else {
-          throw new Error(`No Plugin has been registered under "${byVendor}".`);
-        }
-
-      } else { // register a new Plugin when all arguments are provided (like setter)
-
-        if (typeof installer !== 'function') {
-          throw new Error(`Plugin must be defined with an installable function as the second argument.`);
-        }
-
-        const byVendor = CUE_PLUGINS.get(vendor) || CUE_PLUGINS.set(vendor, new Map()).get(vendor);
-
-        if (byVendor.has(plugin)) {
-          console.warn(`A plugin with name "${plugin}" has already been registered under "${vendor}". Skipping installation...`);
-          return byVendor.get(plugin).interface;
-        }
-
-        const thePlugin = {
-          installer: installer,
-          didInstall: false,
-          name: name,
-          interface: {
-            name: name,
-              onDidInstall() {}
-          }
-        };
-
-        byVendor.set(plugin, thePlugin);
-
-        return autoinstall ? installPlugin(thePlugin) : thePlugin.interface;
-
-      }
-
-    },
-
-    use: (pluginName, options) => {
-
-      if (!isPluginNameValid(pluginName)) {
-        throw new Error(`pluginName must be a namespaced-string (vendor-plugin).`);
-      }
-
-      const [vendor, plugin] = parsePluginName(pluginName);
-
-      const byVendor = CUE_PLUGINS.get(vendor);
-
-      if (byVendor) {
-
-        const thePlugin = byVendor.get(plugin);
-
-        if (thePlugin) {
-          return installPlugin(thePlugin, options);
-        }
-
-      }
-
-      throw new Error(`No Plugin has been registered under "${pluginName}".`);
-
-    }
-
-  };
-
   // Registered State Modules
   const CUE_STATE_MODULES = new Map();
 
@@ -812,7 +179,7 @@
   const MAIN_QUEUE = [];
 
   // Cue-State Prototype Object extends Cue-Prototype Object
-  const CUE_LIB.state = oCreate(CUE_LIB.core, {
+  CUE_LIB.state = oCreate(CUE_LIB.core, {
 
     import: {
       value: function(name) {
@@ -1926,12 +1293,14 @@
 
   };
 
+  CUE_STATE_API.State.isState = x => !!x[__CUE__];
+
   // Registered UI Components
   const CUE_UI_MODULES = new Map();
 
   // The CUE Proto Object (Inner-API) exposed to Cue.Component registration closures
   // inherits methods and properties from main CUE_LIB.core object and thus has access to plugins and generic utilities
-  const CUE_LIB.ui = oCreate(CUE_LIB.core, {
+  CUE_LIB.ui = oCreate(CUE_LIB.core, {
 
     import: {
       value: function(name) {
@@ -1976,6 +1345,10 @@
 
     item(index) {
       return this[__elementClassList__].item(index);
+    }
+
+    has(token) {
+      return this.contains(token);
     }
 
     contains(token) {
@@ -2434,16 +1807,15 @@
 
   // Cue UI Component Instance available as "this" in component lifecycle methods.
   // Provides access to the raw dom element, imports, keyframes and styles
-  // Exposes shorthands and utility methods that allow for DOM and STATE querying, manipulation and binding.
-
+  // Don't refactor to Pojo (used for instanceof checks)
   class ComponentInstance {
 
     constructor(element, imports, styles, keyframes) {
 
       this.element = element;
       this.imports = imports;
-      this.keyframes = keyframes;
       this.styles = styles;
+      this.keyframes = keyframes;
 
       // In case component-scope classes have been generated in a styles object, we map default classNames to unique classNames internally.
       // overwrite element.classList with mapped implementation
@@ -2458,201 +1830,12 @@
 
     }
 
-    getRefs() {
-
-      // collect children of element that have "ref" attribute
-      // returns object hash that maps refValue to domElement
-
-      const tagged = this.element.querySelectorAll('[ref]');
-
-      if (tagged.length) {
-        const refs = {};
-        for (let i = 0, r; i < tagged.length; i++) {
-          r = tagged[i];
-          refs[r.getAttribute('ref')] = r;
-        }
-        return refs;
-      }
-
-    }
-
-    getIndex() {
-      // return the index of the wrapped element within the childList of its parent
-      const children = this.element.parentNode.children;
-      for (let i = 0; i < children.length; i++) {
-        if (children[i] === this.element) return i;
-      }
-      return -1;
-    }
-
-    getSiblings(includeSelf = false) {
-
-      if (includeSelf) {
-        return Array.from(this.element.parentNode.children);
-      } else {
-        const siblings = [];
-        const children = this.element.parentNode.children;
-        for (let i = 0; i < children.length; i++) {
-          if (children[i] !== this.element) {
-            siblings.push(children[i]);
-          }
-        }
-        return siblings;
-      }
-
-    }
-
-    getBoundingBox() {
-      // clone and offset in case element is invisible
-      const clone = this.element.cloneNode(true);
-      clone.style.position = 'absolute';
-      clone.style.left = '-100000px';
-      clone.style.top = '-100000px';
-      clone.style.display = 'block';
-      this.element.parentElement.appendChild(clone);
-      const bb = clone.getBoundingClientRect();
-      clone.parentElement.removeChild(clone);
-      return bb;
-    }
-
-    setChildren({
-      from = [],
-      to,
-      create,
-      update = NOOP
-    }) {
-
-      // the preferred method for updating a list of children after the underlying data model for a rendered list has changed.
-      // performs smart checking and optimized reconciliation to ensure only the minimum amount of dom-work is performed per update.
-
-      // "from" and "to" are raw data arrays which are formatted into dom elements by calling "create" or "update" on each item.
-      // "create" is a function that requires a single data-entry from the "to" array and returns a dom element. (likely a Cue.Component function).
-      // "update" is a function that updates existing elements. It requires two arguments: (domElement, newData). How the newData is rendered into the domElement is specified explicitly in the function body.
-      // "update" defaults to noop because in most cases property / attribute updates are handled by children themselves
-      // "update" is only required for non-reactive or primitive children in data array
-      // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive State module
-
-      // fast path clear all
-      if (to.length === 0) {
-        this.element.textContent = '';
-        return;
-      }
-
-      // fast path create all
-      if (from.length === 0) {
-        for (let i = 0; i < to.length; i++) {
-          parent.appendChild(create(to[i]))
-        }
-        return;
-      }
-
-      // reconcile current/new newData arrays
-      reconcile(this.element, from, to, create, update);
-
-    }
-
-    observe(state, property, handler, autorun = true) {
-
-      const stateInstance = state[__CUE__];
-
-      if (typeof property === 'string') {
-
-        const boundHandler = stateInstance.addChangeReaction(property, handler, this);
-
-        if (autorun === true) {
-          boundHandler({
-            property: property,
-            value: state[property],
-            oldValue: state[property]
-          });
-        }
-
-        return boundHandler;
-
-      } else if (property.constructor === OBJ && property !== null) {
-
-        const _autorun = typeof handler === 'boolean' ? handler : autorun;
-        const boundHandlers = {};
-
-        let prop, boundHandler;
-
-        for (prop in property) {
-
-          boundHandler = stateInstance.addChangeReaction(prop, property[prop], this);
-
-          boundHandlers[prop] = boundHandler;
-
-          if (_autorun === true) {
-            boundHandler({
-              property: prop,
-              value: state[prop],
-              oldValue: state[prop]
-            });
-          }
-
-        }
-
-        return boundHandlers;
-
-      }
-
-    }
-
-    unobserve(state, property, handler) {
-
-      const stateInstance = state[__CUE__];
-
-      if (typeof property === 'string') {
-
-        stateInstance.removeChangeReaction(property, handler);
-
-      } else if (property.constructor === OBJ && property !== null) {
-
-        for (const prop in property) {
-          stateInstance.removeChangeReaction(prop, property[prop]);
-        }
-
-      }
-
-    }
-
-    on(type, handler, options) {
-
-      // element.addEventListener convenience method which accepts a plain object of multiple event -> handlers
-      // since we're always binding to the root element, we facilitate event delegation. handlers can internally compare e.target to refs or children.
-
-      if (arguments.length === 1 && type && type.constructor === OBJ) {
-        for (const eventType in type) {
-          this.element.addEventListener(eventType, type[eventType], handler && typeof handler === 'object' ? handler : {});
-        }
-      } else if (typeof handler === 'function') {
-        this.element.addEventListener(type, handler, options || {});
-      } else {
-        throw new TypeError(`Can't bind event listener(s) because of invalid arguments.`);
-      }
-
-    }
-
-    off(type, handler) {
-
-      if (arguments.length === 1 && type && type.constructor === Object) {
-        for (const eventType in type) {
-          this.element.removeEventListener(eventType, type[eventType]);
-        }
-      } else if (typeof handler === 'function') {
-        this.element.removeEventListener(type, handler);
-      } else {
-        throw new TypeError(`Can't remove event listener(s) because of invalid arguments.`);
-      }
-
-    }
-
   }
 
   function initializeUIComponent(initializer) { // runs only once per module
 
     // componentInitializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
-    const CONFIG = typeof initializer === 'function' ? initializer(CUE_LIB.ui) : initializer;
+    const CONFIG = typeof initializer === 'function' ? initializer.call(null, CUE_LIB.ui) : initializer;
 
     if (!CONFIG || CONFIG.constructor !== OBJ) {
       throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);
@@ -2728,6 +1911,118 @@
 
   };
 
+  CUE_UI_API.UI.isComponent = x => x instanceof ComponentInstance;
+
+  // Plugin Repository
+  const CUE_PLUGINS = new Map();
+
+  // Internal Methods
+  const isPluginNameValid = name => typeof name === 'string' && name.length > 2 && name.indexOf('-') !== -1;
+
+  const parsePluginName = name => name.split('-');
+
+  const installPlugin = (plugin, options) => {
+
+    if (plugin.didInstall) {
+      return plugin.extensionPoint;
+    }
+
+    // Plugins can be extended by other plugins by declaring extension points via the return value from their install function:
+    plugin.extensionPoint = plugin.installer.call(null, CUE_LIB, options);
+    plugin.didInstall = true;
+
+    return plugin.extensionPoint;
+
+  };
+
+  const CUE_PLUGINS_API = {
+
+    Plugin: (name, installer, autoinstall) => {
+
+      if (!isPluginNameValid(name)) {
+        throw new Error(`Plugin must be defined with a namespaced-name (vendor-plugin) of type string as the first argument.`);
+      }
+
+      // split name into vendor, Plugin
+      const [vendor, plugin] = parsePluginName(name);
+
+      if (!installer && !autoinstall) { // return Plugin interface when only name is provided (Handle Plugin() call like getter)
+
+        const byVendor = CUE_PLUGINS.get(vendor);
+
+        if (byVendor) {
+
+          const thePlugin = byVendor.get(plugin);
+
+          if (thePlugin) {
+            return thePlugin;
+          } else {
+            throw new Error(`No Plugin with name ${name} has been registered under "${vendor}".`);
+          }
+
+        } else {
+          throw new Error(`No Plugin has been registered under "${byVendor}".`);
+        }
+
+      } else { // register a new Plugin when all arguments are provided (like setter)
+
+        if (typeof installer !== 'function') {
+          throw new Error(`Plugin must be defined with an installable function as the second argument.`);
+        }
+
+        const byVendor = CUE_PLUGINS.get(vendor) || CUE_PLUGINS.set(vendor, new Map()).get(vendor);
+
+        if (byVendor.has(plugin)) {
+          console.warn(`A plugin with name "${plugin}" has already been registered under "${vendor}". Skipping installation...`);
+          return byVendor.get(plugin).name;
+        }
+
+        const thePlugin = {
+          installer: installer,
+          didInstall: false,
+          name: name,
+          extensionPoint: undefined
+        };
+
+        byVendor.set(plugin, thePlugin);
+
+        if (autoinstall) {
+          installPlugin(thePlugin);
+        }
+
+        // Return just the name token to store it in constants and pass it around the system.
+        return name;
+
+      }
+
+    },
+
+    use: (pluginName, options) => {
+
+      if (!isPluginNameValid(pluginName)) {
+        throw new Error(`pluginName must be a namespaced-string (vendor-plugin).`);
+      }
+
+      const [vendor, plugin] = parsePluginName(pluginName);
+
+      const byVendor = CUE_PLUGINS.get(vendor);
+
+      if (byVendor) {
+
+        const thePlugin = byVendor.get(plugin);
+
+        if (thePlugin) {
+          return installPlugin(thePlugin, options);
+        }
+
+      }
+
+      throw new Error(`No Plugin has been registered under "${pluginName}".`);
+
+    }
+
+  };
+
   const CueInstanceProto = {
 
     mount(target = document.body, props = undefined) {
@@ -2775,7 +2070,7 @@
   };
 
   global || (global = window);
-  global.Cue = oAssign(function(config) {
+  const Cue = global.Cue = oAssign(function(config) {
 
       if (!config || config.constructor !== OBJ)
         throw new TypeError('[Cue]: config is not an object.');
@@ -2811,4 +2106,543 @@
 
   console.log(`%c🍑 Cue.js - Version ${_CUE_VERSION_}`, 'color: rgb(0, 140, 255)');
 
+  Cue.Plugin('cue-math', Library => {
+
+    // Math Helpers
+    const MTH = Math;
+    const MAX = MTH.max;
+    const MIN = MTH.min;
+    const RANDOM = MTH.random;
+    const ABS = MTH.abs;
+    const POW = MTH.pow;
+    const ROUND = MTH.round;
+    const FLOOR = MTH.floor;
+    const CEIL = MTH.ceil;
+    const PI = MTH.PI;
+    const DEG2RAD = PI / 180;
+    const RAD2DEG = 180 / PI;
+
+    return Library.core.Math = {
+
+      clamp(min, max, val) {
+        return MAX(min, MIN(max, val));
+      },
+
+      lerp(from, to, x) {
+        return (1 - x) * from + x * to;
+      },
+
+      smoothStep(min, max, val) {
+        if (val <= min) return 0;
+        if (val >= max) return 1;
+        val = (val - min) / (max - min);
+        return val * val * (3 - 2 * val);
+      },
+
+      translate(sourceMin, sourceMax, targetMin, targetMax, x) {
+        return targetMin + (x - sourceMin) * (targetMax - targetMin) / (sourceMax - sourceMin);
+      },
+
+      createTranslator(sourceMin, sourceMax, targetMin, targetMax) {
+        // creates runtime optimized linear range interpolation functions for static ranges
+        if (sourceMin === 0 && targetMin > 0) return val => ((val * (targetMax - targetMin)) / sourceMax) + targetMin;
+        if (targetMin === 0 && sourceMin > 0) return val => (((val - sourceMin) * targetMax) / (sourceMax - sourceMin));
+        if (sourceMin === 0 === targetMin) return val => (val * targetMax) / targetMax;
+        return this.translate;
+      },
+
+      convertBits(sourceBits, targetBits, val) {
+        if (sourceBits < 32) {
+          if (targetBits < 32) {
+            return val * POW(2, targetBits) / POW(2, sourceBits);
+          } else {
+            return val / POW(2, sourceBits);
+          }
+        } else {
+          if (targetBits < 32) {
+            return ROUND(val * POW(2, targetBits));
+          } else {
+            return val;
+          }
+        }
+      },
+
+      randomIntBetween(min, max) {
+        return FLOOR(RANDOM() * (max - min + 1) + min);
+      },
+
+      randomFloatBetween(min, max) {
+        return RANDOM() * (max - min) + min;
+      },
+
+      isOdd(val) {
+        return val & 1;
+      },
+
+      isEven(val) {
+        return !(val & 1);
+      },
+
+      degreesToRadians(degrees) {
+        return degrees * DEG2RAD;
+      },
+
+      radiansToDegrees(radians) {
+        return radians * RAD2DEG;
+      },
+
+      scale(numericArray, targetLength) {
+
+        // 1D Linear Interpolation
+        const il = numericArray.length - 1,
+          ol = targetLength - 1,
+          s = il / ol;
+
+        let i, a = 0,
+          b = 0,
+          c = 0,
+          d = 0;
+
+        for (i = 1; i < ol; i++) {
+          a = i * s;
+          b = FLOOR(a);
+          c = CEIL(a);
+          d = a - b;
+          numericArray[i] = numericArray[b] + (numericArray[c] - numericArray[b]) * d;
+        }
+
+        numericArray[ol] = numericArray[il];
+
+        return this;
+
+      },
+
+      closest(numericArray, val) {
+        return numericArray.reduce((prev, cur) => (ABS(cur - val) < ABS(prev - val) ? cur : prev));
+      },
+
+      smallest(numericArray) {
+        let min = Infinity;
+        for (let i = 0; i < numericArray.length; i++) {
+          if (numericArray[i] < min) min = numericArray[i];
+        }
+        return min === Infinity ? void 0 : min;
+      },
+
+      largest(numericArray) {
+        let max = -Infinity;
+        for (let i = 0; i < numericArray.length; i++) {
+          if (numericArray[i] > max) max = numericArray[i];
+        }
+        return max === -Infinity ? void 0 : max;
+      }
+
+    };
+
+  }, true);
+
+  Cue.Plugin('cue-string', Library => {
+
+    return Library.core.String = {
+
+      createUID() {
+
+        const letters = 'abcdefghijklmnopqrstuvwxyz';
+
+        let sessionCounter = 0;
+
+        return ((this.createUID = function createUID() {
+
+          let n, o = '';
+          const alphaHex = sessionCounter.toString(26).split('');
+          while ((n = alphaHex.shift())) o += letters[parseInt(n, 26)];
+          sessionCounter++;
+          return o;
+
+        }).call(this));
+
+      },
+
+      toCamelCase(dashed_string) {
+        const c = document.createElement('div');
+        c.setAttribute(`data-${dashed_string}`, '');
+        return oKeys(c.dataset)[0];
+      },
+
+      toDashedCase(camelString) {
+        const c = document.createElement('div');
+        c.dataset[camelString] = '';
+        return c.attributes[0].name.substr(5);
+      }
+
+    };
+
+  });
+
+  Cue.Plugin('cue-array', Library => {
+
+    const isArray = Array.isArray;
+
+    return Library.core.Array = {
+
+      flatten(nDimArray) {
+        return nDimArray.reduce((x, y) => x.concat(isArray(y) ? this.flatten(y) : y), []);
+      },
+
+      insertEveryNth(array, item, n) {
+        let i = array.length;
+        while (--i > 0)
+          if (i % n === 0) array.splice(i, 0, item);
+        return this;
+      },
+
+      removeEveryNth(array, n) {
+        let i = array.length;
+        while (--i)
+          if (i % n === 0) array.splice(i, 1);
+        return this;
+      },
+
+      removeRange(array, from, to) {
+        array.splice(from, to - from);
+        return this;
+      },
+
+      merge(target, ...sources) {
+
+        let i, k, s;
+        for (i = 0; i < sources.length; i++) {
+          s = sources[i];
+          for (k = 0; k < s.length; k++) {
+            target.push(s[k]);
+          }
+        }
+
+        return this;
+
+      }
+
+    };
+
+  }, true);
+
+  Cue.Plugin('cue-equality', Library => {
+
+    const Obj = Object;
+    const isArray = Array.isArray;
+
+    return Obj.assign(Library.core, {
+
+      isEqual(a, b, deep = false) {
+
+        if (a === b) return true;
+
+        if (a && b && typeof a === 'object' && typeof b === 'object') {
+
+          // Plain Objects (ordered) [fast-path]
+          const objA = a.constructor === Obj;
+          const objB = b.constructor === Obj;
+          if (objA !== objB) return false;
+          if (objA && objB) return this.arePlainObjectsEqual(a, b, deep);
+
+          // Arrays (ordered)
+          const arrayA = isArray(a);
+          const arrayB = isArray(b);
+          if (arrayA !== arrayB) return false;
+          if (arrayA && arrayB) return this.areArraysEqual(a, b, deep);
+
+          // Maps (ordered)
+          const mapA = a instanceof Map;
+          const mapB = b instanceof Map;
+          if (mapA !== mapB) return false;
+          if (mapA && mapB) return this.areMapsEqual(a, b, deep);
+
+          // Sets (ordered)
+          const setA = a instanceof Set;
+          const setB = b instanceof Set;
+          if (setA !== setB) return false;
+          if (setA && setB) return this.areSetsEqual(a, b, deep);
+
+          // Dates
+          const dateA = a instanceof Date;
+          const dateB = b instanceof Date;
+          if (dateA !== dateB) return false;
+          if (dateA && dateB) return a.getTime() === b.getTime();
+
+          // Regexp
+          const regexpA = a instanceof RegExp;
+          const regexpB = b instanceof RegExp;
+          if (regexpA !== regexpB) return false;
+          if (regexpA && regexpB) return a.toString() === b.toString();
+
+          // Other Objects [deferred]
+          return this.arePlainObjectsEqual(a, b, deep);
+
+        }
+
+        // Primitives strictly compared
+        return a !== a && b !== b;
+
+      },
+
+      areArraysEqual(a, b, deep = false) {
+
+        if (a.length !== b.length) return false;
+
+        for (let i = 0; i < a.length; i++) {
+          if (!this.isEqual(a[i], b[i], deep)) {
+            return false;
+          }
+        }
+
+        return true;
+
+      },
+
+      arePlainObjectsEqual(a, b, deep = false) {
+
+        const keysA = oKeys(a);
+        const keysB = oKeys(b);
+
+        if (keysA.length !== keysB.length) return false;
+
+        for (let i = 0, k; i < keysA.length; i++) {
+          k = keysA[i];
+          if (keysB.indexOf(k) === -1 || !this.isEqual(a[k], b[keysB[i]], deep)) {
+            return false;
+          }
+        }
+
+        return true;
+
+      },
+
+      areMapsEqual(a, b, deep = false) {
+
+        if (a.size !== b.size) return false;
+
+        const arrA = Array.from(a);
+        const arrB = Array.from(b);
+
+        for (let i = 0, iA, iB; i < arrA.length; i++) {
+          iA = arrA[i];
+          iB = arrB[i];
+          if (iA[0] !== iB[0] || !this.isEqual(iA[1], iB[1], deep)) {
+            return false;
+          }
+        }
+
+        return true;
+
+      },
+
+      areSetsEqual(a, b, deep = false) {
+
+        if (a.size !== b.size) return false;
+
+        const arrA = Array.from(a);
+        const arrB = Array.from(b);
+
+        for (let i = 0; i < arrA.length; i++) {
+          if (!this.isEqual(arrA[i], arrB[i], deep)) {
+            return false;
+          }
+        }
+
+        return true;
+
+      }
+
+    });
+
+  }, true);
+
+  Cue.Plugin('cue-clone', Library => {
+
+    const Obj = Object;
+    const ObjToString = Obj.prototype.toString;
+    const ObjID = '[object Object]';
+
+    const isArray = Array.isArray;
+    const getProto = Object.getPrototypeOf;
+
+    return Obj.assign(Library.core, {
+
+      clone(o, deep = false) {
+
+        if (isArray(o)) return this.cloneArray(o, deep);
+
+        if (typeof o === 'object' && o !== null) {
+
+          if (ObjToString.call(o) === ObjID || getProto(o) === null) return this.clonePlainObject(o, deep);
+          if (o instanceof Map) return this.cloneMap(o, deep);
+          if (o instanceof Set) return this.cloneSet(o, deep);
+          if (o instanceof Date) return new Date(o.getTime());
+          if (o instanceof RegExp) return RegExp(o.source, o.flags);
+
+        }
+
+        throw new TypeError(`Can't clone non-object, null or undefined."`);
+
+      },
+
+      cloneArray(a, deep = false) {
+
+        if (deep) {
+
+          const clone = [];
+
+          for (let i = 0, v; i < a.length; i++) {
+            v = a[i];
+            clone.push(typeof v === 'object' && v !== null ? this.clone(v, deep) : v);
+          }
+
+          return clone;
+
+        } else {
+
+          return a.slice();
+
+        }
+
+      },
+
+      clonePlainObject(o, deep = false) {
+
+        if (deep) {
+
+          const clone = {};
+
+          let k, v;
+          for (k in o) {
+            v = o[k];
+            clone[k] = typeof v === 'object' && v !== null ? this.clone(v, deep) : v;
+          }
+
+          return clone;
+
+        } else {
+
+          return Obj.assign({}, o);
+
+        }
+
+      },
+
+      cloneMap(m, deep = false) {
+
+        const clone = new Map();
+
+        if (deep) {
+          m.forEach((val, key) => clone.set(typeof key === 'object' ? this.clone(key, deep) : key, typeof val === 'object' && val !== null ? this.clone(val, deep) : val));
+        } else {
+          m.forEach((val, key) => clone.set(key, val));
+        }
+
+        return clone;
+
+      },
+
+      cloneSet(s, deep = false) {
+
+        const clone = new Set();
+        s.forEach(entry => clone.add(deep && typeof entry === 'object' && entry !== null ? this.clone(entry, deep) : entry));
+        return clone;
+
+      }
+
+    });
+
+  }, true);
+
+  Cue.Plugin('cue-fn', Library => {
+
+    return Library.core.Function = {
+
+      throttle(func, rate = 250, scope = null) {
+
+        // returns a function that will only be called every "rate" milliseconds
+
+        let now = 0.00,
+          last = 0.00;
+
+        return function(...rest) {
+          now = Date.now();
+          if (now > last + rate) {
+            func.apply(scope, rest);
+            last = now;
+          }
+        };
+
+      },
+
+      defer(func, delay = 250, scope = null) {
+
+        // returns a function that is only called "delay" milliseconds after its last invocation
+
+        let pending = null;
+
+        return function(...rest) {
+          clearTimeout(pending);
+          pending = setTimeout(() => {
+            func.apply(scope, rest);
+            pending = null;
+          }, delay);
+        };
+
+      },
+
+      createTaskWorker(handler) {
+
+        // Run processes in a different thread. Use postMessage interface in handler to call back to main thread.
+        // handler = function || object: {process: worker.onmessage fn, response: how the workers response is handled on the main thread, onError: ...}
+        //
+        // Example:
+        // const worker = createTaskWorker({
+        //   process: function({data}) { <- useful convention to destructure the event object as we're mainly interested in the data
+        //     this computation runs in worker thread. can work with data provided by main thread.
+        //     postMessage(data.toString()); <- this is passed to the response handler on the main thread via event.data
+        //   },
+        //   response: function({data}) {
+        //     runs on main thread in response to postMessage call from worker thread.
+        //     console.log(typeof data);
+        //   }
+        // });
+        //
+        // Start the worker:
+        // worker.process(1.234); // -> logs 'string'
+
+        const process = typeof handler === 'function' ? handler : handler.process ? handler.process : undefined;
+
+        const worker = new Worker(window.URL.createObjectURL(new Blob([
+        `(function() { onmessage = ${process.toString()} })()`
+      ], {
+          type: 'application/javascript'
+        })));
+
+        if (handler.response) worker.onmessage = handler.response;
+        if (handler.onError) worker.onerror = handler.onError;
+
+        return {
+          process: worker.postMessage.bind(worker), // starts the worker process
+          terminate: worker.terminate.bind(worker), // terminates the worker
+          set response(fn) { // defines main-thread response handler for worker
+            worker.onmessage = fn;
+          },
+          get response() {
+            return worker.onmessage;
+          },
+          set onError(fn) { // defines main-thread error handler for worker
+            worker.onerror = fn;
+          },
+          get onError() {
+            return worker.onerror;
+          }
+        };
+
+      }
+
+    };
+
+  }, true);
 }(window || this));

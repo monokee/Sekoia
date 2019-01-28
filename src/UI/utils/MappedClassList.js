@@ -34,6 +34,10 @@ class MappedClassList {
     return this[__elementClassList__].item(index);
   }
 
+  has(token) {
+    return this.contains(token);
+  }
+
   contains(token) {
     return this[__elementClassList__].contains(this[__mappedClassNames__].get(token) || token);
   }

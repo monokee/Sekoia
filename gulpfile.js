@@ -3,6 +3,7 @@ const iife = require('gulp-iife');
 const beautify = require('gulp-jsbeautify');
 const minify = require('gulp-babel-minify');
 const concat = require('gulp-concat');
+const rename = require('gulp-rename');
 
 const NAME = 'cue';
 const SOURCE_DIR = 'src';
@@ -83,30 +84,31 @@ const FILES = {
     `${MODULES.plugin}/index.js`,
     `${MODULES.plugin}/public-api.js`,
   ],
-  library: [
-    `${MODULES.library}/math-utils.js`,
-    `${MODULES.library}/string-utils.js`,
-    `${MODULES.library}/obj-utils.js`,
-    `${MODULES.library}/array-utils.js`,
-    `${MODULES.library}/fn-utils.js`
-  ],
   publicAPI: [
     `${SOURCE_DIR}/proto.js`,
     `${SOURCE_DIR}/public-api.js`
+  ],
+  library: [
+    `${MODULES.library}/cue-math.js`,
+    `${MODULES.library}/cue-string.js`,
+    `${MODULES.library}/cue-array.js`,
+    `${MODULES.library}/cue-equality.js`,
+    `${MODULES.library}/cue-clone.js`,
+    `${MODULES.library}/cue-function.js`
   ]
 };
 
 gulp.task('build-lib', function() {
   
-  gulp
+  return gulp
     .src([
       ...FILES.index,
       ...FILES.eventBus,
       ...FILES.state,
       ...FILES.ui,
       ...FILES.plugin,
-      ...FILES.library,
-      ...FILES.publicAPI
+      ...FILES.publicAPI,
+      ...FILES.library
     ])
 
     .pipe(concat(`${NAME}.js`))
@@ -127,16 +129,9 @@ gulp.task('build-lib', function() {
       max_preserve_newlines: 2
     }))
 
-    .pipe(gulp.dest(BUILD_DIR));
-
-});
-
-gulp.task('minify-lib', function() {
-
-  gulp
-    .src([`${BUILD_DIR}/${NAME}.js`])
-    .pipe(concat(`${NAME}.min.js`))
+    .pipe(gulp.dest(BUILD_DIR))
+    .pipe(rename(`${NAME}.min.js`))
     .pipe(minify())
     .pipe(gulp.dest(BUILD_DIR));
-  
+
 });
