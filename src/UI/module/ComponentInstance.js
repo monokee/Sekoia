@@ -51,18 +51,13 @@ const ComponentInstance = wrap(() => {
 
       this.element = element;
       this.imports = imports;
-      this.styles = styles && oKeys(styles).length ? new MappedClassList(styles, element) : null;
+      this.styles = new MappedClassList(styles, element);
       this.keyframes = keyframes || null;
-      this.on('click', e => {}, {once: true});
-      this.on('.child', 'click', e => {}, {once: true});
-      this.on({click: e => {}}, {once: true});
-      this.on(this.element.firstChild, {})
+      this.reactions = new Map();
 
     }
 
     select(x, within) {
-
-      // TODO: selector needs to account for scoped classNames!
 
       if (typeof x === 'string') {
 
@@ -74,7 +69,7 @@ const ComponentInstance = wrap(() => {
             node = doc.getElementById(x.substring(1));
             break;
           case '.':
-            node = parent.getElementsByClassName(x.substring(1));
+            node = parent.getElementsByClassName(this.styles.get(x.substring(1)));
             break;
           default:
             node = parent.querySelectorAll(x);
@@ -82,7 +77,7 @@ const ComponentInstance = wrap(() => {
         }
 
         if (node.nodeType !== Node.TEXT_NODE && node.length) {
-          return node.length > 1 ? toArray(node) : node[0];
+          return node.length === 1 ? node[0] : toArray(node);
         }
 
         return node;
@@ -120,8 +115,16 @@ const ComponentInstance = wrap(() => {
       return toArray(node.parentNode.children).indexOf(node);
     }
 
-    getSiblings(node, includeSelf = false) {
-      node = node ? this.select(node) : this.element;
+    getSiblings(node, includeSelf) {
+
+      if (arguments.length === 1) {
+        includeSelf = node === true;
+        node = this.element;
+      } else {
+        node = this.select(node);
+        includeSelf = includeSelf === true;
+      }
+
       return includeSelf ? toArray(node.parentNode.children) : toArray(node.parentNode.children).filter(sibling => sibling !== node);
     }
 
@@ -177,7 +180,7 @@ const ComponentInstance = wrap(() => {
 
     setChildren(node, {from = [], to, create, update = NOOP}) {
 
-      node = node ? this.select(node) : this.element;
+      node = arguments.length === 1 ? this.element : this.select(node);
 
       // the preferred method for updating a list of children after the underlying data model for a rendered list has changed.
       // performs smart checking and optimized reconciliation to ensure only the minimum amount of dom-work is performed per update.
@@ -210,12 +213,17 @@ const ComponentInstance = wrap(() => {
 
     observe(state, scope, property, handler, autorun = true) {
 
-      //TODO: likely create link between element and state at this point (hooks?!)
       const stateInstance = state[__CUE__];
 
       if (typeof property === 'string') {
 
         const boundHandler = stateInstance.addChangeReaction(property, handler, scope);
+
+        if (this.reactions.has(property)) {
+          this.reactions.get(property).push(boundHandler);
+        } else {
+          this.reactions.set(property, [boundHandler]);
+        }
 
         if (autorun === true) {
           boundHandler({
@@ -240,6 +248,12 @@ const ComponentInstance = wrap(() => {
 
           boundHandlers[prop] = boundHandler;
 
+          if (this.reactions.has(prop)) {
+            this.reactions.get(prop).push(boundHandler);
+          } else {
+            this.reactions.set(prop, [boundHandler]);
+          }
+
           if (_autorun === true) {
             boundHandler({
               property: prop,
@@ -262,9 +276,15 @@ const ComponentInstance = wrap(() => {
 
       if (typeof property === 'string') {
 
-        stateInstance.removeChangeReaction(property, handler);
+        if (handler) {
+          stateInstance.removeChangeReaction(property, handler);
+        } else if (this.reactions.has(property)) {
+          this.reactions.get(property).forEach(handler => {
+            stateInstance.removeChangeReaction(property, handler);
+          });
+        }
 
-      } else if (property.constructor === OBJ && property !== null) {
+      } else if (isObjectLike(property)) {
 
         for (const prop in property) {
           stateInstance.removeChangeReaction(prop, property[prop]);
@@ -311,16 +331,38 @@ const ComponentInstance = wrap(() => {
     }
 
     insertBefore(node, target) {
+      if (arguments.length === 1) {
+        target = this.select(node);
+        node = this.element;
+      } else {
+        node = this.select(node);
+        target = this.select(target);
+      }
       target.parentNode.insertBefore(node, target);
       return this;
     }
 
     insertAfter(node, target) {
+      if (arguments.length === 1) {
+        target = this.select(node);
+        node = this.element;
+      } else {
+        node = this.select(node);
+        target = this.select(target);
+      }
       target.parentNode.insertBefore(node, target.nextSibling);
       return this;
     }
 
     insertAt(node, index) {
+
+      if (arguments.length === 1) {
+        index = parseInt(node);
+        node = this.element;
+      } else {
+        node = this.select(node);
+        index = parseInt(index);
+      }
 
       const parent = node.parentNode, children = parent.children;
 
@@ -337,10 +379,12 @@ const ComponentInstance = wrap(() => {
     }
 
     detach(node) {
+      node = node ? this.select(node) : this.element;
       return node.parentNode.removeChild(node);
     }
 
     remove(node) {
+      node = node ? this.select(node) : this.element;
       node.parentNode.removeChild(node);
       return this;
     }

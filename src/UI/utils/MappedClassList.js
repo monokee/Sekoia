@@ -10,24 +10,19 @@ class MappedClassList {
 
   constructor(map, element) {
 
-    if (!map) {
-      throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object, 2D Array or a Map but is ${JSON.stringify(map)}.`);
-    } else if (map.constructor === OBJ) {
-      map = new Map(oEntries(map));
-    } else if (isArray(map)) {
+    if (isArray(map)) {
       map = new Map(map);
+    } else if (isObjectLike(map)) {
+      map = new Map(oEntries(map));
     }
-    
-    // internalize map and original classList
-    oDefineProperties(this, {
-      [__mappedClassNames__]: {
-        value: map
-      },
-      [__elementClassList__]: {
-        value: element.classList // internal reference to original classList.
-      }
-    });
 
+    this[__mappedClassNames__] = map;
+    this[__elementClassList__] = element.classList;
+
+  }
+
+  get(token) {
+    return this[__mappedClassNames__].get(token) || token;
   }
 
   item(index) {

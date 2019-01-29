@@ -53,29 +53,41 @@ Cue.UI('App-UI', Component => ({
 
   initialize(appState) {
 
-    const element = this.element;
-    const classList = element.classList;
+    this.state = appState;
     const {top, bottom} = this.getRefs();
+    this.top = top;
+    this.bottom = bottom;
 
-    this.on('.sidebarLeft', {
-      click: e => {
-        appState.startTicker();
-      },
-      contextmenu: e => {
-        e.preventDefault();
-        console.log('right-click', e.target);
+  },
+
+  onUserInput: {
+    click: e => {
+      this.state.startTicker();
+    },
+    contextMenu: e => {
+      e.preventDefault();
+      this.state.stopTicker();
+    }
+  },
+
+  onStateChange: {
+    name: o => {
+      this.bottom.textContent = o.value;
+    },
+    secondsPassed: o => {
+      //TODO: styles implementation as mapped classList won't work. the styles can target nested elements but the mapped classList only targets the root element. wtf?
+      this.addClass('sectionTop');
+      this.removeClass('sectionTop');
+      this.toggleClass('someThing');
+      this.toggleClass(this.bottom, 'someThingElse');
+
+      if (o.value) {
+        this.styles.remove('sectionTop');
+      } else {
+        this.styles.add('sectionTop');
       }
-    });
 
-    this.observe(appState, {
-      name(o) {
-        bottom.textContent = o.value;
-      },
-      secondsPassed(o) {
-        top.textContent = o.value;
-      }
-    });
-
+    }
   }
 
 }));

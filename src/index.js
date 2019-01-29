@@ -40,7 +40,8 @@ const _apply = Reflect.apply;
 const _delete = Reflect.deleteProperty;
 
 // Utility methods TODO: implement. replace typeof checks across lib (accuracy + minification!)
-//const isPlainObject = o => typeof o === 'object' && o !== null && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
+const isObjectLike = o => typeof o === 'object' && o !== null;
+const isPlainObject = o => isObjectLike(o) && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
 const wrap = fn => fn();
 
 // Cue Library Object
