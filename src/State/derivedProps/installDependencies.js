@@ -28,7 +28,6 @@ function installDependencies(props, { computed }) {
   // kill pointers
   DERIVATIVE_INSTALLER.derivative = null;
   DERIVATIVE_INSTALLER.allProperties = null;
-  DERIVATIVE_INSTALLER.dependencyGraph = null;
   DERIVATIVE_INSTALLER.derivedProperties = null;
 
 }

@@ -8,9 +8,9 @@ function installStateReactions(component, reactions) {
 
     for (prop in reactions) {
 
-      val = component.state[prop];
-
       boundHandler = stateInstance.addChangeReaction(prop, reactions[prop], component);
+
+      val = component.state[prop];
 
       if (component.reactions.has(prop)) {
         component.reactions.get(prop).push(boundHandler);

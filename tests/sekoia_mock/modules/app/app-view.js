@@ -22,7 +22,15 @@ Cue.UI('App-UI', Component => ({
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'space-between',
-      flex: '0 1 auto'
+      flex: '0 1 auto',
+      userSelect: 'none',
+      boxSizing: 'borderBox',
+      '&.disabled': { // TODO: allow for scss syntax here. if property is an object, go into sass nesting mode. if first character is "&" chain onto parent selector. else space-append to parent selector.
+
+      },
+      '&:hover': {
+        boxSizing: 'border-box'
+      }
     },
 
     sectionTop: {
@@ -59,20 +67,23 @@ Cue.UI('App-UI', Component => ({
   },
 
   bindEvents: {
-    contextMenu(e) {
+    contextmenu(e) {
       e.preventDefault();
       console.log('right clicked anywhere, default prevented.', e);
     },
-    click: {
+    mousedown(e) {
+      this.md = e.which === 1;
+    },
+    mousemove: {
       '.sectionMid'(e) {
-        console.log('sectionMid clicked!', e);
-      },
-      '.viewerSection'(e) {
-        console.log('.viewerSection clicked. starting counter', this);
-        this.state.startTicker();
-      },
-      'div'(e) {
-        console.log('a div inside element has been clicked.', e);
+        if (!this.md) return;
+        this.state.x = e.clientX;
+        this.state.y = e.clientY;
+      }
+    },
+    mouseup(e) {
+      if (e.which === 1) {
+        this.md = false;
       }
     }
   },
@@ -83,6 +94,9 @@ Cue.UI('App-UI', Component => ({
     },
     secondsPassed(o) {
       this.viewer.textContent = `Seconds passed (ticker): ${o.value}`;
+    },
+    position(o) {
+      this.bottom.textContent = `Dragging: Top: ${o.value.top} | Left: ${o.value.left}`;
     }
   }
 

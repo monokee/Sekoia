@@ -7,30 +7,27 @@ Cue.State('App-State', Module => ({
   props: { // default values
     name: '',
     secondsPassed: 0,
-    health: 100,
-    stamina: 100,
-    limbs: [],
-    isDead({health}) {
-      return health <= 0;
+    x: 0,
+    y: 0,
+    position({x, y}) {
+      return {top: y, left: x};
     },
-    canFight({stamina}) {
-      return stamina > 0;
-    }
+
   },
 
   initialize(props) {
-
     this.name = props.name;
-
   },
 
   // these actions (+ overridable default actions) live on the prototype
   startTicker() {
-
-    setInterval(() => {
+    this.ticker = setInterval(() => {
       this.secondsPassed++;
     }, 1000);
+  },
 
+  stopTicker() {
+    clearInterval(this.ticker);
   }
 
 }));

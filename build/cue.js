@@ -503,7 +503,6 @@
     // kill pointers
     DERIVATIVE_INSTALLER.derivative = null;
     DERIVATIVE_INSTALLER.allProperties = null;
-    DERIVATIVE_INSTALLER.dependencyGraph = null;
     DERIVATIVE_INSTALLER.derivedProperties = null;
 
   }
@@ -513,19 +512,11 @@
     const {
       derivative,
       allProperties,
-      dependencyGraph,
       derivedProperties
     } = DERIVATIVE_INSTALLER;
 
     if (!allProperties.hasOwnProperty(sourceProperty)) {
       throw new Error(`Unable to resolve dependency "${sourceProperty}" of computed prop "${derivative.ownPropertyName}".`);
-    }
-
-    // install the derivative as a dependency of the sourceProperty
-    if (dependencyGraph.has(sourceProperty)) {
-      dependencyGraph.get(sourceProperty).push(derivative);
-    } else {
-      dependencyGraph.set(sourceProperty, [derivative]);
     }
 
     // add the property as a sourceProperty to the derivative
@@ -623,19 +614,19 @@
 
     const value = _get(target, prop);
 
+    // if falsy or proxy, quick return
     if (!value || value[__CUE__]) {
       return value;
     }
 
-    if (isArray(value) || value.constructor === OBJ) {
+    // proxify nested objects that are not the result of a computation TODO: only works for plain array and pojo objects!
+    if (typeof value === 'object' && !target[__CUE__].derivedProperties.has(prop)) {
       return createProxy(StateInternals.assignTo(value, target, prop));
     }
 
-    if (ARRAY_MUTATORS.has(prop) && typeof value === 'function') {
-
+    if (ARRAY_MUTATORS.has(prop) && isFunction(value)) {
       const cache = target[__INTERCEPTED_METHODS__];
       return cache.get(prop) || (cache.set(prop, createInterceptedArrayMutator(value))).get(prop);
-
     }
 
     return value;
@@ -903,7 +894,6 @@
         const derivative = this.derivedProperties.get(property);
         derivative.observers.push(_handler);
         setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
-
       }
 
       return _handler;
@@ -1126,12 +1116,10 @@
     // a module from the stateFactory's generic prototype object.
     // "this" in the methods refers to the current instance.
 
-    let key;
-
-    // Computed Properties
-    for (key in module.computed) {
+    // Computed Properties (module.computed is es6 Map to guarantee property order!)
+    for (const key of module.computed.keys()) {
       oDefineProperty(stateFactory.prototype, key, {
-        get() { // forward requests to Derivative.value getter
+        get() {
           return this[__CUE__].derivedProperties.get(key).value;
         },
         configurable: true,
@@ -1140,7 +1128,7 @@
     }
 
     // Actions
-    for (key in module.actions) {
+    for (const key in module.actions) {
       stateFactory.prototype[key] = module.actions[key];
     }
 
@@ -1266,7 +1254,7 @@
       // Add module properties to StateFactory.prototype
       extendStateFactoryPrototype(StateFactory, module);
 
-      // Overwrite this initialization function with the StateFactory
+      // Overwrite this initialization function with the StateFactory for subsequent calls
       CUE_STATE_MODULES.set(name, StateFactory);
 
       // Call the StateFactory
@@ -1763,9 +1751,9 @@
 
       for (prop in reactions) {
 
-        val = component.state[prop];
-
         boundHandler = stateInstance.addChangeReaction(prop, reactions[prop], component);
+
+        val = component.state[prop];
 
         if (component.reactions.has(prop)) {
           component.reactions.get(prop).push(boundHandler);
@@ -2247,7 +2235,7 @@
             if (selector[0] === '.') {
               scopedSelector = styles.get(selector.substring(1));
               if (scopedSelector) {
-                x['.' + scopedSelector] = x[selector]; // swap scoped/unscoped in-place
+                x['.' + scopedSelector] = x[selector]; // swap .scoped/.unscoped in-place
                 delete x[selector];
               }
             }

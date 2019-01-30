@@ -15,7 +15,7 @@ function createStateFactoryInitializer(name, initializer) {
     // Add module properties to StateFactory.prototype
     extendStateFactoryPrototype(StateFactory, module);
 
-    // Overwrite this initialization function with the StateFactory
+    // Overwrite this initialization function with the StateFactory for subsequent calls
     CUE_STATE_MODULES.set(name, StateFactory);
 
     // Call the StateFactory

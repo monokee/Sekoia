@@ -38,7 +38,6 @@ class StateInternals {
       const derivative = this.derivedProperties.get(property);
       derivative.observers.push(_handler);
       setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
-
     }
 
     return _handler;

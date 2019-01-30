@@ -5,12 +5,10 @@ function extendStateFactoryPrototype(stateFactory, module) {
   // a module from the stateFactory's generic prototype object.
   // "this" in the methods refers to the current instance.
 
-  let key;
-
-  // Computed Properties
-  for (key in module.computed) {
+  // Computed Properties (module.computed is es6 Map to guarantee property order!)
+  for (const key of module.computed.keys()) {
     oDefineProperty(stateFactory.prototype, key, {
-      get() { // forward requests to Derivative.value getter
+      get() {
         return this[__CUE__].derivedProperties.get(key).value;
       },
       configurable: true,
@@ -19,7 +17,7 @@ function extendStateFactoryPrototype(stateFactory, module) {
   }
 
   // Actions
-  for (key in module.actions) {
+  for (const key in module.actions) {
     stateFactory.prototype[key] = module.actions[key];
   }
 

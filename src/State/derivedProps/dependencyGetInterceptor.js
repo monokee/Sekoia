@@ -1,17 +1,10 @@
 
 function dependencyGetInterceptor(target, sourceProperty) {
 
-  const {derivative, allProperties, dependencyGraph, derivedProperties} = DERIVATIVE_INSTALLER;
+  const {derivative, allProperties, derivedProperties} = DERIVATIVE_INSTALLER;
 
   if (!allProperties.hasOwnProperty(sourceProperty)) {
     throw new Error(`Unable to resolve dependency "${sourceProperty}" of computed prop "${derivative.ownPropertyName}".`);
-  }
-
-  // install the derivative as a dependency of the sourceProperty
-  if (dependencyGraph.has(sourceProperty)) {
-    dependencyGraph.get(sourceProperty).push(derivative);
-  } else {
-    dependencyGraph.set(sourceProperty, [ derivative ]);
   }
 
   // add the property as a sourceProperty to the derivative
