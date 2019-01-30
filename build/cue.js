@@ -1820,7 +1820,7 @@
 
     const transitionEventTypes = (() => {
 
-      const el = document.createElement('tst'),
+      const el = doc.createElement('tst'),
         ts = {
           'transition': {
             run: 'transitionrun',
