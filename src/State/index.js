@@ -3,7 +3,7 @@
 // Registered State Modules
 const CUE_STATE_MODULES = new Map();
 
-// #State Variables
+// State Flags
 let isReacting = false; // is a reaction currently in process?
 let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
 
@@ -14,7 +14,7 @@ const DERIVATIVE_INSTALLER = {
   derivedProperties: null
 };
 
-// Traversal Directions
+// Traversal Directions (needed for dependency branch walking)
 const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
 

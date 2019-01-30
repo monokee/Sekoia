@@ -33,7 +33,7 @@ function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
     // 3.3 Enhance Derivative for self-aware traversal
     for (i = 0; i < vDerivative.superDerivatives.length; i++) {
       // because the module derivatives are topologically sorted, we know that the superDerivative is available
-      superDerivative = internal.derivedProperties.get(vDerivative.superDerivatives.ownPropertyName);
+      superDerivative = internal.derivedProperties.get(vDerivative.superDerivatives[i].ownPropertyName);
       derivative.superDerivatives.push(superDerivative);
       superDerivative.subDerivatives.push(derivative);
     }

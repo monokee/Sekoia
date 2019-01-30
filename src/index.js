@@ -40,6 +40,7 @@ const _delete = Reflect.deleteProperty;
 const oKeys = OBJ.keys;
 const oEntries = OBJ.entries;
 const isArray = ARR.isArray;
+const toArray = ARR.from;
 const isObjectLike = o => typeof o === 'object' && o !== null;
 const isPlainObject = o => isObjectLike(o) && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
 const isFunction = fn => typeof fn === 'function';

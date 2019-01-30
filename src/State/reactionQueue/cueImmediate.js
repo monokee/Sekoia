@@ -10,7 +10,6 @@ function cueImmediate(prop, value, oldValue, observers, derivatives, stopPropaga
       item = observers[i];
       if (MAIN_QUEUE.indexOf(item) === -1) {
         MAIN_QUEUE.push(item, {
-          property: prop,
           value: value,
           oldValue: oldValue
         });

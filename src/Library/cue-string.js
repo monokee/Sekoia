@@ -35,4 +35,4 @@ Cue.Plugin('cue-string', Library => {
 
   };
 
-});
+}, true);

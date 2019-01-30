@@ -4,9 +4,6 @@
 // Don't refactor to Pojo (used for instanceof checks)
 const ComponentInstance = wrap(() => {
 
-  const isArray = Array.isArray;
-  const toArray = Array.from;
-  const isObjectLike = o => typeof o === 'object' && o !== null;
   const doc = document;
   const isNodeListProto = NodeList.prototype.isPrototypeOf;
   const isHTMLCollectionProto = HTMLCollection.prototype.isPrototypeOf;
@@ -94,7 +91,7 @@ const ComponentInstance = wrap(() => {
 
       if (isArray(x)) return x.map(item => this.select(item, within));
 
-      if (typeof x === 'object' && x !== null) {
+      if (isObjectLike(x)) {
         const o = {};
         for (const item in x) o[item] = this.select(x[item], within);
         return o;

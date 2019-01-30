@@ -31,7 +31,7 @@ function initializeStateModule(moduleInitializer) {
 
     for (i = 0; i < config.props.length; i++) {
       val = config.props[i];
-      if (typeof val === 'function') {
+      if (isFunction(val)) {
         module.computed.set(i, {
           ownPropertyName: i,
           computation: val,
@@ -50,7 +50,7 @@ function initializeStateModule(moduleInitializer) {
 
       val = config.props[prop];
 
-      if (typeof val === 'function') {
+      if (isFunction(val)) {
         module.computed.set(prop, {
           ownPropertyName: prop,
           computation: val,
@@ -79,13 +79,13 @@ function initializeStateModule(moduleInitializer) {
 
     if (prop === 'initialize') {
 
-      if (typeof val === 'function') {
+      if (isFunction(val)) {
         module[prop] = val;
       } else {
         throw new TypeError(`"${prop}" is a reserved word for Cue State Modules and must be a function but is of type ${typeof val}`);
       }
 
-    } else if (typeof val === 'function') {
+    } else if (isFunction(val)) {
 
       module.actions[prop] = val;
 

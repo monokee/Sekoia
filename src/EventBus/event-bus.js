@@ -1,4 +1,6 @@
 
+// TODO: Only State Module should have an Event Bus so that all inter-component communication logic is strictly handled outside of UI.
+
 const CUE_EVENT_BUS_API = {};
 
 { // Cue Event Bus
@@ -30,7 +32,7 @@ const CUE_EVENT_BUS_API = {};
 
       _handler = events[_type];
 
-      if (typeof _handler === 'function') {
+      if (isFunction(_handler)) {
         addEvent(_type, _handler, scope, once);
       } else {
         throw new TypeError(`Can't add listener because handler for "${_type}" is not a function but of type ${typeof _handler}`);
@@ -45,10 +47,10 @@ const CUE_EVENT_BUS_API = {};
 
     on: (type, handler, scope) => {
 
-      if (type && type.constructor === OBJ) {
+      if (isObjectLike(type)) {
         _scope = typeof handler === 'object' ? handler : null;
         addEvents(type, _scope, false);
-      } else if (typeof type === 'string' && typeof handler === 'function') {
+      } else if (typeof type === 'string' && isFunction(handler)) {
         _scope = typeof scope === 'object' ? scope : null;
         addEvent(type, handler, _scope, false);
       } else {
@@ -59,10 +61,10 @@ const CUE_EVENT_BUS_API = {};
 
     once: (type, handler, scope) => {
 
-      if (type && type.constructor === OBJ) {
+      if (isObjectLike(type)) {
         _scope = typeof handler === 'object' ? handler : null;
         addEvents(type, _scope, true);
-      } else if (typeof type === 'string' && typeof handler === 'function') {
+      } else if (typeof type === 'string' && isFunction(handler)) {
         _scope = typeof scope === 'object' ? scope : null;
         addEvent(type, handler, _scope, true);
       } else {

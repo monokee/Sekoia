@@ -25,11 +25,8 @@ Cue.UI('App-UI', Component => ({
       flex: '0 1 auto',
       userSelect: 'none',
       boxSizing: 'borderBox',
-      '&.disabled': { // TODO: allow for scss syntax here. if property is an object, go into sass nesting mode. if first character is "&" chain onto parent selector. else space-append to parent selector.
-
-      },
-      '&:hover': {
-        boxSizing: 'border-box'
+      '&.disabled': {
+        cursor: 'not-allowed'
       }
     },
 
@@ -43,7 +40,10 @@ Cue.UI('App-UI', Component => ({
     sectionMid: {
       width: '100%',
       flex: '1 1 auto',
-      border: '1px solid #ebebeb'
+      border: '1px solid #ebebeb',
+      '&:hover': {
+        background: 'red'
+      }
     },
 
     sectionBottom: {
@@ -61,15 +61,14 @@ Cue.UI('App-UI', Component => ({
 
   initialize(appState) {
     this.state = appState;
-    const {viewer, bottom} = this.refs();
-    this.viewer = viewer;
-    this.bottom = bottom;
+    this.viewer = this.select('.viewerSection');
+    this.bottom = this.select('.sectionBottom');
   },
 
   bindEvents: {
     contextmenu(e) {
       e.preventDefault();
-      console.log('right clicked anywhere, default prevented.', e);
+      this.state.disabled = !this.state.disabled;
     },
     mousedown(e) {
       this.md = e.which === 1;
@@ -95,8 +94,15 @@ Cue.UI('App-UI', Component => ({
     secondsPassed(o) {
       this.viewer.textContent = `Seconds passed (ticker): ${o.value}`;
     },
-    position(o) {
-      this.bottom.textContent = `Dragging: Top: ${o.value.top} | Left: ${o.value.left}`;
+    positionInPixels(o) {
+      this.bottom.textContent = `Mouse Coordinates ${o.value}`;
+    },
+    disabled(o) {
+      if (o.value === true) {
+        this.addClass('disabled');
+      } else {
+        this.removeClass('disabled');
+      }
     }
   }
 

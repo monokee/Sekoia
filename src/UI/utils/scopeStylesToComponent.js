@@ -16,8 +16,12 @@ function scopeStylesToComponent(styles, template) {
     classRules = styles[className];
 
     for (classRule in classRules) {
-      if (classRule[0] === ':' || classRule[0] === ' ') {
-        pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName}${classRule} {}`, CUE_UI_STYLESHEET.cssRules.length);
+      if (isObjectLike(classRules[classRule])) { // nested selectors with basic sass functionality.
+        if (classRule[0] === '&') { // chain onto the selector
+          pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName}${classRule.substring(1)} {}`, CUE_UI_STYLESHEET.cssRules.length);
+        } else { // nest the selector (space separation)
+          pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName} ${classRule} {}`, CUE_UI_STYLESHEET.cssRules.length);
+        }
         pseudoRuleStyle = CUE_UI_STYLESHEET.cssRules[pseudoRuleIndex].style;
         oAssign(pseudoRuleStyle, classRules[classRule]);
         delete classRules[classRule];

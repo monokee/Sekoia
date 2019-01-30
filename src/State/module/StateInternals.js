@@ -20,27 +20,32 @@ class StateInternals {
 
   }
 
-  addChangeReaction(property, handler, scope = null) {
+  addChangeReaction(stateInstance, property, handler, scope, autorun = true) {
 
-    if (typeof handler !== 'function') {
+    if (!isFunction(handler)) {
       throw new TypeError(`Property change reaction for "${property}" is not a function...`);
     }
 
-    const _handler = scope === null ? handler : handler.bind(scope);
+    const boundHandler = handler.bind(scope);
 
     if (this.observersOf.has(property)) {
-      this.observersOf.get(property).push(_handler);
+      this.observersOf.get(property).push(boundHandler);
     } else {
-      this.observersOf.set(property, [ _handler ]);
+      this.observersOf.set(property, [ boundHandler ]);
     }
 
     if (this.derivedProperties.has(property)) {
       const derivative = this.derivedProperties.get(property);
-      derivative.observers.push(_handler);
+      derivative.observers.push(boundHandler);
       setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
     }
 
-    return _handler;
+    if (autorun === true) {
+      const val = stateInstance[property];
+      boundHandler({value: val, oldValue: val});
+    }
+
+    return boundHandler;
 
   }
 
@@ -60,7 +65,7 @@ class StateInternals {
           setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
         }
 
-      } else if (typeof handler === 'function') {
+      } else if (isFunction(handler)) {
 
         let i = reactions.indexOf(handler);
 

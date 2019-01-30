@@ -41,6 +41,7 @@
   const oKeys = OBJ.keys;
   const oEntries = OBJ.entries;
   const isArray = ARR.isArray;
+  const toArray = ARR.from;
   const isObjectLike = o => typeof o === 'object' && o !== null;
   const isPlainObject = o => isObjectLike(o) && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
   const isFunction = fn => typeof fn === 'function';
@@ -53,6 +54,8 @@
     state: oCreate(__lib_core__), // extends core
     ui: oCreate(__lib_core__) // extends core
   };
+
+  // TODO: Only State Module should have an Event Bus so that all inter-component communication logic is strictly handled outside of UI.
 
   const CUE_EVENT_BUS_API = {};
 
@@ -85,7 +88,7 @@
 
         _handler = events[_type];
 
-        if (typeof _handler === 'function') {
+        if (isFunction(_handler)) {
           addEvent(_type, _handler, scope, once);
         } else {
           throw new TypeError(`Can't add listener because handler for "${_type}" is not a function but of type ${typeof _handler}`);
@@ -100,10 +103,10 @@
 
       on: (type, handler, scope) => {
 
-        if (type && type.constructor === OBJ) {
+        if (isObjectLike(type)) {
           _scope = typeof handler === 'object' ? handler : null;
           addEvents(type, _scope, false);
-        } else if (typeof type === 'string' && typeof handler === 'function') {
+        } else if (typeof type === 'string' && isFunction(handler)) {
           _scope = typeof scope === 'object' ? scope : null;
           addEvent(type, handler, _scope, false);
         } else {
@@ -114,10 +117,10 @@
 
       once: (type, handler, scope) => {
 
-        if (type && type.constructor === OBJ) {
+        if (isObjectLike(type)) {
           _scope = typeof handler === 'object' ? handler : null;
           addEvents(type, _scope, true);
-        } else if (typeof type === 'string' && typeof handler === 'function') {
+        } else if (typeof type === 'string' && isFunction(handler)) {
           _scope = typeof scope === 'object' ? scope : null;
           addEvent(type, handler, _scope, true);
         } else {
@@ -158,7 +161,7 @@
   // Registered State Modules
   const CUE_STATE_MODULES = new Map();
 
-  // #State Variables
+  // State Flags
   let isReacting = false; // is a reaction currently in process?
   let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
 
@@ -169,7 +172,7 @@
     derivedProperties: null
   };
 
-  // Traversal Directions
+  // Traversal Directions (needed for dependency branch walking)
   const TRAVERSE_DOWN = -1;
   const TRAVERSE_UP = 1;
 
@@ -763,7 +766,6 @@
         item = observers[i];
         if (MAIN_QUEUE.indexOf(item) === -1) {
           MAIN_QUEUE.push(item, {
-            property: prop,
             value: value,
             oldValue: oldValue
           });
@@ -808,7 +810,6 @@
         item = observers[i];
         if (MAIN_QUEUE.indexOf(item) === -1) {
           MAIN_QUEUE.push(item, {
-            property: prop,
             value: value,
             oldValue: oldValue
           });
@@ -831,7 +832,7 @@
       previous = item._value; // internal
       result = item.value; // calls "getter" -> recomputes value
       if (item.hasChanged) {
-        cueAll(item.ownPropertyName, result, previous, item.observers, item.derivatives, item.stopPropagation);
+        cueAll(item.ownPropertyName, result, previous, item.observers, item.subDerivatives, item.stopPropagation);
       }
     }
 
@@ -843,7 +844,7 @@
 
     const l = MAIN_QUEUE.length;
 
-    // MAIN_QUEUE contains pairs of i: reactionHandler(), i+1: payload{property, value, oldValue}
+    // MAIN_QUEUE contains pairs of i: reactionHandler(), i+1: payload{value, oldValue}
     for (let i = 0; i < l; i += 2) {
       MAIN_QUEUE[i](MAIN_QUEUE[i + 1]);
     }
@@ -876,27 +877,35 @@
 
     }
 
-    addChangeReaction(property, handler, scope = null) {
+    addChangeReaction(stateInstance, property, handler, scope, autorun = true) {
 
-      if (typeof handler !== 'function') {
+      if (!isFunction(handler)) {
         throw new TypeError(`Property change reaction for "${property}" is not a function...`);
       }
 
-      const _handler = scope === null ? handler : handler.bind(scope);
+      const boundHandler = handler.bind(scope);
 
       if (this.observersOf.has(property)) {
-        this.observersOf.get(property).push(_handler);
+        this.observersOf.get(property).push(boundHandler);
       } else {
-        this.observersOf.set(property, [_handler]);
+        this.observersOf.set(property, [boundHandler]);
       }
 
       if (this.derivedProperties.has(property)) {
         const derivative = this.derivedProperties.get(property);
-        derivative.observers.push(_handler);
+        derivative.observers.push(boundHandler);
         setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
       }
 
-      return _handler;
+      if (autorun === true) {
+        const val = stateInstance[property];
+        boundHandler({
+          value: val,
+          oldValue: val
+        });
+      }
+
+      return boundHandler;
 
     }
 
@@ -916,7 +925,7 @@
             setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
           }
 
-        } else if (typeof handler === 'function') {
+        } else if (isFunction(handler)) {
 
           let i = reactions.indexOf(handler);
 
@@ -1006,7 +1015,7 @@
       // 3.3 Enhance Derivative for self-aware traversal
       for (i = 0; i < vDerivative.superDerivatives.length; i++) {
         // because the module derivatives are topologically sorted, we know that the superDerivative is available
-        superDerivative = internal.derivedProperties.get(vDerivative.superDerivatives.ownPropertyName);
+        superDerivative = internal.derivedProperties.get(vDerivative.superDerivatives[i].ownPropertyName);
         derivative.superDerivatives.push(superDerivative);
         superDerivative.subDerivatives.push(derivative);
       }
@@ -1172,7 +1181,7 @@
 
       for (i = 0; i < config.props.length; i++) {
         val = config.props[i];
-        if (typeof val === 'function') {
+        if (isFunction(val)) {
           module.computed.set(i, {
             ownPropertyName: i,
             computation: val,
@@ -1191,7 +1200,7 @@
 
         val = config.props[prop];
 
-        if (typeof val === 'function') {
+        if (isFunction(val)) {
           module.computed.set(prop, {
             ownPropertyName: prop,
             computation: val,
@@ -1220,13 +1229,13 @@
 
       if (prop === 'initialize') {
 
-        if (typeof val === 'function') {
+        if (isFunction(val)) {
           module[prop] = val;
         } else {
           throw new TypeError(`"${prop}" is a reserved word for Cue State Modules and must be a function but is of type ${typeof val}`);
         }
 
-      } else if (typeof val === 'function') {
+      } else if (isFunction(val)) {
 
         module.actions[prop] = val;
 
@@ -1353,8 +1362,12 @@
       classRules = styles[className];
 
       for (classRule in classRules) {
-        if (classRule[0] === ':' || classRule[0] === ' ') {
-          pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName}${classRule} {}`, CUE_UI_STYLESHEET.cssRules.length);
+        if (isObjectLike(classRules[classRule])) { // nested selectors with basic sass functionality.
+          if (classRule[0] === '&') { // chain onto the selector
+            pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName}${classRule.substring(1)} {}`, CUE_UI_STYLESHEET.cssRules.length);
+          } else { // nest the selector (space separation)
+            pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName} ${classRule} {}`, CUE_UI_STYLESHEET.cssRules.length);
+          }
           pseudoRuleStyle = CUE_UI_STYLESHEET.cssRules[pseudoRuleIndex].style;
           oAssign(pseudoRuleStyle, classRules[classRule]);
           delete classRules[classRule];
@@ -1745,42 +1758,16 @@
 
     const stateInstance = component.state[__CUE__];
 
-    let prop, val, boundHandler;
+    let prop, boundHandler;
 
-    if (component.autorun === true) {
+    for (prop in reactions) {
 
-      for (prop in reactions) {
+      boundHandler = stateInstance.addChangeReaction(component.state, prop, reactions[prop], component, component.autorun);
 
-        boundHandler = stateInstance.addChangeReaction(prop, reactions[prop], component);
-
-        val = component.state[prop];
-
-        if (component.reactions.has(prop)) {
-          component.reactions.get(prop).push(boundHandler);
-        } else {
-          component.reactions.set(prop, [boundHandler]);
-        }
-
-        boundHandler({
-          property: prop,
-          value: val,
-          oldValue: val
-        });
-
-      }
-
-    } else {
-
-      for (prop in reactions) {
-
-        boundHandler = stateInstance.addChangeReaction(prop, reactions[prop], component);
-
-        if (component.reactions.has(prop)) {
-          component.reactions.get(prop).push(boundHandler);
-        } else {
-          component.reactions.set(prop, [boundHandler]);
-        }
-
+      if (component.reactions.has(prop)) {
+        component.reactions.get(prop).push(boundHandler);
+      } else {
+        component.reactions.set(prop, [boundHandler]);
       }
 
     }
@@ -1827,9 +1814,6 @@
   // Don't refactor to Pojo (used for instanceof checks)
   const ComponentInstance = wrap(() => {
 
-    const isArray = Array.isArray;
-    const toArray = Array.from;
-    const isObjectLike = o => typeof o === 'object' && o !== null;
     const doc = document;
     const isNodeListProto = NodeList.prototype.isPrototypeOf;
     const isHTMLCollectionProto = HTMLCollection.prototype.isPrototypeOf;
@@ -1919,7 +1903,7 @@
 
         if (isArray(x)) return x.map(item => this.select(item, within));
 
-        if (typeof x === 'object' && x !== null) {
+        if (isObjectLike(x)) {
           const o = {};
           for (const item in x) o[item] = this.select(x[item], within);
           return o;
@@ -2683,7 +2667,7 @@
 
     };
 
-  });
+  }, true);
 
   Cue.Plugin('cue-array', Library => {
 
@@ -2868,6 +2852,7 @@
     const Obj = Object;
     const ObjToString = Obj.prototype.toString;
     const ObjID = '[object Object]';
+    const isObjectLike = o => typeof o === 'object' && o !== null;
 
     const isArray = Array.isArray;
     const getProto = Object.getPrototypeOf;
@@ -2878,7 +2863,7 @@
 
         if (isArray(o)) return this.cloneArray(o, deep);
 
-        if (typeof o === 'object' && o !== null) {
+        if (isObjectLike(o)) {
 
           if (ObjToString.call(o) === ObjID || getProto(o) === null) return this.clonePlainObject(o, deep);
           if (o instanceof Map) return this.cloneMap(o, deep);
@@ -2900,7 +2885,7 @@
 
           for (let i = 0, v; i < a.length; i++) {
             v = a[i];
-            clone.push(typeof v === 'object' && v !== null ? this.clone(v, deep) : v);
+            clone.push(isObjectLike(v) ? this.clone(v, deep) : v);
           }
 
           return clone;
@@ -2922,7 +2907,7 @@
           let k, v;
           for (k in o) {
             v = o[k];
-            clone[k] = typeof v === 'object' && v !== null ? this.clone(v, deep) : v;
+            clone[k] = isObjectLike(v) ? this.clone(v, deep) : v;
           }
 
           return clone;
@@ -2940,7 +2925,7 @@
         const clone = new Map();
 
         if (deep) {
-          m.forEach((val, key) => clone.set(typeof key === 'object' ? this.clone(key, deep) : key, typeof val === 'object' && val !== null ? this.clone(val, deep) : val));
+          m.forEach((val, key) => clone.set(isObjectLike(key) ? this.clone(key, deep) : key, isObjectLike(val) ? this.clone(val, deep) : val));
         } else {
           m.forEach((val, key) => clone.set(key, val));
         }
@@ -2952,7 +2937,7 @@
       cloneSet(s, deep = false) {
 
         const clone = new Set();
-        s.forEach(entry => clone.add(deep && typeof entry === 'object' && entry !== null ? this.clone(entry, deep) : entry));
+        s.forEach(entry => clone.add(deep && isObjectLike(entry) ? this.clone(entry, deep) : entry));
         return clone;
 
       }

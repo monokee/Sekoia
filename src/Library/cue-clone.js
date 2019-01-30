@@ -4,6 +4,7 @@ Cue.Plugin('cue-clone', Library => {
   const Obj = Object;
   const ObjToString = Obj.prototype.toString;
   const ObjID = '[object Object]';
+  const isObjectLike = o => typeof o === 'object' && o !== null;
 
   const isArray = Array.isArray;
   const getProto = Object.getPrototypeOf;
@@ -14,7 +15,7 @@ Cue.Plugin('cue-clone', Library => {
 
       if (isArray(o)) return this.cloneArray(o, deep);
 
-      if (typeof o === 'object' && o !== null) {
+      if (isObjectLike(o)) {
 
         if (ObjToString.call(o) === ObjID || getProto(o) === null) return this.clonePlainObject(o, deep);
         if (o instanceof Map) return this.cloneMap(o, deep);
@@ -36,7 +37,7 @@ Cue.Plugin('cue-clone', Library => {
 
         for (let i = 0, v; i < a.length; i++) {
           v = a[i];
-          clone.push(typeof v === 'object' && v !== null ? this.clone(v, deep) : v);
+          clone.push(isObjectLike(v) ? this.clone(v, deep) : v);
         }
 
         return clone;
@@ -58,7 +59,7 @@ Cue.Plugin('cue-clone', Library => {
         let k, v;
         for (k in o) {
           v = o[k];
-          clone[k] = typeof v === 'object' && v !== null ? this.clone(v, deep) : v;
+          clone[k] = isObjectLike(v) ? this.clone(v, deep) : v;
         }
 
         return clone;
@@ -76,7 +77,7 @@ Cue.Plugin('cue-clone', Library => {
       const clone = new Map();
 
       if (deep) {
-        m.forEach((val, key) => clone.set(typeof key === 'object' ? this.clone(key, deep) : key, typeof val === 'object' && val !== null ? this.clone(val, deep) : val));
+        m.forEach((val, key) => clone.set(isObjectLike(key) ? this.clone(key, deep) : key, isObjectLike(val) ? this.clone(val, deep) : val));
       } else {
         m.forEach((val, key) => clone.set(key, val));
       }
@@ -88,7 +89,7 @@ Cue.Plugin('cue-clone', Library => {
     cloneSet(s, deep = false) {
 
       const clone = new Set();
-      s.forEach(entry => clone.add(deep && typeof entry === 'object' && entry !== null ? this.clone(entry, deep) : entry));
+      s.forEach(entry => clone.add(deep && isObjectLike(entry) ? this.clone(entry, deep) : entry));
       return clone;
 
     }

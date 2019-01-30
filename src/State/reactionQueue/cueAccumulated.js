@@ -6,7 +6,7 @@ function cueAccumulated(derivatives) {
     previous = item._value; // internal
     result = item.value; // calls "getter" -> recomputes value
     if (item.hasChanged) {
-      cueAll(item.ownPropertyName, result, previous, item.observers, item.derivatives, item.stopPropagation);
+      cueAll(item.ownPropertyName, result, previous, item.observers, item.subDerivatives, item.stopPropagation);
     }
   }
 
