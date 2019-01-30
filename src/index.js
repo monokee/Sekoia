@@ -29,9 +29,6 @@ const oDefineProperties = OBJ.defineProperties;
 const oSetPrototypeOf = OBJ.setPrototypeOf;
 const oGetPrototypeOf = OBJ.getPrototypeOf;
 const oProtoToString = OBJ.prototype.toString;
-const oKeys = OBJ.keys;
-const oEntries = OBJ.entries;
-const isArray = ARR.isArray;
 
 // Reflect methods
 const _set = Reflect.set;
@@ -39,9 +36,13 @@ const _get = Reflect.get;
 const _apply = Reflect.apply;
 const _delete = Reflect.deleteProperty;
 
-// Utility methods TODO: implement. replace typeof checks across lib (accuracy + minification!)
+// Utility methods
+const oKeys = OBJ.keys;
+const oEntries = OBJ.entries;
+const isArray = ARR.isArray;
 const isObjectLike = o => typeof o === 'object' && o !== null;
 const isPlainObject = o => isObjectLike(o) && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
+const isFunction = fn => typeof fn === 'function';
 const wrap = fn => fn();
 
 // Cue Library Object

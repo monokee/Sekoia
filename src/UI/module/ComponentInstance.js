@@ -51,9 +51,11 @@ const ComponentInstance = wrap(() => {
 
       this.element = element;
       this.imports = imports;
-      this.styles = new MappedClassList(styles, element);
-      this.keyframes = keyframes || null;
+      this.styles = styles;
+      this.keyframes = keyframes;
       this.reactions = new Map();
+      this.events = new Map();
+      this.autorun = true;
 
     }
 
@@ -61,18 +63,18 @@ const ComponentInstance = wrap(() => {
 
       if (typeof x === 'string') {
 
-        const parent = within ? this.select(within) : this.element;
-        let node;
+        within = within ? this.select(within) : this.element;
+        let node, s;
 
         switch(x[0]) {
           case '#':
             node = doc.getElementById(x.substring(1));
             break;
           case '.':
-            node = parent.getElementsByClassName(this.styles.get(x.substring(1)));
+            node = within.getElementsByClassName(this.styles.get((s = x.substring(1))) || s);
             break;
           default:
-            node = parent.querySelectorAll(x);
+            node = within.querySelectorAll(x);
             break;
         }
 
@@ -110,30 +112,109 @@ const ComponentInstance = wrap(() => {
       return node.nodeType !== Node.TEXT_NODE && node.length;
     }
 
-    getIndex(node) {
+    hasClass(node, className) {
+
+      if (arguments.length === 1) {
+        className = node;
+        node = this.element;
+      } else {
+        node = this.select(node);
+      }
+
+      return node.classList.contains(this.styles.get(className) || className);
+
+    }
+
+    addClass(node, className) {
+
+      let classNames;
+
+      if (arguments.length === 1) {
+        classNames = node.split(' ').map(token => (this.styles.get(token) || token));
+        node = this.element;
+      } else {
+        node = this.select(node);
+        classNames = className.split(' ').map(token => (this.styles.get(token) || token));
+      }
+
+      node.classList.add(...classNames);
+
+      return this;
+
+    }
+
+    removeClass(node, className) {
+
+      let classNames;
+
+      if (arguments.length === 1) {
+        classNames = node.split(' ').map(token => (this.styles.get(token) || token));
+        node = this.element;
+      } else {
+        node = this.select(node);
+        classNames = className.split(' ').map(token => (this.styles.get(token) || token));
+      }
+
+      node.classList.remove(...classNames);
+
+      return this;
+
+    }
+
+    toggleClass(node, className) {
+
+      if (arguments.length === 1) {
+        className = node;
+        node = this.element;
+      } else {
+        node = this.select(node);
+      }
+
+      node.classList.toggle(this.styles.get(className) || className);
+
+      return this;
+
+    }
+
+    replaceClass(node, oldClass, newClass) {
+
+      if (arguments.length === 2) {
+        oldClass = node;
+        newClass = oldClass;
+        node = this.element;
+      } else {
+        node = this.select(node);
+      }
+
+      node.classList.replace(this.styles.get(oldClass) || oldClass, this.styles.get(newClass) || newClass);
+
+      return this;
+
+    }
+
+    index(node) {
       node = node ? this.select(node) : this.element;
       return toArray(node.parentNode.children).indexOf(node);
     }
 
-    getSiblings(node, includeSelf) {
+    siblings(node, includeSelf) {
 
       if (arguments.length === 1) {
         includeSelf = node === true;
         node = this.element;
       } else {
         node = this.select(node);
-        includeSelf = includeSelf === true;
       }
 
       return includeSelf ? toArray(node.parentNode.children) : toArray(node.parentNode.children).filter(sibling => sibling !== node);
     }
 
-    getRefs(parentNode) {
+    refs(within) {
 
       // collect children of element that have "ref" attribute
       // returns object hash that maps refValue to domElement
-      parentNode = parent ? this.select(parentNode) : this.element;
-      const tagged = parentNode.querySelectorAll('[ref]');
+      within = within ? this.select(within) : this.element;
+      const tagged = within.querySelectorAll('[ref]');
 
       if (tagged.length) {
         const refs = {};
@@ -146,7 +227,7 @@ const ComponentInstance = wrap(() => {
 
     }
 
-    getBoundingBox(node) {
+    boundingBox(node) {
       node = node ? this.select(node) : this.element;
       // clone and offset in case element is invisible
       const clone = node.cloneNode(true);
@@ -158,6 +239,23 @@ const ComponentInstance = wrap(() => {
       const bb = clone.getBoundingClientRect();
       clone.parentElement.removeChild(clone);
       return bb;
+    }
+
+    position(node) {
+      node = node ? this.select(node) : this.element;
+      return {
+        top: node.offsetTop,
+        left: node.offsetLeft
+      };
+    }
+
+    offset(node) {
+      node = node ? this.select(node) : this.element;
+      const rect = node.getBoundingClientRect();
+      return {
+        top: rect.top + document.body.scrollTop,
+        left: rect.left + document.body.scrollLeft
+      };
     }
 
     awaitTransition(...nodes) {
@@ -195,7 +293,7 @@ const ComponentInstance = wrap(() => {
       // fast path clear all
       if (to.length === 0) {
         node.textContent = '';
-        return;
+        return this;
       }
 
       // fast path create all
@@ -203,130 +301,13 @@ const ComponentInstance = wrap(() => {
         for(let i = 0; i < to.length; i++) {
           node.appendChild(create(to[i]))
         }
-        return;
+        return this;
       }
 
       // reconcile current/new newData arrays
       reconcile(node, from, to, create, update);
 
-    }
-
-    observe(state, scope, property, handler, autorun = true) {
-
-      const stateInstance = state[__CUE__];
-
-      if (typeof property === 'string') {
-
-        const boundHandler = stateInstance.addChangeReaction(property, handler, scope);
-
-        if (this.reactions.has(property)) {
-          this.reactions.get(property).push(boundHandler);
-        } else {
-          this.reactions.set(property, [boundHandler]);
-        }
-
-        if (autorun === true) {
-          boundHandler({
-            property: property,
-            value: state[property],
-            oldValue: state[property]
-          });
-        }
-
-        return boundHandler;
-
-      } else if (isObjectLike(property)) {
-
-        const _autorun = typeof handler === 'boolean' ? handler : autorun;
-        const boundHandlers = {};
-
-        let prop, boundHandler;
-
-        for (prop in property) {
-
-          boundHandler = stateInstance.addChangeReaction(prop, property[prop], scope);
-
-          boundHandlers[prop] = boundHandler;
-
-          if (this.reactions.has(prop)) {
-            this.reactions.get(prop).push(boundHandler);
-          } else {
-            this.reactions.set(prop, [boundHandler]);
-          }
-
-          if (_autorun === true) {
-            boundHandler({
-              property: prop,
-              value: state[prop],
-              oldValue: state[prop]
-            });
-          }
-
-        }
-
-        return boundHandlers;
-
-      }
-
-    }
-
-    unobserve(state, property, handler) {
-
-      const stateInstance = state[__CUE__];
-
-      if (typeof property === 'string') {
-
-        if (handler) {
-          stateInstance.removeChangeReaction(property, handler);
-        } else if (this.reactions.has(property)) {
-          this.reactions.get(property).forEach(handler => {
-            stateInstance.removeChangeReaction(property, handler);
-          });
-        }
-
-      } else if (isObjectLike(property)) {
-
-        for (const prop in property) {
-          stateInstance.removeChangeReaction(prop, property[prop]);
-        }
-
-      }
-
-    }
-
-    on(node, type, handler, options) {
-
-      // TODO: refactor. live-delegate within element if selector is passed.
-      node = this.select(node);
-
-      // element.addEventListener convenience method which accepts a plain object of multiple event -> handlers
-      // since we're always binding to the root element, we facilitate event delegation. handlers can internally compare e.target to refs or children.
-
-      if (arguments.length === 2 && isObjectLike(type)) {
-        for (const eventType in type) {
-          node.addEventListener(eventType, type[eventType], isObjectLike(handler) ? handler : {});
-        }
-      } else if (typeof handler === 'function') {
-        node.addEventListener(type, handler, options || {});
-      } else {
-        throw new TypeError(`Can't bind event listener(s) because of invalid arguments.`);
-      }
-
-    }
-
-    off(node, type, handler) {
-
-      node = this.select(node);
-
-      if (arguments.length === 2 && isObjectLike(type)) {
-        for (const eventType in type) {
-          node.removeEventListener(eventType, type[eventType]);
-        }
-      } else if (typeof handler === 'function') {
-        node.removeEventListener(type, handler);
-      } else {
-        throw new TypeError(`Can't remove event listener(s) because of invalid arguments.`);
-      }
+      return this;
 
     }
 

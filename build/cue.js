@@ -30,9 +30,6 @@
   const oSetPrototypeOf = OBJ.setPrototypeOf;
   const oGetPrototypeOf = OBJ.getPrototypeOf;
   const oProtoToString = OBJ.prototype.toString;
-  const oKeys = OBJ.keys;
-  const oEntries = OBJ.entries;
-  const isArray = ARR.isArray;
 
   // Reflect methods
   const _set = Reflect.set;
@@ -40,8 +37,13 @@
   const _apply = Reflect.apply;
   const _delete = Reflect.deleteProperty;
 
-  // Utility methods TODO: implement. replace typeof checks across lib (accuracy + minification!)
-  //const isPlainObject = o => typeof o === 'object' && o !== null && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
+  // Utility methods
+  const oKeys = OBJ.keys;
+  const oEntries = OBJ.entries;
+  const isArray = ARR.isArray;
+  const isObjectLike = o => typeof o === 'object' && o !== null;
+  const isPlainObject = o => isObjectLike(o) && (oProtoToString.call(o) === OBJ_ID || oGetPrototypeOf(o) === null);
+  const isFunction = fn => typeof fn === 'function';
   const wrap = fn => fn();
 
   // Cue Library Object
@@ -1313,67 +1315,6 @@
 
   });
 
-  // Implementation of DOM ClassList that works with mapped classNames
-  // Useful when a component has generated unique, component-scoped classNames
-  // but we want to work with the user-defined classNames in our high-level code.
-
-  const __mappedClassNames__ = Symbol('ClassName Map');
-  const __elementClassList__ = Symbol('Original ClassList');
-
-  class MappedClassList {
-
-    constructor(map, element) {
-
-      if (!map) {
-        throw new TypeError(`Can't create MappedClassList. First argument has to be a plain Object, 2D Array or a Map but is ${JSON.stringify(map)}.`);
-      } else if (map.constructor === OBJ) {
-        map = new Map(oEntries(map));
-      } else if (isArray(map)) {
-        map = new Map(map);
-      }
-
-      // internalize map and original classList
-      oDefineProperties(this, {
-      [__mappedClassNames__]: {
-          value: map
-        },
-      [__elementClassList__]: {
-          value: element.classList // internal reference to original classList.
-        }
-      });
-
-    }
-
-    item(index) {
-      return this[__elementClassList__].item(index);
-    }
-
-    has(token) {
-      return this.contains(token);
-    }
-
-    contains(token) {
-      return this[__elementClassList__].contains(this[__mappedClassNames__].get(token) || token);
-    }
-
-    add(token) {
-      this[__elementClassList__].add(this[__mappedClassNames__].get(token) || token);
-    }
-
-    remove(token) {
-      this[__elementClassList__].remove(this[__mappedClassNames__].get(token) || token);
-    }
-
-    replace(existingToken, newToken) {
-      this[__elementClassList__].replace((this[__mappedClassNames__].get(existingToken) || existingToken), (this[__mappedClassNames__].get(newToken) || newToken));
-    }
-
-    toggle(token) {
-      this[__elementClassList__].toggle(this[__mappedClassNames__].get(token) || token);
-    }
-
-  }
-
   // Library stylesheet that components can write scoped classes to
   const CUE_UI_STYLESHEET = (() => {
     const stylesheet = document.createElement('style');
@@ -1409,6 +1350,9 @@
 
   function scopeStylesToComponent(styles, template) {
 
+    const map = new Map();
+    if (!styles) return map;
+
     let className, classRules, classRule, pseudoRuleIndex, pseudoRuleStyle, uniqueClassName, ruleIndex, ruleStyle;
 
     for (className in styles) {
@@ -1430,7 +1374,7 @@
       }
 
       oAssign(ruleStyle, classRules);
-      styles[className] = uniqueClassName;
+      map.set(className, uniqueClassName);
 
       if (template) {
         replaceClassNameInElement(className, uniqueClassName, template);
@@ -1438,11 +1382,14 @@
 
     }
 
-    return styles;
+    return map;
 
   }
 
   function scopeKeyframesToComponent(keyframes) {
+
+    const map = new Map();
+    if (!keyframes) return map;
 
     let name, uniqueName, framesIndex, framesSheet, frames, percent, index, style;
 
@@ -1462,11 +1409,11 @@
         oAssign(style, frames[percent]);
       }
 
-      keyframes[name] = uniqueName;
+      map.set(name, uniqueName);
 
     }
 
-    return keyframes;
+    return map;
 
   }
 
@@ -1806,6 +1753,87 @@
 
   }
 
+  function installStateReactions(component, reactions) {
+
+    const stateInstance = component.state[__CUE__];
+
+    let prop, val, boundHandler;
+
+    if (component.autorun === true) {
+
+      for (prop in reactions) {
+
+        val = component.state[prop];
+
+        boundHandler = stateInstance.addChangeReaction(prop, reactions[prop], component);
+
+        if (component.reactions.has(prop)) {
+          component.reactions.get(prop).push(boundHandler);
+        } else {
+          component.reactions.set(prop, [boundHandler]);
+        }
+
+        boundHandler({
+          property: prop,
+          value: val,
+          oldValue: val
+        });
+
+      }
+
+    } else {
+
+      for (prop in reactions) {
+
+        boundHandler = stateInstance.addChangeReaction(prop, reactions[prop], component);
+
+        if (component.reactions.has(prop)) {
+          component.reactions.get(prop).push(boundHandler);
+        } else {
+          component.reactions.set(prop, [boundHandler]);
+        }
+
+      }
+
+    }
+
+  }
+
+  function bindComponentEvents(component, events) {
+
+    let eventName, value;
+    for (eventName in events) {
+
+      value = events[eventName];
+
+      if (component.events.has(eventName)) { // base event already registered
+
+        addHandlerToBaseEvent(component.events.get(eventName), value, component);
+
+      } else { // register new base event
+
+        const eventStack = [];
+        component.events.set(eventName, eventStack);
+        addHandlerToBaseEvent(eventStack, value, component);
+
+        component.element.addEventListener(eventName, e => {
+          for (let i = 0; i < eventStack.length; i++) eventStack[i].call(component, e);
+        });
+
+      }
+
+    }
+
+  }
+
+  function addHandlerToBaseEvent(eventStack, handlerOrDelegate, scope) {
+    if (isFunction(handlerOrDelegate)) {
+      eventStack.push(handlerOrDelegate);
+    } else if (isObjectLike(handlerOrDelegate)) {
+      for (const selector in handlerOrDelegate) eventStack.push(e => e.target.closest(selector) && handlerOrDelegate[selector].call(scope, e));
+    }
+  }
+
   // Cue UI Component Instance available as "this" in component lifecycle methods.
   // Provides access to the raw dom element, imports, keyframes and styles
   // Don't refactor to Pojo (used for instanceof checks)
@@ -1860,46 +1888,35 @@
 
         this.element = element;
         this.imports = imports;
-        this.styles = styles && oKeys(styles).length ? new MappedClassList(styles, element) : null;
-        this.keyframes = keyframes || null;
-        this.on('click', e => {}, {
-          once: true
-        });
-        this.on('.child', 'click', e => {}, {
-          once: true
-        });
-        this.on({
-          click: e => {}
-        }, {
-          once: true
-        });
-        this.on(this.element.firstChild, {})
+        this.styles = styles;
+        this.keyframes = keyframes;
+        this.reactions = new Map();
+        this.events = new Map();
+        this.autorun = true;
 
       }
 
       select(x, within) {
 
-        // TODO: selector needs to account for scoped classNames!
-
         if (typeof x === 'string') {
 
-          const parent = within ? this.select(within) : this.element;
-          let node;
+          within = within ? this.select(within) : this.element;
+          let node, s;
 
           switch (x[0]) {
             case '#':
               node = doc.getElementById(x.substring(1));
               break;
             case '.':
-              node = parent.getElementsByClassName(x.substring(1));
+              node = within.getElementsByClassName(this.styles.get((s = x.substring(1))) || s);
               break;
             default:
-              node = parent.querySelectorAll(x);
+              node = within.querySelectorAll(x);
               break;
           }
 
           if (node.nodeType !== Node.TEXT_NODE && node.length) {
-            return node.length > 1 ? toArray(node) : node[0];
+            return node.length === 1 ? node[0] : toArray(node);
           }
 
           return node;
@@ -1932,22 +1949,109 @@
         return node.nodeType !== Node.TEXT_NODE && node.length;
       }
 
-      getIndex(node) {
+      hasClass(node, className) {
+
+        if (arguments.length === 1) {
+          className = node;
+          node = this.element;
+        } else {
+          node = this.select(node);
+        }
+
+        return node.classList.contains(this.styles.get(className) || className);
+
+      }
+
+      addClass(node, className) {
+
+        let classNames;
+
+        if (arguments.length === 1) {
+          classNames = node.split(' ').map(token => (this.styles.get(token) || token));
+          node = this.element;
+        } else {
+          node = this.select(node);
+          classNames = className.split(' ').map(token => (this.styles.get(token) || token));
+        }
+
+        node.classList.add(...classNames);
+
+        return this;
+
+      }
+
+      removeClass(node, className) {
+
+        let classNames;
+
+        if (arguments.length === 1) {
+          classNames = node.split(' ').map(token => (this.styles.get(token) || token));
+          node = this.element;
+        } else {
+          node = this.select(node);
+          classNames = className.split(' ').map(token => (this.styles.get(token) || token));
+        }
+
+        node.classList.remove(...classNames);
+
+        return this;
+
+      }
+
+      toggleClass(node, className) {
+
+        if (arguments.length === 1) {
+          className = node;
+          node = this.element;
+        } else {
+          node = this.select(node);
+        }
+
+        node.classList.toggle(this.styles.get(className) || className);
+
+        return this;
+
+      }
+
+      replaceClass(node, oldClass, newClass) {
+
+        if (arguments.length === 2) {
+          oldClass = node;
+          newClass = oldClass;
+          node = this.element;
+        } else {
+          node = this.select(node);
+        }
+
+        node.classList.replace(this.styles.get(oldClass) || oldClass, this.styles.get(newClass) || newClass);
+
+        return this;
+
+      }
+
+      index(node) {
         node = node ? this.select(node) : this.element;
         return toArray(node.parentNode.children).indexOf(node);
       }
 
-      getSiblings(node, includeSelf = false) {
-        node = node ? this.select(node) : this.element;
+      siblings(node, includeSelf) {
+
+        if (arguments.length === 1) {
+          includeSelf = node === true;
+          node = this.element;
+        } else {
+          node = this.select(node);
+        }
+
         return includeSelf ? toArray(node.parentNode.children) : toArray(node.parentNode.children).filter(sibling => sibling !== node);
       }
 
-      getRefs(parentNode) {
+      refs(within) {
 
         // collect children of element that have "ref" attribute
         // returns object hash that maps refValue to domElement
-        parentNode = parent ? this.select(parentNode) : this.element;
-        const tagged = parentNode.querySelectorAll('[ref]');
+        within = within ? this.select(within) : this.element;
+        const tagged = within.querySelectorAll('[ref]');
 
         if (tagged.length) {
           const refs = {};
@@ -1960,7 +2064,7 @@
 
       }
 
-      getBoundingBox(node) {
+      boundingBox(node) {
         node = node ? this.select(node) : this.element;
         // clone and offset in case element is invisible
         const clone = node.cloneNode(true);
@@ -1972,6 +2076,23 @@
         const bb = clone.getBoundingClientRect();
         clone.parentElement.removeChild(clone);
         return bb;
+      }
+
+      position(node) {
+        node = node ? this.select(node) : this.element;
+        return {
+          top: node.offsetTop,
+          left: node.offsetLeft
+        };
+      }
+
+      offset(node) {
+        node = node ? this.select(node) : this.element;
+        const rect = node.getBoundingClientRect();
+        return {
+          top: rect.top + document.body.scrollTop,
+          left: rect.left + document.body.scrollLeft
+        };
       }
 
       awaitTransition(...nodes) {
@@ -1999,7 +2120,7 @@
         update = NOOP
       }) {
 
-        node = node ? this.select(node) : this.element;
+        node = arguments.length === 1 ? this.element : this.select(node);
 
         // the preferred method for updating a list of children after the underlying data model for a rendered list has changed.
         // performs smart checking and optimized reconciliation to ensure only the minimum amount of dom-work is performed per update.
@@ -2014,7 +2135,7 @@
         // fast path clear all
         if (to.length === 0) {
           node.textContent = '';
-          return;
+          return this;
         }
 
         // fast path create all
@@ -2022,127 +2143,49 @@
           for (let i = 0; i < to.length; i++) {
             node.appendChild(create(to[i]))
           }
-          return;
+          return this;
         }
 
         // reconcile current/new newData arrays
         reconcile(node, from, to, create, update);
 
-      }
-
-      observe(state, scope, property, handler, autorun = true) {
-
-        //TODO: likely create link between element and state at this point (hooks?!)
-        const stateInstance = state[__CUE__];
-
-        if (typeof property === 'string') {
-
-          const boundHandler = stateInstance.addChangeReaction(property, handler, scope);
-
-          if (autorun === true) {
-            boundHandler({
-              property: property,
-              value: state[property],
-              oldValue: state[property]
-            });
-          }
-
-          return boundHandler;
-
-        } else if (isObjectLike(property)) {
-
-          const _autorun = typeof handler === 'boolean' ? handler : autorun;
-          const boundHandlers = {};
-
-          let prop, boundHandler;
-
-          for (prop in property) {
-
-            boundHandler = stateInstance.addChangeReaction(prop, property[prop], scope);
-
-            boundHandlers[prop] = boundHandler;
-
-            if (_autorun === true) {
-              boundHandler({
-                property: prop,
-                value: state[prop],
-                oldValue: state[prop]
-              });
-            }
-
-          }
-
-          return boundHandlers;
-
-        }
-
-      }
-
-      unobserve(state, property, handler) {
-
-        const stateInstance = state[__CUE__];
-
-        if (typeof property === 'string') {
-
-          stateInstance.removeChangeReaction(property, handler);
-
-        } else if (property.constructor === OBJ && property !== null) {
-
-          for (const prop in property) {
-            stateInstance.removeChangeReaction(prop, property[prop]);
-          }
-
-        }
-
-      }
-
-      on(node, type, handler, options) {
-
-        // TODO: refactor. live-delegate within element if selector is passed.
-        node = this.select(node);
-
-        // element.addEventListener convenience method which accepts a plain object of multiple event -> handlers
-        // since we're always binding to the root element, we facilitate event delegation. handlers can internally compare e.target to refs or children.
-
-        if (arguments.length === 2 && isObjectLike(type)) {
-          for (const eventType in type) {
-            node.addEventListener(eventType, type[eventType], isObjectLike(handler) ? handler : {});
-          }
-        } else if (typeof handler === 'function') {
-          node.addEventListener(type, handler, options || {});
-        } else {
-          throw new TypeError(`Can't bind event listener(s) because of invalid arguments.`);
-        }
-
-      }
-
-      off(node, type, handler) {
-
-        node = this.select(node);
-
-        if (arguments.length === 2 && isObjectLike(type)) {
-          for (const eventType in type) {
-            node.removeEventListener(eventType, type[eventType]);
-          }
-        } else if (typeof handler === 'function') {
-          node.removeEventListener(type, handler);
-        } else {
-          throw new TypeError(`Can't remove event listener(s) because of invalid arguments.`);
-        }
+        return this;
 
       }
 
       insertBefore(node, target) {
+        if (arguments.length === 1) {
+          target = this.select(node);
+          node = this.element;
+        } else {
+          node = this.select(node);
+          target = this.select(target);
+        }
         target.parentNode.insertBefore(node, target);
         return this;
       }
 
       insertAfter(node, target) {
+        if (arguments.length === 1) {
+          target = this.select(node);
+          node = this.element;
+        } else {
+          node = this.select(node);
+          target = this.select(target);
+        }
         target.parentNode.insertBefore(node, target.nextSibling);
         return this;
       }
 
       insertAt(node, index) {
+
+        if (arguments.length === 1) {
+          index = parseInt(node);
+          node = this.element;
+        } else {
+          node = this.select(node);
+          index = parseInt(index);
+        }
 
         const parent = node.parentNode,
           children = parent.children;
@@ -2160,10 +2203,12 @@
       }
 
       detach(node) {
+        node = node ? this.select(node) : this.element;
         return node.parentNode.removeChild(node);
       }
 
       remove(node) {
+        node = node ? this.select(node) : this.element;
         node.parentNode.removeChild(node);
         return this;
       }
@@ -2187,15 +2232,38 @@
 
     const templateNode = createTemplateRootElement(CONFIG.template);
 
+    // automatically scope classNames or keyframes to the component by replacing their names with unique names.
+    // functions return a map of the original name to the unique name or an empty map if no component-level styles/keyframes exist.
+    const styles = scopeStylesToComponent(CONFIG.styles, templateNode);
+    const keyframes = scopeKeyframesToComponent(CONFIG.keyframes);
+
+    // rewrite delegated event selectors to internally match the scoped classNames
+    if (CONFIG.bindEvents && styles.size > 0) {
+      let eventName, x, selector, scopedSelector;
+      for (eventName in CONFIG.bindEvents) {
+        x = CONFIG.bindEvents[eventName];
+        if (isObjectLike(x)) { // event type has sub-selectors
+          for (selector in x) {
+            if (selector[0] === '.') {
+              scopedSelector = styles.get(selector.substring(1));
+              if (scopedSelector) {
+                x['.' + scopedSelector] = x[selector]; // swap scoped/unscoped in-place
+                delete x[selector];
+              }
+            }
+          }
+        }
+      }
+    }
+
     return {
       template: templateNode,
       imports: CONFIG.imports || null,
-      styles: CONFIG.styles ? scopeStylesToComponent(CONFIG.styles, templateNode) : null,
-      keyframes: CONFIG.keyframes ? scopeKeyframesToComponent(CONFIG.keyframes) : null,
+      styles: styles,
+      keyframes: keyframes,
       initialize: CONFIG.initialize || null,
-      didMount: CONFIG.didMount || NOOP,
-      didUpdate: CONFIG.didUpdate || NOOP,
-      willUnmount: CONFIG.willUnmount || NOOP
+      bindEvents: CONFIG.bindEvents || null,
+      renderState: CONFIG.renderState || null
     };
 
   }
@@ -2217,12 +2285,19 @@
         component.keyframes
       );
 
-      // how can we make the "instance" available to the static "Component" Object (lib-ui, extends lib-core)?
-      // Component is shared by all instances. Calling Component.hasContent() without a parameter should default to instance.element as the default component.
-
-      // initialize
+      // 1. Initialize
       if (component.initialize) {
         component.initialize.call(instance, state);
+      }
+
+      // 2. Render State
+      if (component.renderState) {
+        installStateReactions(instance, component.renderState);
+      }
+
+      // 3. Bind Events
+      if (component.bindEvents) {
+        bindComponentEvents(instance, component.bindEvents);
       }
 
       // return dom element for compositing

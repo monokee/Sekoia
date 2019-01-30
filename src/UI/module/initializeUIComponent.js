@@ -14,15 +14,38 @@ function initializeUIComponent(initializer) { // runs only once per module
 
   const templateNode = createTemplateRootElement(CONFIG.template);
 
+  // automatically scope classNames or keyframes to the component by replacing their names with unique names.
+  // functions return a map of the original name to the unique name or an empty map if no component-level styles/keyframes exist.
+  const styles = scopeStylesToComponent(CONFIG.styles, templateNode);
+  const keyframes = scopeKeyframesToComponent(CONFIG.keyframes);
+
+  // rewrite delegated event selectors to internally match the scoped classNames
+  if (CONFIG.bindEvents && styles.size > 0) {
+    let eventName, x, selector, scopedSelector;
+    for (eventName in CONFIG.bindEvents) {
+      x = CONFIG.bindEvents[eventName];
+      if (isObjectLike(x)) { // event type has sub-selectors
+        for (selector in x) {
+          if (selector[0] === '.') {
+            scopedSelector = styles.get(selector.substring(1));
+            if (scopedSelector) {
+              x['.' + scopedSelector] = x[selector]; // swap .scoped/.unscoped in-place
+              delete x[selector];
+            }
+          }
+        }
+      }
+    }
+  }
+
   return {
     template: templateNode,
     imports: CONFIG.imports || null,
-    styles: CONFIG.styles ? scopeStylesToComponent(CONFIG.styles, templateNode): null,
-    keyframes: CONFIG.keyframes ? scopeKeyframesToComponent(CONFIG.keyframes) : null,
+    styles: styles,
+    keyframes: keyframes,
     initialize: CONFIG.initialize || null,
-    didMount: CONFIG.didMount || NOOP,
-    didUpdate: CONFIG.didUpdate || NOOP,
-    willUnmount: CONFIG.willUnmount || NOOP
+    bindEvents: CONFIG.bindEvents || null,
+    renderState: CONFIG.renderState || null
   };
 
 }

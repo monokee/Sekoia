@@ -1,6 +1,9 @@
 
 function scopeStylesToComponent(styles, template) {
 
+  const map = new Map();
+  if (!styles) return map;
+
   let className, classRules, classRule, pseudoRuleIndex, pseudoRuleStyle, uniqueClassName, ruleIndex, ruleStyle;
 
   for (className in styles) {
@@ -22,7 +25,7 @@ function scopeStylesToComponent(styles, template) {
     }
 
     oAssign(ruleStyle, classRules);
-    styles[className] = uniqueClassName;
+    map.set(className, uniqueClassName);
 
     if (template) {
       replaceClassNameInElement(className, uniqueClassName, template);
@@ -30,6 +33,6 @@ function scopeStylesToComponent(styles, template) {
 
   }
 
-  return styles;
+  return map;
 
 }

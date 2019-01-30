@@ -16,12 +16,19 @@ function createComponentFactory(initializer) {
       component.keyframes
     );
 
-    // how can we make the "instance" available to the static "Component" Object (lib-ui, extends lib-core)?
-    // Component is shared by all instances. Calling Component.hasContent() without a parameter should default to instance.element as the default component.
-
-    // initialize
+    // 1. Initialize
     if (component.initialize) {
       component.initialize.call(instance, state);
+    }
+
+    // 2. Render State
+    if (component.renderState) {
+      installStateReactions(instance, component.renderState);
+    }
+
+    // 3. Bind Events
+    if (component.bindEvents) {
+      bindComponentEvents(instance, component.bindEvents);
     }
 
     // return dom element for compositing

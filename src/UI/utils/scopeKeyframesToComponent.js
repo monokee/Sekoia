@@ -1,6 +1,9 @@
 
 function scopeKeyframesToComponent(keyframes) {
 
+  const map = new Map();
+  if (!keyframes) return map;
+
   let name, uniqueName, framesIndex, framesSheet, frames, percent, index, style;
 
   for (name in keyframes) {
@@ -19,10 +22,10 @@ function scopeKeyframesToComponent(keyframes) {
       oAssign(style, frames[percent]);
     }
 
-    keyframes[name] = uniqueName;
+    map.set(name, uniqueName);
 
   }
 
-  return keyframes;
+  return map;
 
 }

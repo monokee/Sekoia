@@ -5,7 +5,7 @@ Cue.UI('App-UI', Component => ({
        <div ref="top" class="sectionTop"></div>
        <div class="sectionMid">
          <div class="sidebarRight"></div>
-         <div class="viewerSection"></div>
+         <div ref ="viewer" class="viewerSection"></div>
          <div class="sidebarLeft"></div>
        </div>
        <div ref="bottom" class="sectionBottom"></div>
@@ -52,41 +52,37 @@ Cue.UI('App-UI', Component => ({
   },
 
   initialize(appState) {
-
     this.state = appState;
-    const {top, bottom} = this.getRefs();
-    this.top = top;
+    const {viewer, bottom} = this.refs();
+    this.viewer = viewer;
     this.bottom = bottom;
-
   },
 
-  onUserInput: {
-    click: e => {
-      this.state.startTicker();
-    },
-    contextMenu: e => {
+  bindEvents: {
+    contextMenu(e) {
       e.preventDefault();
-      this.state.stopTicker();
+      console.log('right clicked anywhere, default prevented.', e);
+    },
+    click: {
+      '.sectionMid'(e) {
+        console.log('sectionMid clicked!', e);
+      },
+      '.viewerSection'(e) {
+        console.log('.viewerSection clicked. starting counter', this);
+        this.state.startTicker();
+      },
+      'div'(e) {
+        console.log('a div inside element has been clicked.', e);
+      }
     }
   },
 
-  onStateChange: {
-    name: o => {
+  renderState: {
+    name(o) {
       this.bottom.textContent = o.value;
     },
-    secondsPassed: o => {
-      //TODO: styles implementation as mapped classList won't work. the styles can target nested elements but the mapped classList only targets the root element. wtf?
-      this.addClass('sectionTop');
-      this.removeClass('sectionTop');
-      this.toggleClass('someThing');
-      this.toggleClass(this.bottom, 'someThingElse');
-
-      if (o.value) {
-        this.styles.remove('sectionTop');
-      } else {
-        this.styles.add('sectionTop');
-      }
-
+    secondsPassed(o) {
+      this.viewer.textContent = `Seconds passed (ticker): ${o.value}`;
     }
   }
 

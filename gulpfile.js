@@ -63,7 +63,6 @@ const FILES = {
     `${MODULES.ui}/index.js`,
     `${MODULES.ui}/proto.js`,
 
-    `${MODULES.ui}/utils/MappedClassList.js`,
     `${MODULES.ui}/utils/CueStylesheet.js`,
     `${MODULES.ui}/utils/createUniqueClassName.js`,
     `${MODULES.ui}/utils/replaceClassNameInElement.js`,
@@ -72,6 +71,8 @@ const FILES = {
     `${MODULES.ui}/utils/createTemplateRootElement.js`,
     `${MODULES.ui}/utils/reconcile.js`,
     `${MODULES.ui}/utils/longestIncreasingSubsequence.js`,
+    `${MODULES.ui}/utils/installStateReactions.js`,
+    `${MODULES.ui}/utils/bindComponentEvents.js`,
 
     `${MODULES.ui}/module/ComponentInstance.js`,
     `${MODULES.ui}/module/initializeUIComponent.js`,
