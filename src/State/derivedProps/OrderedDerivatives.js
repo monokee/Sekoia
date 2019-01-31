@@ -1,12 +1,20 @@
 
+/**
+ * Topological sorter to resolve dependencies of derivatives
+ * @namespace OrderedDerivatives
+ * @property {(null|Map)} source - Placeholder for the Map of vDerivatives to be sorted. Nullified after each job.
+ * @property {Array} visited - Placeholder for visited properties. Helper for topological sorter. Emptied after each job.
+ */
 const OrderedDerivatives = {
-
-  // topological sorter to resolve derivative dependencies
-  // returns sorted map
 
   source: null,
   visited: [],
 
+  /**
+   * Public method which resolves dependency order of computed properties.
+   * @param   {Map}   derivatives - unordered vDerivatives
+   * @returns {Map}   target      - vDerivatives in resolved dependency order
+   */
   from(derivatives) {
 
     this.source = derivatives;
@@ -24,6 +32,13 @@ const OrderedDerivatives = {
 
   },
 
+  /**
+   * Private Method used for topological sorting.
+   * Detects circular dependencies and throws.
+   * @param {string} sourceProperty - The property name of the derivative on its source object.
+   * @param {Array}  dependencies   - An array we're passing around to collect the property names that the derivative depends on.
+   * @param {Map}    target         - The ordered Map to which a derivative is added after all of its dependencies are resolved.
+   */
   _visit(sourceProperty, dependencies, target) {
 
     if (this.source.has(sourceProperty)) {

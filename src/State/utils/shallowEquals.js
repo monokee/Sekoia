@@ -1,7 +1,15 @@
 
+/**
+ * One-level (shallow), ordered equality check.
+ * Works for primitives, plain objects and arrays.
+ * Other object types are strictly compared.
+ * @function areShallowEqual
+ * @param     {*}       a - Compare this to:
+ * @param     {*}       b - this...
+ * @returns   {boolean}   - True or false, depending on the evaluated shallow equality.
+ * */
 function areShallowEqual(a, b) {
 
-  // One-level shallow, ordered equality check
   if (a === b) return true;
 
   if (a && b && typeof a === 'object' && typeof b === 'object') {
@@ -22,11 +30,18 @@ function areShallowEqual(a, b) {
 
   }
 
-  // Primitives, Maps, Sets, Date, RegExp etc strictly compared
+  // Maps, Sets, Date, RegExp etc strictly compared
   return a !== a && b !== b;
 
 }
 
+/**
+ * One-level (shallow), ordered equality check for plain old javascript objects.
+ * @function arePlainObjectsShallowEqual
+ * @param   {Object}  a - The object that is compared to:
+ * @param   {Object}  b - this other object.
+ * @returns {boolean}   - True if a and b are shallow equal, else false.
+ * */
 function arePlainObjectsShallowEqual(a, b) {
 
   const keysA = oKeys(a);
@@ -47,6 +62,13 @@ function arePlainObjectsShallowEqual(a, b) {
 
 }
 
+/**
+ * One-level (shallow), ordered equality check for arrays.
+ * @function areArraysShallowEqual
+ * @param   {Array}  a - The array that is compared to:
+ * @param   {Array}  b - this other array.
+ * @returns {boolean}  - True if a and b are shallow equal, else false.
+ * */
 function areArraysShallowEqual(a, b) {
 
   if (a.length !== b.length) {

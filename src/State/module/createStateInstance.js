@@ -1,4 +1,15 @@
 
+/**
+ * Creates a new instance of a State Module
+ * @function createStateInstance
+ * @param {string}            type                - Either 'object' or 'array'. Indicates the modules base type.
+ * @param {function}          factory             - StateFactory function used to create this instance. We care about its prototype Object (which is already inheriting from base type).
+ * @param {object}            module              - The module blueprint containing data and method objects that are shared between all instances.
+ * @param {object}            [_parent]           - If known at instantiation time, the parent object graph to which the new instance is attached in the state tree.
+ * @param {string}            [_ownPropertyName]  - If known at instantiation time, the property name of the new state instance on the parent object graph in the state tree.
+ * @returns {(object|array)}  instance            - A new instance of the state module. Deep cloned from the defaults and with the correct prototype chain for its base type.
+ * */
+
 function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
 
   // 1. Create base instance
@@ -44,7 +55,6 @@ function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
 
   });
 
-  // 4. Return
   return instance;
 
 }

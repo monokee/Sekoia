@@ -1,4 +1,16 @@
 
+/**
+ * Creates a cache-able, intercepted array mutator function.
+ * Only array mutators can mutate objects. If such a mutator is called on an observable state instance
+ * we intercept the operation like any get/set/delete request to determine if we need to fire reactions.
+ * Due to the "top-down" nature of methods that mutate the contents of a "container", change reactions are
+ * only fired on the parent of the array. If the array doesn't have a reactive parent, we simply apply
+ * the mutation and return. If it does have a reactive parent, we first determine if the mutation actually yields a
+ * shallow change to the array and only then attempt to queue and react on the parent of the array.
+ * @function createInterceptedArrayMutator
+ * @param   {function}  nativeMethod            - the default array mutator which we are wrapping
+ * @return  {function}  interceptedArrayMutator - See above.
+ */
 function createInterceptedArrayMutator(nativeMethod) {
 
   return function(...args) {

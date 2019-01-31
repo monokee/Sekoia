@@ -25,12 +25,14 @@ Cue.State('App-State', Module => ({
      * The sole purpose of interceptors is to conditionally: a) rewrite observation.value and/or b) raise side-effects
      * Because interceptions can rewrite observation.value, another equality check is performed after an interceptor has run
      * to determine if change-reactions should be run next.
-     *
+     * Interceptors may perform in-place mutation of o.value which is passed along to reactions.
+     * Interceptors can only be run on settable props i.e computeds can not be intercepted.
+     * Interceptors do not affect propagation of computeds because they are always run, regardless of whether or not a property is being observed by an after-the-fact reaction.
      **/
     soloCount(o) {
       if (o.value > 99) {
         o.value = o.oldValue;
-        Module.trigger('WARNINGS.maximumSoloItemsReached'); // TODO: can this be problematic?
+        Module.trigger('WARNINGS.maximumSoloItemsReached');
       }
     }
   },
@@ -62,6 +64,10 @@ Cue.State('App-State', Module => ({
         this.soloCount--;
       }
     });*/
+
+  },
+
+  on: {
 
   },
 

@@ -1,9 +1,14 @@
 
+/**
+ * Traverses derivatives to flag the deepest observed derivative in a computation branch.
+ * This allows me to to stop propagation of computations at the deepest occurring observer
+ * and never recompute derivatives that are either unobserved or are an ancestor dependency of
+ * an eventually unobserved child derivative.
+ * @function setEndOfPropagationInBranchOf
+ * @param {object} derivative - The Root Derivative from which we start walking.
+ * @param {number} direction - The traversal direction indicating whether we should walk up or down.
+ * */
 function setEndOfPropagationInBranchOf(derivative, direction) {
-  // traverses derivatives to flag the deepest observed derivative in a computation branch.
-  // this allows us to stop propagation of computations at the deepest occurring observer
-  // and never recompute derivatives that are either unobserved or are an ancestor dependency of an
-  // eventually unobserved child derivative.
   if (direction === TRAVERSE_DOWN) {
     unflagAllSuperDerivativesOf(derivative); // unflag anything upwards of derivative
     flagDeepestObservedSubDerivativesOf(derivative); // flag deepest observed sub-derivative (can be self)

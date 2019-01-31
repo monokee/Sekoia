@@ -6,6 +6,7 @@ const CUE_STATE_MODULES = new Map();
 // State Flags
 let isReacting = false; // is a reaction currently in process?
 let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
+const accumulatedDerivatives = []; // derivatives which are accumulated during batch operations (emptied after each batch!)
 
 // Global derivative installer payload
 const DERIVATIVE_INSTALLER = {

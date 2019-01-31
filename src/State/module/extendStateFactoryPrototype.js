@@ -1,9 +1,13 @@
 
-function extendStateFactoryPrototype(stateFactory, module) {
+/**
+ * Adds methods and properties to a StateFactory's prototype object to make them available to all instances.
+ * "this" in the methods refers to the current instance of a module.
+ * @function extendStateFactoryPrototype
+ * @param {function}  stateFactory  - The function that is called to create new instances of a state module.
+ * @param {object}    module        - The module blueprint containing data and method objects that are shared between all instances.
+ * */
 
-  // These methods and properties are shared by all instances of
-  // a module from the stateFactory's generic prototype object.
-  // "this" in the methods refers to the current instance.
+function extendStateFactoryPrototype(stateFactory, module) {
 
   // Computed Properties (module.computed is es6 Map to guarantee property order!)
   for (const key of module.computed.keys()) {

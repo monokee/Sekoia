@@ -1,7 +1,16 @@
 
-// Derived Property Instance
+/**
+ * Creates a new computed property instance.
+ * @class Derivative
+ */
 class Derivative {
 
+  /**
+   * @constructs
+   * @param {string}    ownPropertyName   - The name of the derived property on the parent node graph (state instance).
+   * @param {function}  computation       - The pure computation function that should return its result.
+   * @param {array}     sourceProperties  - Array of property keys that this derivative depends on.
+   */
   constructor(ownPropertyName, computation, sourceProperties) {
 
     this.ownPropertyName = ownPropertyName;
@@ -23,10 +32,11 @@ class Derivative {
 
   }
 
+  /**
+   * Dynamic getter of computation result which recomputes only when a direct (shallow) dependency has been previously updated
+   * @return {*} The current value of the derivative
+   */
   get value() {
-
-    // Dynamic getter of value which recomputes only when
-    // a direct (shallow) dependency has been previously updated
 
     if (this.needsUpdate) {
 
@@ -50,6 +60,12 @@ class Derivative {
 
   }
 
+  /**
+   * Update a single sourceProperty of the derivative by updating the internal valueCache.
+   * Flag needsUpdate to true so that the next request to value getter will recompute.
+   * @param {string} property - The property that needs to update its value
+   * @param {*}      value    - The new value. This value is guaranteed to have changed(!)
+   */
   updateProperty(property, value) {
     // update a single dependency of the derivative.
     // the passed value is guaranteed to have changed
@@ -59,6 +75,10 @@ class Derivative {
     this.needsUpdate = true;
   }
 
+  /**
+   * Pull in all dependency values from source. Used at instantiation time to fill cache with initial values
+   * @param {object} source - The source state object from which values should be pulled into the internal cache.
+   */
   fillCache(source) {
     // pulls in all dependency values from source object
     for (let i = 0, k; i < this.sourceProperties.length; i++) {
@@ -68,6 +88,10 @@ class Derivative {
     this.needsUpdate = true;
   }
 
+  /**
+   * Dispose this derivative by nullifying its strong pointers and removing itself from its computation branch.
+   * @param {boolean} root - required for recursive calls to self. see inline comments below
+   */
   dispose(root = true) {
 
     let i;
