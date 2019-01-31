@@ -10,7 +10,6 @@ const SOURCE_DIR = 'src';
 const BUILD_DIR = 'build';
 
 const MODULES = {
-  eventBus: SOURCE_DIR + '/EventBus',
   state:    SOURCE_DIR + '/State',
   ui:       SOURCE_DIR + '/UI',
   plugin:   SOURCE_DIR + '/Plugin',
@@ -20,9 +19,6 @@ const MODULES = {
 const FILES = {
   index: [
     `${SOURCE_DIR}/index.js`
-  ],
-  eventBus: [
-    `${MODULES.eventBus}/event-bus.js`
   ],
   state: [
 
@@ -104,7 +100,6 @@ gulp.task('build-lib', function() {
   return gulp
     .src([
       ...FILES.index,
-      ...FILES.eventBus,
       ...FILES.state,
       ...FILES.ui,
       ...FILES.plugin,

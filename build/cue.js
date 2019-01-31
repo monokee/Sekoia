@@ -55,108 +55,19 @@
     ui: oCreate(__lib_core__) // extends core
   };
 
-  // TODO: Only State Module should have an Event Bus so that all inter-component communication logic is strictly handled outside of UI.
-
-  const CUE_EVENT_BUS_API = {};
-
-  { // Cue Event Bus
-
-    const CUE_EVENTS = new Map();
-    const CUE_EVENTS_ARGS_ERROR = `Can't add listener because the provided arguments are invalid.`;
-
-    let _type, _handler, _scope, _events, _event, _disposable = [];
-
-    const addEvent = (type, handler, scope, once) => {
-
-      const event = {
-        handler: handler,
-        scope: scope,
-        once: once
-      };
-
-      if (CUE_EVENTS.has(type)) {
-        CUE_EVENTS.get(type).push(event);
-      } else {
-        CUE_EVENTS.set(type, [event]);
-      }
-
-    };
-
-    const addEvents = (events, scope, once) => {
-
-      for (_type in events) {
-
-        _handler = events[_type];
-
-        if (isFunction(_handler)) {
-          addEvent(_type, _handler, scope, once);
-        } else {
-          throw new TypeError(`Can't add listener because handler for "${_type}" is not a function but of type ${typeof _handler}`);
-        }
-
-      }
-
-    };
-
-    // Public API
-    oAssign(CUE_EVENT_BUS_API, {
-
-      on: (type, handler, scope) => {
-
-        if (isObjectLike(type)) {
-          _scope = typeof handler === 'object' ? handler : null;
-          addEvents(type, _scope, false);
-        } else if (typeof type === 'string' && isFunction(handler)) {
-          _scope = typeof scope === 'object' ? scope : null;
-          addEvent(type, handler, _scope, false);
-        } else {
-          throw new TypeError(CUE_EVENTS_ARGS_ERROR);
-        }
-
-      },
-
-      once: (type, handler, scope) => {
-
-        if (isObjectLike(type)) {
-          _scope = typeof handler === 'object' ? handler : null;
-          addEvents(type, _scope, true);
-        } else if (typeof type === 'string' && isFunction(handler)) {
-          _scope = typeof scope === 'object' ? scope : null;
-          addEvent(type, handler, _scope, true);
-        } else {
-          throw new TypeError(CUE_EVENTS_ARGS_ERROR);
-        }
-
-      },
-
-      off: type => {
-        CUE_EVENTS.delete(type);
-      },
-
-      trigger: (type, ...payload) => {
-
-        if ((_events = CUE_EVENTS.get(type))) {
-
-          for (let i = 0; i < _events.length; i++) {
-            _event = _events[i];
-            _event.handler.apply(_event.scope, payload);
-            if (_event.once) _disposable.push(_event);
-          }
-
-          if (_disposable.length) {
-            CUE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
-            _disposable.length = 0;
-          }
-
-          _events = null;
-
-        }
-
-      }
-
-    });
-
-  }
+  /**
+   * Cue.State - The granular reactivity engine behind Cue.
+   *
+   * Has the following built-in concepts:
+   * - User defined modules have declarative default properties, computed properties and actions.
+   * - Modules are blueprints from which state instances can be created using factory functions.
+   * - Modules are like classes but specifically optimized for reactive state modeling.
+   * - Modules can import other Modules which they extend themselves with.
+   * - Property change interception (willChange handlers)
+   * - Change reaction handling (didChange handlers and external reactions for side-effects)
+   * - Chain-able and micro-optimized computed properties
+   * - State Event Bus for loosely exchanging messages with foreign modules and instances, no matter where they are in the state tree.
+   */
 
   // Registered State Modules
   const CUE_STATE_MODULES = new Map();
@@ -164,6 +75,7 @@
   // State Flags
   let isReacting = false; // is a reaction currently in process?
   let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
+  const accumulatedDerivatives = []; // derivatives which are accumulated during batch operations (emptied after each batch!)
 
   // Global derivative installer payload
   const DERIVATIVE_INSTALLER = {
@@ -184,19 +96,135 @@
   // Reaction Queue
   const MAIN_QUEUE = [];
 
-  // Cue-State Prototype Object extends Cue-Prototype Object
-  CUE_LIB.state = oCreate(CUE_LIB.core, {
+  /**
+   * CUE_LIB.state Proto
+   * Available as "Module" Object in module registration closure.
+   * Has it's own Event Bus implementation to simply and loosely exchange messages between
+   * deeply nested state instances. Because there are other, primary means of (reactive) communication
+   * that naturally solve most cross-realm communication problems much better, the use of the event bus is
+   * automatically reserved for inter-module communication which, when required, is a very nice and performant abstraction.
+   *
+   * Also extends CUE_LIB.core so that any helper libraries and plugins are also available under "Module".
+   * Below code definitely needs some cleaning up...
+   */
 
-    import: {
-      value: function(name) {
-        const state = CUE_STATE_MODULES.get(name);
-        if (!state) throw new ReferenceError(`Can't import State Module because nothing is registered under "${name}".`);
-        return state;
+  { // wrap in extra closure
+
+    const STATE_EVENTS = new Map();
+    const STATE_EVENTS_ARGS_ERROR = `Can't add listener because the provided arguments are invalid.`;
+
+    let _type, _handler, _scope, _events, _event, _disposable = [];
+
+    const addEvent = (type, handler, scope, once) => {
+      const event = {
+        handler: handler,
+        scope: scope,
+        once: once
+      };
+      if (STATE_EVENTS.has(type)) {
+        STATE_EVENTS.get(type).push(event);
+      } else {
+        STATE_EVENTS.set(type, [event]);
       }
-    }
+    };
 
-  });
+    const addEvents = (events, scope, once) => {
 
+      for (_type in events) {
+        _handler = events[_type];
+        if (isFunction(_handler)) {
+          addEvent(_type, _handler, scope, once);
+        } else {
+          throw new TypeError(`Can't add listener because handler for "${_type}" is not a function but of type ${typeof _handler}`);
+        }
+      }
+    };
+
+    /**
+     * @namespace {object} CUE_LIB.state
+     * @extends   {object} CUE_LIB.core
+     */
+    CUE_LIB.state = oCreate(CUE_LIB.core, {
+
+      /**
+       * Import another state module that the current instance can extend itself with.
+       * @function import
+       * @memberOf CUE_LIB.state
+       * @param   {string}    name  - The unique name of the Cue.State module to be imported.
+       * @returns {function}  state - The factory function of the imported module.
+       */
+      import: {
+        value: function(name) {
+          const state = CUE_STATE_MODULES.get(name);
+          if (!state) throw new ReferenceError(`Can't import State Module because nothing is registered under "${name}".`);
+          return state;
+        }
+      },
+
+      on: (type, handler, scope) => {
+
+        if (isObjectLike(type)) {
+          _scope = typeof handler === 'object' ? handler : null;
+          addEvents(type, _scope, false);
+        } else if (typeof type === 'string' && isFunction(handler)) {
+          _scope = typeof scope === 'object' ? scope : null;
+          addEvent(type, handler, _scope, false);
+        } else {
+          throw new TypeError(STATE_EVENTS_ARGS_ERROR);
+        }
+
+      },
+
+      once: (type, handler, scope) => {
+
+        if (isObjectLike(type)) {
+          _scope = typeof handler === 'object' ? handler : null;
+          addEvents(type, _scope, true);
+        } else if (typeof type === 'string' && isFunction(handler)) {
+          _scope = typeof scope === 'object' ? scope : null;
+          addEvent(type, handler, _scope, true);
+        } else {
+          throw new TypeError(STATE_EVENTS_ARGS_ERROR);
+        }
+
+      },
+
+      off: type => {
+        STATE_EVENTS.delete(type);
+      },
+
+      trigger: (type, ...payload) => {
+
+        if ((_events = STATE_EVENTS.get(type))) {
+
+          for (let i = 0; i < _events.length; i++) {
+            _event = _events[i];
+            _event.handler.apply(_event.scope, payload);
+            if (_event.once) _disposable.push(_event);
+          }
+
+          if (_disposable.length) {
+            STATE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
+            _disposable.length = 0;
+          }
+
+          _events = null;
+
+        }
+
+      }
+
+    });
+
+  }
+
+  /**
+   * Utility to functionally append the contents of one array to another array
+   * @function appendToArray
+   * @param   {Array} target    - The array to which we append.
+   * @param   {Array} toAppend  - Append its items to the target.
+   * @returns {Array} target    - The merged array.
+   */
   function appendToArray(target, toAppend) {
 
     for (let i = 0; i < toAppend.length; i++) {
@@ -207,20 +235,13 @@
 
   }
 
-  function deepCloneObjectOrArray(o) {
-
-    // Deep cloning for plain Objects and Arrays
-
-    if (o && o.constructor === OBJ) {
-      return deepClonePlainObject(o);
-    }
-
-    if (isArray(o)) {
-      return deepCloneArray(o);
-    }
-
-  }
-
+  /**
+   * Creates deep clone of serializable plain object.
+   * Object must only contain primitives, plain objects or arrays.
+   * @function deepClonePlainObject
+   * @param   {Object} o      - The plain object to clone.
+   * @returns {Object} clone  - Deeply cloned plain object.
+   */
   function deepClonePlainObject(o) {
 
     const clone = {};
@@ -229,29 +250,44 @@
 
     for (i in o) {
       v = o[i];
-      clone[i] = typeof v === 'object' ? deepCloneObjectOrArray(v) : v;
+      clone[i] = isArray(v) ? deepCloneArray(v) : isObjectLike(v) ? deepClonePlainObject(v) : v;
     }
 
     return clone;
 
   }
 
-  function deepCloneArray(o) {
+  /**
+   * Creates deep clone of serializable Array.
+   * Array must only contain primitives, plain objects or arrays.
+   * @function deepCloneArray
+   * @param   {Array} a      - The plain array to clone.
+   * @returns {Array} clone  - Deeply cloned array.
+   */
+  function deepCloneArray(a) {
 
     const clone = [];
 
-    for (let i = 0, v; i < o.length; i++) {
-      v = o[i];
-      clone[i] = typeof v === 'object' ? deepCloneObjectOrArray(v) : v;
+    for (let i = 0, v; i < a.length; i++) {
+      v = a[i];
+      clone[i] = isArray(v) ? deepCloneArray(v) : isObjectLike(v) ? deepClonePlainObject(v) : v;
     }
 
     return clone;
 
   }
 
+  /**
+   * One-level (shallow), ordered equality check.
+   * Works for primitives, plain objects and arrays.
+   * Other object types are strictly compared.
+   * @function areShallowEqual
+   * @param     {*}       a - Compare this to:
+   * @param     {*}       b - this...
+   * @returns   {boolean}   - True or false, depending on the evaluated shallow equality.
+   * */
   function areShallowEqual(a, b) {
 
-    // One-level shallow, ordered equality check
     if (a === b) return true;
 
     if (a && b && typeof a === 'object' && typeof b === 'object') {
@@ -272,11 +308,18 @@
 
     }
 
-    // Primitives, Maps, Sets, Date, RegExp etc strictly compared
+    // Maps, Sets, Date, RegExp etc strictly compared
     return a !== a && b !== b;
 
   }
 
+  /**
+   * One-level (shallow), ordered equality check for plain old javascript objects.
+   * @function arePlainObjectsShallowEqual
+   * @param   {Object}  a - The object that is compared to:
+   * @param   {Object}  b - this other object.
+   * @returns {boolean}   - True if a and b are shallow equal, else false.
+   * */
   function arePlainObjectsShallowEqual(a, b) {
 
     const keysA = oKeys(a);
@@ -297,6 +340,13 @@
 
   }
 
+  /**
+   * One-level (shallow), ordered equality check for arrays.
+   * @function areArraysShallowEqual
+   * @param   {Array}  a - The array that is compared to:
+   * @param   {Array}  b - this other array.
+   * @returns {boolean}  - True if a and b are shallow equal, else false.
+   * */
   function areArraysShallowEqual(a, b) {
 
     if (a.length !== b.length) {
@@ -313,9 +363,18 @@
 
   }
 
-  // Derived Property Instance
+  /**
+   * Creates a new computed property instance.
+   * @class Derivative
+   */
   class Derivative {
 
+    /**
+     * @constructs
+     * @param {string}    ownPropertyName   - The name of the derived property on the parent node graph (state instance).
+     * @param {function}  computation       - The pure computation function that should return its result.
+     * @param {array}     sourceProperties  - Array of property keys that this derivative depends on.
+     */
     constructor(ownPropertyName, computation, sourceProperties) {
 
       this.ownPropertyName = ownPropertyName;
@@ -337,10 +396,11 @@
 
     }
 
+    /**
+     * Dynamic getter of computation result which recomputes only when a direct (shallow) dependency has been previously updated
+     * @return {*} The current value of the derivative
+     */
     get value() {
-
-      // Dynamic getter of value which recomputes only when
-      // a direct (shallow) dependency has been previously updated
 
       if (this.needsUpdate) {
 
@@ -364,6 +424,12 @@
 
     }
 
+    /**
+     * Update a single sourceProperty of the derivative by updating the internal valueCache.
+     * Flag needsUpdate to true so that the next request to value getter will recompute.
+     * @param {string} property - The property that needs to update its value
+     * @param {*}      value    - The new value. This value is guaranteed to have changed(!)
+     */
     updateProperty(property, value) {
       // update a single dependency of the derivative.
       // the passed value is guaranteed to have changed
@@ -373,6 +439,10 @@
       this.needsUpdate = true;
     }
 
+    /**
+     * Pull in all dependency values from source. Used at instantiation time to fill cache with initial values
+     * @param {object} source - The source state object from which values should be pulled into the internal cache.
+     */
     fillCache(source) {
       // pulls in all dependency values from source object
       for (let i = 0, k; i < this.sourceProperties.length; i++) {
@@ -382,6 +452,10 @@
       this.needsUpdate = true;
     }
 
+    /**
+     * Dispose this derivative by nullifying its strong pointers and removing itself from its computation branch.
+     * @param {boolean} root - required for recursive calls to self. see inline comments below
+     */
     dispose(root = true) {
 
       let i;
@@ -417,14 +491,22 @@
 
   }
 
+  /**
+   * Topological sorter to resolve dependencies of derivatives
+   * @namespace OrderedDerivatives
+   * @property {(null|Map)} source - Placeholder for the Map of vDerivatives to be sorted. Nullified after each job.
+   * @property {Array} visited - Placeholder for visited properties. Helper for topological sorter. Emptied after each job.
+   */
   const OrderedDerivatives = {
-
-    // topological sorter to resolve derivative dependencies
-    // returns sorted map
 
     source: null,
     visited: [],
 
+    /**
+     * Public method which resolves dependency order of computed properties.
+     * @param   {Map}   derivatives - unordered vDerivatives
+     * @returns {Map}   target      - vDerivatives in resolved dependency order
+     */
     from(derivatives) {
 
       this.source = derivatives;
@@ -442,6 +524,13 @@
 
     },
 
+    /**
+     * Private Method used for topological sorting.
+     * Detects circular dependencies and throws.
+     * @param {string} sourceProperty - The property name of the derivative on its source object.
+     * @param {Array}  dependencies   - An array we're passing around to collect the property names that the derivative depends on.
+     * @param {Map}    target         - The ordered Map to which a derivative is added after all of its dependencies are resolved.
+     */
     _visit(sourceProperty, dependencies, target) {
 
       if (this.source.has(sourceProperty)) {
@@ -475,29 +564,38 @@
 
   };
 
-  function installDependencies(props, {
-    computed
-  }) {
+  /**
+   * Creates a dependency graph on the vDerivatives stored on a state module.
+   * vDerivatives are used at runtime to quickly create instances of Derivatives.
+   * Here we create a proxy object around the original config.props (allProperties) and call
+   * the computations of the computed properties in the context of this proxy. The proxy will
+   * intercept any "get" requests that the computations perform and thus figures out which properties
+   * the computation depends on. As a convention it is encouraged that computations should destructure their dependencies from their first
+   * function argument instead of dotting into "this" to ensure all dependencies are reached even when they are requested from within conditionals.
+   * @function installDependencies
+   * @param {Object}  allProperties       - config.props object containing both normal and computed properties.
+   * @param {Map}     computedProperties  - Map of computed Properties -> vDerivatives.
+   * */
+  function installDependencies(allProperties, computedProperties) {
 
     // set the current installer payload
     oAssign(DERIVATIVE_INSTALLER, {
-      allProperties: props,
-      derivedProperties: computed
+      allProperties: allProperties,
+      computedProperties: computedProperties
     });
 
     // intercept get requests to props object to grab sourceProperties
-    const installer = new Proxy(props, {
+    const installer = new Proxy(allProperties, {
       get: dependencyGetInterceptor
     });
 
     // call each computation which will trigger the intercepted get requests
-    computed.forEach(derivative => {
+    computedProperties.forEach(derivative => {
 
       DERIVATIVE_INSTALLER.derivative = derivative;
 
       try {
         // the computation itself will most definitely fail but we only care about the property dependencies so we can safely ignore all errors.
-        // #DOC: As a convention, computations should destructure dependencies from first argument instead of dotting into "this" to ensure all dependencies are reached even if computation body contains conditionals.
         derivative.computation.call(installer, installer);
       } catch (e) {}
 
@@ -506,16 +604,29 @@
     // kill pointers
     DERIVATIVE_INSTALLER.derivative = null;
     DERIVATIVE_INSTALLER.allProperties = null;
-    DERIVATIVE_INSTALLER.derivedProperties = null;
+    DERIVATIVE_INSTALLER.computedProperties = null;
 
   }
 
+  /**
+   * Used as Proxy "get" handler during dependency installation for computed properties (Derivatives)
+   * @function dependencyGetInterceptor
+   * @param {object} target - The Installer Object (proxy)
+   * @param {string} sourceProperty - The property name that is being intercepted.
+   * @external {object} DERIVATIVE_INSTALLER - Derivative installer payload object that is reused throughout the library.
+   */
   function dependencyGetInterceptor(target, sourceProperty) {
 
+    /**
+     * @external {object} DERIVATIVE_INSTALLER
+     * @property {object} derivative - The currently installing derivative
+     * @property {object} allProperties - config.props object containing both normal properties AND computed properties.
+     * @property {object} computedProperties - module.computed properties. Map of vDerivatives
+     */
     const {
       derivative,
       allProperties,
-      derivedProperties
+      computedProperties
     } = DERIVATIVE_INSTALLER;
 
     if (!allProperties.hasOwnProperty(sourceProperty)) {
@@ -528,9 +639,9 @@
     }
 
     // if the sourceProperty is a derivative itself
-    if (derivedProperties.has(sourceProperty)) {
+    if (computedProperties.has(sourceProperty)) {
 
-      const SourceDerivative = derivedProperties.get(sourceProperty);
+      const SourceDerivative = computedProperties.get(sourceProperty);
 
       if (SourceDerivative.subDerivatives.indexOf(derivative) === -1) {
         SourceDerivative.subDerivatives.push(derivative);
@@ -544,11 +655,16 @@
 
   }
 
+  /**
+   * Traverses derivatives to flag the deepest observed derivative in a computation branch.
+   * This allows me to to stop propagation of computations at the deepest occurring observer
+   * and never recompute derivatives that are either unobserved or are an ancestor dependency of
+   * an eventually unobserved child derivative.
+   * @function setEndOfPropagationInBranchOf
+   * @param {object} derivative - The Root Derivative from which we start walking.
+   * @param {number} direction - The traversal direction indicating whether we should walk up or down.
+   * */
   function setEndOfPropagationInBranchOf(derivative, direction) {
-    // traverses derivatives to flag the deepest observed derivative in a computation branch.
-    // this allows us to stop propagation of computations at the deepest occurring observer
-    // and never recompute derivatives that are either unobserved or are an ancestor dependency of an
-    // eventually unobserved child derivative.
     if (direction === TRAVERSE_DOWN) {
       unflagAllSuperDerivativesOf(derivative); // unflag anything upwards of derivative
       flagDeepestObservedSubDerivativesOf(derivative); // flag deepest observed sub-derivative (can be self)
@@ -594,6 +710,13 @@
     }
   }
 
+  /**
+   * Wraps a state object into a reactive ES6 Proxy
+   * so that any get, set and delete mutations can be intercepted for change-event handling.
+   * @function createProxy
+   * @param   {object} stateInstance      - The object we are wrapping.
+   * @returns {object} stateInstanceProxy - The intercepted stateInstance.
+   */
   function createProxy(stateInstance) {
 
     return new Proxy(stateInstance, {
@@ -604,6 +727,16 @@
 
   }
 
+  /**
+   * Intercept "get" requests of properties in a reactive state object.
+   * When prop is special symbol key, interceptor can return special data for recursive access etc.
+   * Auto-wraps any sub-objects (Plain Objects and Arrays) into reactive proxies (unless they are the result of a computation).
+   * Auto-creates -and caches intercepted array mutator functions when the get request is to an array mutator.
+   * @function proxyGetHandler
+   * @param   {object}            target  - The state instance from which a property is being requested.
+   * @param   {(string|symbol)}   prop    - The property that is being requested.
+   * @returns {*}                 value   - Either the plain state value or a special value when get request has been made to an internal symbol.
+   */
   function proxyGetHandler(target, prop) {
 
     // never intercept special properties
@@ -622,7 +755,7 @@
       return value;
     }
 
-    // proxify nested objects that are not the result of a computation TODO: only works for plain array and pojo objects!
+    // proxify nested objects that are not the result of a computation
     if (typeof value === 'object' && !target[__CUE__].derivedProperties.has(prop)) {
       return createProxy(StateInternals.assignTo(value, target, prop));
     }
@@ -636,6 +769,17 @@
 
   }
 
+  /**
+   * Intercept "set" requests of properties in a reactive state object.
+   * Only sets properties when not currently reacting to state changes. Disallows and console.warns when mutating state inside of reactions.
+   * Automatically assigns "parent" and "ownPropertyName" to value if value is a reactive state instance that does not yet have these required properties.
+   * Compares new value to cached value before attempting to queue reactions.
+   * @function proxySetHandler
+   * @param   {object}            target  - The state instance on which a new or existing property is being set.
+   * @param   {string}            prop    - The property that is being set.
+   * @param   {*}                 value   - The value that is being assigned to target.prop.
+   * @returns {(boolean|undefined)}       - True if the set operation has been successful. Undefined if not set.
+   */
   function proxySetHandler(target, prop, value) {
 
     if (!isReacting) {
@@ -676,12 +820,19 @@
 
     } else {
 
-      console.warn(`Setting of "${prop}" ignored. Don't mutate state in a reaction. Refactor to computed properties instead.`);
+      console.warn(`Setting of "${prop}" ignored. Don't mutate state in a reaction. Refactor to computed properties or willChange/didChange handlers instead.`);
 
     }
 
   }
 
+  /**
+   * Intercept "delete" requests of properties in a reactive state object
+   * @function proxyDeleteHandler
+   * @param {object} target         - the state instance from which a property should be deleted.
+   * @param {string} prop           - the property that should be deleted from the target.
+   * @returns {(boolean|undefined)} - true if property has been deleted, else undefined.
+   */
   function proxyDeleteHandler(target, prop) {
 
     if (!isReacting) {
@@ -718,6 +869,18 @@
 
   }
 
+  /**
+   * Creates a cache-able, intercepted array mutator function.
+   * Only array mutators can mutate objects. If such a mutator is called on an observable state instance
+   * we intercept the operation like any get/set/delete request to determine if we need to fire reactions.
+   * Due to the "top-down" nature of methods that mutate the contents of a "container", change reactions are
+   * only fired on the parent of the array. If the array doesn't have a reactive parent, we simply apply
+   * the mutation and return. If it does have a reactive parent, we first determine if the mutation actually yields a
+   * shallow change to the array and only then attempt to queue and react on the parent of the array.
+   * @function createInterceptedArrayMutator
+   * @param   {function}  nativeMethod            - the default array mutator which we are wrapping
+   * @return  {function}  interceptedArrayMutator - See above.
+   */
   function createInterceptedArrayMutator(nativeMethod) {
 
     return function(...args) {
@@ -755,9 +918,19 @@
 
   }
 
+  /**
+   * Queues all reactions, derivatives and their subDerivative branch in a single recursive function.
+   * This function is used for queueing dependencies whenever we are not in a batch-op situation (like actions) and we don't want to
+   * defer dependency traversal until after a batch op has finished.
+   * @function cueAll
+   * @param {string}  prop            - The property which has been mutated.
+   * @param {*}       value           - The result of the mutation.
+   * @param {*}       oldValue        - The previous value of the property.
+   * @param {Array}   observers       - Reaction handlers observing the property.
+   * @param {Array}   derivatives     - Derivatives that are being derived from the property.
+   * @param {boolean} stopPropagation - Whether or not a derivative has been flagged to be the last observed derivative in its dependency branch. Used for recursion.
+   */
   function cueAll(prop, value, oldValue, observers, derivatives, stopPropagation) {
-
-    // Collect observers and derivatives of the changed property and, recursively those of all of it's descendant derivatives
 
     let i, l, item;
 
@@ -799,17 +972,23 @@
 
   }
 
+  /**
+   * Called when state is mutated in a batch operation. Queues only the immediate reactions and derivatives of a mutated source property.
+   * Explicitly collects the immediate derivatives of the mutated source properties on "accumulatedDerivatives" Array
+   * so that the queueing of their subDerivatives (their dependency branch) can be deferred until the batch operation has finished.
+   * Batch Op is detected -> Mutations call cueImmediate -> batch op finishes -> cueAccumulated is called -> react() is called.
+   * @function cueImmediate
+   * @external {Array} accumulatedDerivatives - Collects unique derivatives which were affected by source property mutation(s). Queueing of their subDerivatives is deferred.
+   */
   function cueImmediate(prop, value, oldValue, observers, derivatives, stopPropagation) {
 
-    // Collect immediate observers and derivatives of the changed property. Don't recurse over sub-derivatives just yet.
-
-    let i, item;
+    let i, reaction, derivative;
 
     if (observers) {
       for (i = 0; i < observers.length; i++) {
-        item = observers[i];
-        if (MAIN_QUEUE.indexOf(item) === -1) {
-          MAIN_QUEUE.push(item, {
+        reaction = observers[i];
+        if (MAIN_QUEUE.indexOf(reaction) === -1) {
+          MAIN_QUEUE.push(reaction, {
             value: value,
             oldValue: oldValue
           });
@@ -819,32 +998,54 @@
 
     if (derivatives && stopPropagation === false) {
       for (i = 0; i < derivatives.length; i++) {
-        derivatives[i].updateProperty(prop, value);
+        derivative = derivatives[i];
+        derivative.updateProperty(prop, value);
+        if (accumulatedDerivatives.indexOf(derivative) === -1) {
+          accumulatedDerivatives.push(derivative);
+        }
       }
     }
 
   }
 
-  function cueAccumulated(derivatives) {
+  /**
+   * Queues the subDerivatives of derivatives which have accumulated during a batch operation.
+   * This method is called after a batch operation has finished and is an optimization that prevents unnecessary re-computations
+   * of the dependency branch when there is a chance that one or many source properties are changed multiple times during a batch op (like actions).
+   * @function cueAccumulated
+   * @external {Array} accumulatedDerivatives - Contains unique derivatives which were affected by source property mutation(s). Their subDerivatives have not yet been queued.
+   */
+  function cueAccumulated() {
 
-    for (let i = 0, item, previous, result; i < derivatives.length; i++) {
-      item = derivatives[i];
-      previous = item._value; // internal
-      result = item.value; // calls "getter" -> recomputes value
-      if (item.hasChanged) {
-        cueAll(item.ownPropertyName, result, previous, item.observers, item.subDerivatives, item.stopPropagation);
+    for (let i = 0, derivative, previous, result; i < accumulatedDerivatives.length; i++) {
+      derivative = accumulatedDerivatives[i];
+      previous = derivative._value; // internal
+      result = derivative.value; // calls "getter" -> recomputes value
+      if (derivative.hasChanged) {
+        cueAll(derivative.ownPropertyName, result, previous, derivative.observers, derivative.subDerivatives, derivative.stopPropagation);
       }
     }
 
+    // Empty accumulatedDerivatives
+    accumulatedDerivatives.splice(0, accumulatedDerivatives.length);
+
   }
 
+  /**
+   * Runs through the Main Queue to execute each collected reaction with each collected observation payload as the first and only argument.
+   * Main Queue is emptied after each call to react.
+   * @function react
+   */
   function react() {
 
+    /**
+     * @external {boolean}  isReacting - flag indicating to interceptors that we are now reacting to changes. Used to prevent state mutations inside of reaction handlers.
+     * @external {Array}    MAIN_QUEUE - Contains pairs of i = reactionHandler() and i+1 = observation payload {value, oldValue}
+     */
     isReacting = true;
 
     const l = MAIN_QUEUE.length;
 
-    // MAIN_QUEUE contains pairs of i: reactionHandler(), i+1: payload{value, oldValue}
     for (let i = 0; i < l; i += 2) {
       MAIN_QUEUE[i](MAIN_QUEUE[i + 1]);
     }
@@ -856,13 +1057,26 @@
 
   }
 
+  /**
+   * Attaches itself to a reactive state instance under private [__CUE__] symbol.
+   * Properties and methods are required for reactivity engine embedded into every Cue State Instance
+   * @class StateInternals
+   * */
+
   class StateInternals {
 
+    /**
+     * Assign new StateInternals to private expando
+     * @param {object}  stateInstance     - The piece of state that the internals should be assigned to.
+     * @param {object} [parent]           - The parent object graph that the stateInstance is a child of
+     * @param {string} [ownPropertyName]  - The property name of the stateInstance on the parent object graph
+     * */
     static assignTo(stateInstance, parent, ownPropertyName) {
       stateInstance[__CUE__] = new this(parent, ownPropertyName);
       return stateInstance;
     }
 
+    /** Creates new instance of internals required for reactivity */
     constructor(parent = null, ownPropertyName = '') {
 
       this.parent = parent;
@@ -877,6 +1091,15 @@
 
     }
 
+    /**
+     * Add reaction handler to the list of "observersOf" under the property name they observe.
+     * @param   {object}    stateInstance     - The piece of state that should be observed
+     * @param   {string}    property          - The property name on the state instance that should be observed
+     * @param   {function}  handler           - The reaction that should be executed whenever the value of the observed property has changed
+     * @param   {object}    scope             - The "this" context the handler should be executed in (pre-bound)
+     * @param   {boolean}   [autorun = true]  - Whether the handler should be run once immediately after registration.
+     * @returns {function}  boundHandler      - The handler which has been bound to the passed scope.
+     */
     addChangeReaction(stateInstance, property, handler, scope, autorun = true) {
 
       if (!isFunction(handler)) {
@@ -909,6 +1132,11 @@
 
     }
 
+    /**
+     * Remove reaction handler(s) from "observersOf"
+     * @param {string} property - The property key of the state property that should be unobserved
+     * @param {function} [handler] - The reaction handler to be removed. If not provided, remove all reactions for the passed property name
+     */
     removeChangeReaction(property, handler) {
 
       if (this.observersOf.has(property)) {
@@ -956,6 +1184,15 @@
 
     }
 
+    /**
+     * Called from proxy interceptors when a value change of a state property has been detected.
+     * Checks if there are any derivatives or observers (dependencies) that depend on the changed property.
+     * If there are dependencies, it adds the change to the global reaction queue.
+     * @param   {string}  prop      - The property name of the changed value.
+     * @param   {*}       value     - The new value (after mutation)
+     * @param   {*}       oldValue  - The previous value (before mutation)
+     * @returns {number}  didQueue  - 1 if didQueue, 0 if not. Reactions bubble to parent and we count total number of queued changes per mutation to determine if queue should run.
+     */
     attemptCue(prop, value, oldValue) {
 
       const drv = this.derivativesOf.get(prop);
@@ -980,6 +1217,17 @@
     }
 
   }
+
+  /**
+   * Creates a new instance of a State Module
+   * @function createStateInstance
+   * @param {string}            type                - Either 'object' or 'array'. Indicates the modules base type.
+   * @param {function}          factory             - StateFactory function used to create this instance. We care about its prototype Object (which is already inheriting from base type).
+   * @param {object}            module              - The module blueprint containing data and method objects that are shared between all instances.
+   * @param {object}            [_parent]           - If known at instantiation time, the parent object graph to which the new instance is attached in the state tree.
+   * @param {string}            [_ownPropertyName]  - If known at instantiation time, the property name of the new state instance on the parent object graph in the state tree.
+   * @returns {(object|array)}  instance            - A new instance of the state module. Deep cloned from the defaults and with the correct prototype chain for its base type.
+   * */
 
   function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
 
@@ -1026,27 +1274,37 @@
 
     });
 
-    // 4. Return
     return instance;
 
   }
 
+  /**
+   * Creates a factory function that returns new instances of a state module.
+   * @function createStateFactory
+   * @param   {object} module         - The module blueprint created by "initializeStateModule"
+   * @returns {function} StateFactory - A factory function that creates instances of a state module.
+   * */
+
   function createStateFactory(module) {
+
+    /**
+     * @function StateFactory
+     * @params {(object|array)}   [props]   - Properties passed into the factory initializer. Like constructor params can be used to override default values during instantiation
+     * @returns {(object|array)}  instance  - An instance of the state module. When module is static, instance is pointer to static module data, else deep clone of module defaults.
+     * */
 
     let StateFactory;
 
-    if (isArray(module.defaults)) {
+    if (isArray(module.defaults)) { // if the module defaults are defined as an Array, the created instances will inherit from Array.prototype
 
-      if (module.static) {
+      if (module.static) { // if the module is static, all instances will share the same data
 
         let statik;
 
         StateFactory = props => {
-          if (module.initialize) {
-            statik[__CUE__].isInitializing = true;
-            module.initialize.call(statik, props);
-            statik[__CUE__].isInitializing = false;
-          }
+          statik[__CUE__].isInitializing = true;
+          module.initialize.call(statik, props);
+          statik[__CUE__].isInitializing = false;
           return statik;
         };
 
@@ -1054,59 +1312,45 @@
 
         statik = createProxy(createStateInstance('array', StateFactory, module));
 
-      } else {
+      } else { // if the module is not static, instances will be deep clones of module defaults
 
         StateFactory = props => {
-
           const instance = createProxy(createStateInstance('array', StateFactory, module));
-
-          if (module.initialize) {
-            instance[__CUE__].isInitializing = true;
-            module.initialize.call(instance, props);
-            instance[__CUE__].isInitializing = false;
-          }
-
+          instance[__CUE__].isInitializing = true;
+          module.initialize.call(instance, props);
+          instance[__CUE__].isInitializing = false;
           return instance;
-
         };
 
         StateFactory.prototype = oCreate(Array.prototype);
 
       }
 
-    } else {
+    } else { // if module defaults are defined as plain objects, the created instances will inherit from Object.prototype
 
       if (module.static) {
 
         let statik;
 
         StateFactory = props => {
-          if (module.initialize) {
-            statik[__CUE__].isInitializing = true;
-            module.initialize.call(statik, props);
-            statik[__CUE__].isInitializing = false;
-          }
+          statik[__CUE__].isInitializing = true;
+          module.initialize.call(statik, props);
+          statik[__CUE__].isInitializing = false;
           return statik;
         };
 
-        StateFactory.prototype = {};
+        StateFactory.prototype = {}; // the prototype is an object which inherits from Object.prototype
 
         statik = createProxy(createStateInstance('object', StateFactory, module));
 
       } else {
 
         StateFactory = props => {
-
           const instance = createProxy(createStateInstance('object', StateFactory, module));
-
-          if (module.initialize) {
-            instance[__CUE__].isInitializing = true;
-            module.initialize.call(instance, props);
-            instance[__CUE__].isInitializing = false;
-          }
-
+          instance[__CUE__].isInitializing = true;
+          module.initialize.call(instance, props);
+          instance[__CUE__].isInitializing = false;
           return instance;
-
         };
 
         StateFactory.prototype = {};
@@ -1119,11 +1363,15 @@
 
   }
 
-  function extendStateFactoryPrototype(stateFactory, module) {
+  /**
+   * Adds methods and properties to a StateFactory's prototype object to make them available to all instances.
+   * "this" in the methods refers to the current instance of a module.
+   * @function extendStateFactoryPrototype
+   * @param {function}  stateFactory  - The function that is called to create new instances of a state module.
+   * @param {object}    module        - The module blueprint containing data and method objects that are shared between all instances.
+   * */
 
-    // These methods and properties are shared by all instances of
-    // a module from the stateFactory's generic prototype object.
-    // "this" in the methods refers to the current instance.
+  function extendStateFactoryPrototype(stateFactory, module) {
 
     // Computed Properties (module.computed is es6 Map to guarantee property order!)
     for (const key of module.computed.keys()) {
@@ -1149,30 +1397,51 @@
 
   }
 
+  /**
+   * Creates a reusable State Module. A module is a blueprint from which factories can create instances of State.
+   * When moduleInitializer argument is a function it must be called with CUE_LIB.state as the first argument to make it available in the public module definition closure.
+   * @function initializeStateModule
+   * @param   {(object|function)} moduleInitializer - The second argument passed to public Cue.State function. Can be a config object or a function returning a config object
+   * @returns {object}            module            - A reusable module from which a factory can create new instances of state
+   * */
+
   function initializeStateModule(moduleInitializer) {
 
-    // creates a reusable Module. A Module is a blueprint
-    // from which factories can create instances of State.
+    const config = isFunction(moduleInitializer) ? moduleInitializer(CUE_LIB.state) : moduleInitializer;
 
-    const config = typeof moduleInitializer === 'function' ? moduleInitializer(CUE_LIB.state) : moduleInitializer;
-
-    if (!config || config.constructor !== OBJ) {
+    if (!isPlainObject(config)) {
       throw new TypeError(`Can't create State Module because the config function does not return a plain object.`);
     }
 
-    const type = isArray(config.props) ? 'array' : config.props && config.props.constructor === OBJ ? 'object' : 'illegal';
+    const type = isArray(config.props) ? 'array' : isPlainObject(config.props) ? 'object' : 'illegal';
 
     if (type === 'illegal') {
       throw new TypeError(`State Module requires "props" object (plain object or array) containing default and optional computed properties.`);
     }
 
+    /**
+     * Module is the internal representation of a state component from which instances can be created.
+     * Properties on the internal module differ from those on the public interface.
+     * @namespace module
+     * @property {object}   defaults      - contains public "props" that are not functions
+     * @property {map}      computed      - contains public "props" that are functions (will be resolved by dependency order)
+     * @property {map}      interceptors  - contains public "willChange" methods that intercept property changes before they are written to state instances
+     * @property {map}      reactions     - contains public "didChange" methods which trigger side-effects after a property on a state instance has changed
+     * @property {function} initialize    - a pseudo-constructor function which, when defined, is called initially after an internal state-instance has been created. Defaults to NOOP.
+     * @property {object}   actions       - contains any methods from public module (except built-ins like initialize). These methods will be shared on the module prototype.
+     * @property {boolean}  static        - indicates whether module.defaults should be cloned for each instance (true, default behaviour) or shared between all instances (false)
+     * @property {object}   imports       - contains sub-modules this modules extends itself with
+     */
+
     const module = {
       defaults: type === 'array' ? [] : {},
-      computed: new Map(), // key -> vDerivative (resolved & ordered)
-      initialize: undefined,
+      computed: new Map(),
+      interceptors: new Map(),
+      reactions: new Map(),
+      initialize: NOOP,
       actions: {},
       static: config.static === true,
-      imports: config.imports,
+      imports: config.imports
     };
 
     // 1. Split props into default and computed properties
@@ -1217,12 +1486,11 @@
     }
 
     // 2. Install dependencies of derivatives by connecting properties
-    installDependencies(config.props, module);
-
-    // 3. Resolve dependencies and sort derivatives topologically
+    installDependencies(config.props, module.computed);
+    // 2.1 Resolve dependencies and sort derivatives topologically
     module.computed = OrderedDerivatives.from(module.computed);
 
-    // 4. Collect all methods except "initialize" on action object
+    // 3. Collect all methods except "initialize" on action object
     for (prop in config) {
 
       val = config[prop];
@@ -1232,7 +1500,7 @@
         if (isFunction(val)) {
           module[prop] = val;
         } else {
-          throw new TypeError(`"${prop}" is a reserved word for Cue State Modules and must be a function but is of type ${typeof val}`);
+          throw new TypeError(`"${prop}" is a reserved word for Cue State Modules and must be a function but is of type "${typeof val}"`);
         }
 
       } else if (isFunction(val)) {
@@ -1243,17 +1511,37 @@
 
     }
 
+    // 4. Collect interceptors
+    for (prop in config.willChange) {
+      val = config.willChange[prop];
+      if (!isFunction(val)) throw new TypeError(`Module.willChange handler for "${prop}" is not a function.`);
+      module.interceptors.set(prop, val);
+    }
+
+    // 5. Collect watchers
+    for (prop in config.didChange) {
+      val = config.didChange[prop];
+      if (!isFunction(val)) throw new TypeError(`Module.didChange handler for "${prop}" is not a function.`);
+      module.reactions.set(prop, val);
+    }
+
     return module;
 
   }
 
+  /**
+   * Creates a function that will run once when a module is first used.
+   * It internally creates a StateFactory function for the module that will be called
+   * on any subsequent requests. (Lazy instantiation of modules)
+   * @function createStateFactoryInitializer
+   * @param   {string}            name                    - The unique name of the state module.
+   * @param   {(object|function)} initializer             - The second argument passed to public Cue.State function. Can be a config object or a function returning a config object.
+   * @returns {function}          StateFactoryInitializer - The self-overwriting function which creates the factory function that will be called in place of itself on any subsequent instantiations of the module.
+   * */
+
   function createStateFactoryInitializer(name, initializer) {
 
     return props => {
-
-      // the returned function will run once when the module is first used
-      // it internally creates a StateFactory function for the model that is called on
-      // any subsequent requests.
 
       const module = initializeStateModule(initializer);
 
@@ -1266,15 +1554,26 @@
       // Overwrite this initialization function with the StateFactory for subsequent calls
       CUE_STATE_MODULES.set(name, StateFactory);
 
-      // Call the StateFactory
+      // Call the StateFactory and return the result
       return StateFactory.call(null, props);
 
     }
 
   }
 
+  /**
+   * The Public State Interface. Used to register new state modules.
+   * @namespace {object} CUE_STATE_API
+   */
   const CUE_STATE_API = {
 
+    /**
+     * @function State
+     * @namespace State
+     * @memberOf CUE_STATE_API
+     * @param {string} name - The unique name for the state module to be registered.
+     * @param {(object|function)} moduleInitializer - Can be a config object or a function returning a config object
+     */
     State: (name, moduleInitializer) => {
 
       if (typeof name !== 'string') {
@@ -1283,17 +1582,20 @@
         throw new Error(`A State Module has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
       }
 
-      const StateFactoryInitializer = createStateFactoryInitializer(name, moduleInitializer);
-
-      CUE_STATE_MODULES.set(name, StateFactoryInitializer);
-
-      return StateFactoryInitializer;
+      CUE_STATE_MODULES.set(name, createStateFactoryInitializer(name, moduleInitializer));
 
     }
 
   };
 
-  CUE_STATE_API.State.isState = x => !!x[__CUE__];
+  /**
+   * Check if a value is a Cue.State instance.
+   * @function isState
+   * @memberOf State
+   * @param     {*}       x - Any value that should be evaluated.
+   * @returns   {boolean}   - True if value is a Cue.State instance, false if not.
+   */
+  CUE_STATE_API.State.isState = x => x && x[__CUE__];
 
   // Registered UI Components
   const CUE_UI_MODULES = new Map();
@@ -2487,7 +2789,6 @@
 
     },
 
-    CUE_EVENT_BUS_API,
     CUE_PLUGINS_API,
     CUE_STATE_API,
     CUE_UI_API

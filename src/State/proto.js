@@ -10,7 +10,8 @@
  * Also extends CUE_LIB.core so that any helper libraries and plugins are also available under "Module".
  * Below code definitely needs some cleaning up...
  */
-{
+
+{ // wrap in extra closure
 
   const STATE_EVENTS = new Map();
   const STATE_EVENTS_ARGS_ERROR = `Can't add listener because the provided arguments are invalid.`;

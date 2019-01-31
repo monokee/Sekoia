@@ -27,7 +27,6 @@ const Cue = global.Cue = oAssign(function(config) {
 
   },
 
-  CUE_EVENT_BUS_API,
   CUE_PLUGINS_API,
   CUE_STATE_API,
   CUE_UI_API
