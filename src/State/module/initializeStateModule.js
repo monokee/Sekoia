@@ -3,8 +3,8 @@
  * Creates a reusable State Module. A module is a blueprint from which factories can create instances of State.
  * When moduleInitializer argument is a function it must be called with CUE_LIB.state as the first argument to make it available in the public module definition closure.
  * @function initializeStateModule
- * @param {(object|function)} moduleInitializer - The second argument passed to public Cue.State function. Can be a config object or a function returning a config object
- * @returns {object} module                     - A reusable module from which a factory can create new instances of state
+ * @param   {(object|function)} moduleInitializer - The second argument passed to public Cue.State function. Can be a config object or a function returning a config object
+ * @returns {object}            module            - A reusable module from which a factory can create new instances of state
  * */
 
 function initializeStateModule(moduleInitializer) {

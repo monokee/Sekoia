@@ -1,4 +1,17 @@
 
+/**
+ * Cue.State - The granular reactivity engine behind Cue.
+ *
+ * Has the following built-in concepts:
+ * - User defined modules have declarative default properties, computed properties and actions.
+ * - Modules are blueprints from which state instances can be created using factory functions.
+ * - Modules are like classes but specifically optimized for reactive state modeling.
+ * - Modules can import other Modules which they extend themselves with.
+ * - Property change interception (willChange handlers)
+ * - Change reaction handling (didChange handlers and external reactions for side-effects)
+ * - Chain-able and micro-optimized computed properties
+ * - State Event Bus for loosely exchanging messages with foreign modules and instances, no matter where they are in the state tree.
+ */
 
 // Registered State Modules
 const CUE_STATE_MODULES = new Map();
