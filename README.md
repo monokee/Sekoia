@@ -3,7 +3,7 @@
 "No logic in markup." & "Not the front-end framework your dad used." 😢💔
 
 <br>
-<img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="450" style="position: relative; margin-left: 50%; transform: translateY(-50%);"/>
+<img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="270"/>
 
 ### Reactive module-driven state
 ```javascript
