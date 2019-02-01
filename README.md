@@ -1,4 +1,4 @@
-# cue - Build atomically reactive web apps in pure Javascript.
+# Cue - Build atomically reactive web apps in pure Javascript.
 
 "No logic in markup." & "Not the front-end framework your dad used." 😢💔
 
