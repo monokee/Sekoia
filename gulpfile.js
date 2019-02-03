@@ -10,6 +10,7 @@ const SOURCE_DIR = 'src';
 const BUILD_DIR = 'build';
 
 const MODULES = {
+  eventBus: SOURCE_DIR + '/EventBus',
   state:    SOURCE_DIR + '/State',
   ui:       SOURCE_DIR + '/UI',
   plugin:   SOURCE_DIR + '/Plugin',
@@ -20,29 +21,33 @@ const FILES = {
   index: [
     `${SOURCE_DIR}/index.js`
   ],
+  eventBus: [
+    `${SOURCE_DIR}/EventBus/public-api.js`
+  ],
   state: [
 
     `${MODULES.state}/index.js`,
-    `${MODULES.state}/proto.js`,
+
+    `${MODULES.state}/transductions/*.js`,
 
     `${MODULES.state}/utils/*.js`,
 
-    `${MODULES.state}/derivedProps/Derivative.js`,
-    `${MODULES.state}/derivedProps/OrderedDerivatives.js`,
-    `${MODULES.state}/derivedProps/installDependencies.js`,
-    `${MODULES.state}/derivedProps/dependencyGetInterceptor.js`,
-    `${MODULES.state}/derivedProps/branchWalkers.js`,
+    `${MODULES.state}/derivatives/Derivative.js`,
+    `${MODULES.state}/derivatives/OrderedDerivatives.js`,
+    `${MODULES.state}/derivatives/installDependencies.js`,
+    `${MODULES.state}/derivatives/dependencyGetInterceptor.js`,
+    `${MODULES.state}/derivatives/branchWalkers.js`,
 
-    `${MODULES.state}/observe/createProxy.js`,
-    `${MODULES.state}/observe/proxyGetHandler.js`,
-    `${MODULES.state}/observe/proxySetHandler.js`,
-    `${MODULES.state}/observe/proxyDeleteHandler.js`,
-    `${MODULES.state}/observe/createInterceptedArrayMutator.js`,
+    `${MODULES.state}/observers/createProxy.js`,
+    `${MODULES.state}/observers/proxyGetHandler.js`,
+    `${MODULES.state}/observers/proxySetHandler.js`,
+    `${MODULES.state}/observers/proxyDeleteHandler.js`,
+    `${MODULES.state}/observers/createInterceptedArrayMutator.js`,
 
-    `${MODULES.state}/reactionQueue/cueAll.js`,
-    `${MODULES.state}/reactionQueue/cueImmediate.js`,
-    `${MODULES.state}/reactionQueue/cueAccumulated.js`,
-    `${MODULES.state}/reactionQueue/react.js`,
+    `${MODULES.state}/reactions/cueAll.js`,
+    `${MODULES.state}/reactions/cueImmediate.js`,
+    `${MODULES.state}/reactions/cueAccumulated.js`,
+    `${MODULES.state}/reactions/react.js`,
 
     `${MODULES.state}/module/StateInternals.js`,
     `${MODULES.state}/module/createStateInstance.js`,
@@ -51,6 +56,7 @@ const FILES = {
     `${MODULES.state}/module/initializeStateModule.js`,
     `${MODULES.state}/module/createStateFactoryInitializer.js`,
 
+    `${MODULES.state}/proto.js`,
     `${MODULES.state}/public-api.js`
 
   ],
@@ -100,6 +106,7 @@ gulp.task('build-lib', function() {
   return gulp
     .src([
       ...FILES.index,
+      ...FILES.eventBus,
       ...FILES.state,
       ...FILES.ui,
       ...FILES.plugin,

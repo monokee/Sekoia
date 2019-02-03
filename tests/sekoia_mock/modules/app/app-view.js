@@ -6,7 +6,9 @@ Cue.UI('App-UI', Component => ({
        <div class="sectionMid">
          <div class="sidebarRight"></div>
          <div ref ="viewer" class="viewerSection"></div>
-         <div class="sidebarLeft"></div>
+         <div class="sidebarLeft">
+            <button ref="myButton" class="myButton"></button>
+         </div>
        </div>
        <div ref="bottom" class="sectionBottom"></div>
      </div>`
@@ -50,19 +52,37 @@ Cue.UI('App-UI', Component => ({
       width: '100%',
       height: '260px',
       border: '1px solid rgb(0, 140, 255)'
+    },
+
+    myButton: {
+      margin: 0,
+      backgroundColor: 'rgb(0, 115, 255)',
+      width: '420px',
+      height: '52px',
+      borderRadius: '500px',
+      outline: 'none',
+      border: 'none',
+      '&:focus': {
+        outline: 'none',
+        border: 'none',
+        backgroundColor: '#ffb400'
+      }
     }
 
   },
 
   imports: {
-    //LeftMenu: Component.import('App.LeftMenu'),
+    //mySubComponent: Component.import('MySubUIComponent'),
     //Scopes: Component.import('Utils.ScopesView')
   },
 
   initialize(appState) {
     this.state = appState;
-    this.viewer = this.select('.viewerSection');
-    this.bottom = this.select('.sectionBottom');
+    const {top, viewer, myButton, bottom} = this.refs();
+    this.top = top;
+    this.bottom = bottom;
+    this.viewer = viewer;
+    this.myButton = myButton;
   },
 
   bindEvents: {
@@ -70,8 +90,10 @@ Cue.UI('App-UI', Component => ({
       e.preventDefault();
       this.state.disabled = !this.state.disabled;
     },
-    mousedown(e) {
-      this.md = e.which === 1;
+    mousedown: {
+      '.sectionMid'(e) {
+        this.md = e.which === 1;
+      }
     },
     mousemove: {
       '.sectionMid'(e) {
@@ -88,6 +110,7 @@ Cue.UI('App-UI', Component => ({
   },
 
   renderState: {
+
     name(o) {
       this.bottom.textContent = o.value;
     },

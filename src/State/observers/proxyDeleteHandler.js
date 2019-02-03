@@ -16,11 +16,11 @@ function proxyDeleteHandler(target, prop) {
 
       const oldValue = instance.valueCache.get(prop);
 
-      let inQueue = instance.attemptCue(prop, undefined, oldValue);
+      let inQueue = instance.propertyDidChange(prop, undefined, oldValue);
 
       if (instance.parent) {
         const oldTarget = isArray(target) ? target.slice() : oAssign({}, target);
-        inQueue += instance.parent.attemptCue.call(instance.parent, instance.ownPropertyName, target, oldTarget);
+        inQueue += instance.parent.propertyDidChange.call(instance.parent, instance.ownPropertyName, target, oldTarget);
       }
 
       _delete(target, prop);

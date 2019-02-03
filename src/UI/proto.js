@@ -1,14 +1,12 @@
 
-// The CUE Proto Object (Inner-API) exposed to Cue.Component registration closures
-// inherits methods and properties from main CUE_LIB.core object and thus has access to plugins and generic utilities
-CUE_LIB.ui = oCreate(CUE_LIB.core, {
+// The helper object available to public component registration closure as "Component".
+// inherits methods and properties from main LIB object and thus has access to plugins and generic utilities
+oAssign(UI_COMPONENT, {
 
-  import: {
-    value: function(name) {
-      const component = CUE_UI_MODULES.get(name);
-      if(!component) throw new ReferenceError(`Can't import UI Component because nothing is registered under "${name}".`);
-      return component;
-    }
+  import: name => {
+    const component = CUE_UI_MODULES.get(name);
+    if(!component) throw new ReferenceError(`Can't import UI Component because nothing is registered under "${name}".`);
+    return component;
   }
 
 });

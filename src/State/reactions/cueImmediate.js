@@ -12,15 +12,16 @@ function cueImmediate(prop, value, oldValue, observers, derivatives, stopPropaga
   let i, reaction, derivative;
 
   if (observers) {
+
+    const o_O = {value: value, oldValue: oldValue};
+
     for (i = 0; i < observers.length; i++) {
       reaction = observers[i];
       if (MAIN_QUEUE.indexOf(reaction) === -1) {
-        MAIN_QUEUE.push(reaction, {
-          value: value,
-          oldValue: oldValue
-        });
+        MAIN_QUEUE.push(reaction, o_O);
       }
     }
+
   }
 
   if (derivatives && stopPropagation === false) {

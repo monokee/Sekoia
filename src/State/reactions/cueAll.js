@@ -16,15 +16,17 @@ function cueAll(prop, value, oldValue, observers, derivatives, stopPropagation) 
   let i, l, item;
 
   if (observers) {
+
+    const o_O = {value: value, oldValue: oldValue};
+
+    // add pairs of unique [reactionHandler, observationObject] to queue
     for (i = 0; i < observers.length; i++) {
       item = observers[i];
       if (MAIN_QUEUE.indexOf(item) === -1) {
-        MAIN_QUEUE.push(item, {
-          value: value,
-          oldValue: oldValue
-        });
+        MAIN_QUEUE.push(item, o_O);
       }
     }
+
   }
 
   if (derivatives && (l = derivatives.length) && stopPropagation === false) {

@@ -21,7 +21,8 @@ const OrderedDerivatives = {
 
     const target = new Map();
 
-    for (const sourceProperty of derivatives.keys()) {
+    let sourceProperty;
+    for (sourceProperty of derivatives.keys()) {
       this._visit(sourceProperty, [], target);
     }
 

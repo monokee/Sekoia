@@ -25,7 +25,8 @@ function installDependencies(allProperties, computedProperties) {
   });
 
   // call each computation which will trigger the intercepted get requests
-  computedProperties.forEach(derivative => {
+  let derivative;
+  for (derivative of computedProperties.values()) {
 
     DERIVATIVE_INSTALLER.derivative = derivative;
 
@@ -34,7 +35,7 @@ function installDependencies(allProperties, computedProperties) {
       derivative.computation.call(installer, installer);
     } catch(e) {}
 
-  });
+  }
 
   // kill pointers
   DERIVATIVE_INSTALLER.derivative = null;

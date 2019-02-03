@@ -1,15 +1,15 @@
 
 /**
- * The Public State Interface. Used to register new state modules.
- * @namespace {object} CUE_STATE_API
+ * Public API for Cue.State
+ * @namespace CUE_STATE_API
  */
 const CUE_STATE_API = {
 
   /**
-   * @function State
-   * @namespace State
+   * Registers a new State Module under the specified name.
+   * @function
    * @memberOf CUE_STATE_API
-   * @param {string} name - The unique name for the state module to be registered.
+   * @param {string}            name              - The unique name for the state module to be registered.
    * @param {(object|function)} moduleInitializer - Can be a config object or a function returning a config object
    */
   State: (name, moduleInitializer) => {
@@ -29,8 +29,8 @@ const CUE_STATE_API = {
 /**
  * Check if a value is a Cue.State instance.
  * @function isState
- * @memberOf State
- * @param     {*}       x - Any value that should be evaluated.
+ * @memberOf CUE_STATE_API.State
+ * @param     {*} x       - Any value that should be evaluated.
  * @returns   {boolean}   - True if value is a Cue.State instance, false if not.
  */
 CUE_STATE_API.State.isState = x => x && x[__CUE__];

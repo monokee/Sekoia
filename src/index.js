@@ -25,7 +25,6 @@ const OBJ_ID = '[object Object]';
 const oAssign = OBJ.assign;
 const oCreate = OBJ.create;
 const oDefineProperty = OBJ.defineProperty;
-const oDefineProperties = OBJ.defineProperties;
 const oSetPrototypeOf = OBJ.setPrototypeOf;
 const oGetPrototypeOf = OBJ.getPrototypeOf;
 const oProtoToString = OBJ.prototype.toString;
@@ -38,7 +37,6 @@ const _delete = Reflect.deleteProperty;
 
 // Utility methods
 const oKeys = OBJ.keys;
-const oEntries = OBJ.entries;
 const isArray = ARR.isArray;
 const toArray = ARR.from;
 const isObjectLike = o => typeof o === 'object' && o !== null;
@@ -47,9 +45,8 @@ const isFunction = fn => typeof fn === 'function';
 const wrap = fn => fn();
 
 // Cue Library Object
-const __lib_core__ = {};
-const CUE_LIB = {
-  core: __lib_core__,
-  state: oCreate(__lib_core__), // extends core
-  ui: oCreate(__lib_core__)     // extends core
-};
+const LIB = {};
+// Cue State Library Object
+const STATE_MODULE = oCreate(LIB);
+// Cue UI Library Object
+const UI_COMPONENT = oCreate(LIB);

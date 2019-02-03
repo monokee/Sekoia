@@ -13,7 +13,7 @@ function createStateFactoryInitializer(name, initializer) {
 
   return props => {
 
-    const module = initializeStateModule(initializer);
+    const module = initializeStateModule(name, initializer);
 
     // Create a Factory Function that will be used to instantiate the module
     const StateFactory = createStateFactory(module);

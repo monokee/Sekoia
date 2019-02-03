@@ -1,122 +1,36 @@
 
 /**
- * CUE_LIB.state Proto
- * Available as "Module" Object in module registration closure.
- * Has it's own Event Bus implementation to simply and loosely exchange messages between
- * deeply nested state instances. Because there are other, primary means of (reactive) communication
- * that naturally solve most cross-realm communication problems much better, the use of the event bus is
- * automatically reserved for inter-module communication which, when required, is a very nice and performant abstraction.
- *
- * Also extends CUE_LIB.core so that any helper libraries and plugins are also available under "Module".
- * Below code definitely needs some cleaning up...
+ * The namespace that is available as "Module" Object in state module registration closures. Contains helpers and plugins.
+ * @namespace {object} STATE_MODULE
+ * @extends   {object} LIB
  */
-
-{ // wrap in extra closure
-
-  const STATE_EVENTS = new Map();
-  const STATE_EVENTS_ARGS_ERROR = `Can't add listener because the provided arguments are invalid.`;
-
-  let _type, _handler, _scope, _events, _event, _disposable = [];
-
-  const addEvent = (type, handler, scope, once) => {
-    const event = {
-      handler: handler,
-      scope: scope,
-      once: once
-    };
-    if (STATE_EVENTS.has(type)) {
-      STATE_EVENTS.get(type).push(event);
-    } else {
-      STATE_EVENTS.set(type, [event]);
-    }
-  };
-
-  const addEvents = (events, scope, once) => {
-
-    for (_type in events) {
-      _handler = events[_type];
-      if (isFunction(_handler)) {
-        addEvent(_type, _handler, scope, once);
-      } else {
-        throw new TypeError(`Can't add listener because handler for "${_type}" is not a function but of type ${typeof _handler}`);
-      }
-    }
-  };
+oAssign(STATE_MODULE, {
 
   /**
-   * @namespace {object} CUE_LIB.state
-   * @extends   {object} CUE_LIB.core
+   * Import another state module that the current instance can extend itself with.
+   * @method
+   * @param   {string}    name  - The unique name of the Cue.State module to be imported.
+   * @returns {function}  state - The factory function of the imported module.
    */
-  CUE_LIB.state = oCreate(CUE_LIB.core, {
+  import: name => {
+    const state = CUE_STATE_MODULES.get(name);
+    if (!state) throw new ReferenceError(`Can't import State Module because nothing is registered under "${name}".`);
+    return state;
+   },
 
-    /**
-     * Import another state module that the current instance can extend itself with.
-     * @function import
-     * @memberOf CUE_LIB.state
-     * @param   {string}    name  - The unique name of the Cue.State module to be imported.
-     * @returns {function}  state - The factory function of the imported module.
-     */
-    import: {
-      value: function (name) {
-        const state = CUE_STATE_MODULES.get(name);
-        if (!state) throw new ReferenceError(`Can't import State Module because nothing is registered under "${name}".`);
-        return state;
-      }
-    },
+  /**
+   * Inject a property from a parent state into child state props.
+   * @method
+   * @param   {string} sourcePath                         - the path to the property on the module. ie "MyModule.SubModule.propA" where "MyModule.SubModule" is the module and "propA" the property to inject from that module.
+   * @param   {object} [options = {readOnly: false}]      - optional options object that can indicate whether an injected property has both read-write (default) or read-only capabilities.
+   * @returns {ProviderDescription}                              - Object describing the relationship between consumers and providers. Reused and enhanced throughout module instantiation cycle.
+   */
+  inject: (sourcePath, options = { readOnly: false }) => {
+    const fragments = sourcePath.split('.');
+    const providerModule = fragments.slice(0, -1).join('.');
+    const providedProperty = fragments[fragments.length - 1];
+    if (!CUE_STATE_MODULES.has(providerModule)) throw new ReferenceError(`Won't be able to inject "${providedProperty}" because State Module "${providerModule}" is undefined.`);
+    return new ProviderDescription(providerModule, providedProperty, options.readOnly);
+  }
 
-    on: (type, handler, scope) => {
-
-      if (isObjectLike(type)) {
-        _scope = typeof handler === 'object' ? handler : null;
-        addEvents(type, _scope, false);
-      } else if (typeof type === 'string' && isFunction(handler)) {
-        _scope = typeof scope === 'object' ? scope : null;
-        addEvent(type, handler, _scope, false);
-      } else {
-        throw new TypeError(STATE_EVENTS_ARGS_ERROR);
-      }
-
-    },
-
-    once: (type, handler, scope) => {
-
-      if (isObjectLike(type)) {
-        _scope = typeof handler === 'object' ? handler : null;
-        addEvents(type, _scope, true);
-      } else if (typeof type === 'string' && isFunction(handler)) {
-        _scope = typeof scope === 'object' ? scope : null;
-        addEvent(type, handler, _scope, true);
-      } else {
-        throw new TypeError(STATE_EVENTS_ARGS_ERROR);
-      }
-
-    },
-
-    off: type => {
-      STATE_EVENTS.delete(type);
-    },
-
-    trigger: (type, ...payload) => {
-
-      if ((_events = STATE_EVENTS.get(type))) {
-
-        for (let i = 0; i < _events.length; i++) {
-          _event = _events[i];
-          _event.handler.apply(_event.scope, payload);
-          if (_event.once) _disposable.push(_event);
-        }
-
-        if (_disposable.length) {
-          STATE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
-          _disposable.length = 0;
-        }
-
-        _events = null;
-
-      }
-
-    }
-
-  });
-
-}
+});

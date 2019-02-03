@@ -10,26 +10,36 @@ class StateInternals {
   /**
    * Assign new StateInternals to private expando
    * @param {object}  stateInstance     - The piece of state that the internals should be assigned to.
+   * @param {object}  module            - The module blueprint that the instance is based on.
    * @param {object} [parent]           - The parent object graph that the stateInstance is a child of
    * @param {string} [ownPropertyName]  - The property name of the stateInstance on the parent object graph
    * */
-  static assignTo(stateInstance, parent, ownPropertyName) {
-    stateInstance[__CUE__] = new this(parent, ownPropertyName);
+  static assignTo(stateInstance, module, parent, ownPropertyName) {
+    stateInstance[__CUE__] = new this(module, parent, ownPropertyName);
     return stateInstance;
   }
 
   /** Creates new instance of internals required for reactivity */
-  constructor(parent = null, ownPropertyName = '') {
+  constructor(module, parent = null, ownPropertyName = '') {
+
+    this.module = module;
 
     this.parent = parent;
     this.ownPropertyName = ownPropertyName;
 
     this.isInitializing = false;
 
-    this.valueCache = new Map();
-    this.observersOf = new Map();
-    this.derivativesOf = new Map();
-    this.derivedProperties = new Map();
+    this.valueCache = new Map(); // 1D map [propertyName -> currentValue]
+    this.observersOf = new Map(); // 1D map [propertyName -> handler]
+    this.derivativesOf = new Map(); // 2D map [propertyName -> 1D array[...Derivatives]]
+    this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
+
+    // when consumers of a parent prop "get" a consumed prop, the "get" request is forwarded to the provider (parentState[nameOfPropAsDefinedByParent]).
+    // when a state has providers of a property, mutation calls (set, delete, arrayMutators) are forwarded to the provider (parentState[nameOfPropAsDefinedByParent]).
+    // when a state has consumers of a property, it propagates the mutationHandler "propertyDidChange" downwards to its consumers (mutate: childState[nameOfPropAsDefinedByChild]).
+
+    this.consumersOf = new Map(); // 2D map [propertyName -> 1D array[...Consumers]]  Consumer = {stateInternals: childStateInstance[__CUE__], property: nameOfPropAsDefinedByChild}
+    this.providersOf = new Map(); // 1D map [propertyName -> Provider]                Provider = {stateInternals: parentStateInstance[__CUE__], property: nameOfPropAsDefinedByParent}
 
   }
 
@@ -73,8 +83,8 @@ class StateInternals {
 
   /**
    * Remove reaction handler(s) from "observersOf"
-   * @param {string} property - The property key of the state property that should be unobserved
-   * @param {function} [handler] - The reaction handler to be removed. If not provided, remove all reactions for the passed property name
+   * @param {string}    property  - The property key of the state property that should be unobserved
+   * @param {function}  [handler] - The reaction handler to be removed. If not provided, remove all reactions for the passed property name
    */
   removeChangeReaction(property, handler) {
 
@@ -125,32 +135,33 @@ class StateInternals {
 
   /**
    * Called from proxy interceptors when a value change of a state property has been detected.
-   * Checks if there are any derivatives or observers (dependencies) that depend on the changed property.
-   * If there are dependencies, it adds the change to the global reaction queue.
+   * First it queues up the observers of the property and all direct + indirect derivatives of the property. (cueAll/cueImmediate)
+   * Then it propagates the change reaction recursively downwards by calling itself on all child instances that consume the property.
    * @param   {string}  prop      - The property name of the changed value.
    * @param   {*}       value     - The new value (after mutation)
    * @param   {*}       oldValue  - The previous value (before mutation)
-   * @returns {number}  didQueue  - 1 if didQueue, 0 if not. Reactions bubble to parent and we count total number of queued changes per mutation to determine if queue should run.
    */
-  attemptCue(prop, value, oldValue) {
+  propertyDidChange(prop, value, oldValue) {
 
-    const drv = this.derivativesOf.get(prop);
-    const obs = this.observersOf.get(prop);
+    const observers = this.observersOf.get(prop);
+    const derivatives = this.derivativesOf.get(prop);
+    const consumers = this.consumersOf.get(prop);
 
-    if (drv || obs) {
-
+    // 1. recurse over direct dependencies
+    if (observers || derivatives) {
       if (isAccumulating) {
-        cueImmediate(prop, value, oldValue, obs, drv, false);
+        cueImmediate(prop, value, oldValue, observers, derivatives, false);
       } else {
-        cueAll(prop, value, oldValue, obs, drv, false);
+        cueAll(prop, value, oldValue, observers, derivatives, false);
       }
+    }
 
-      return 1;
-
-    } else {
-
-      return 0;
-
+    // 2. propagate change to consuming child modules
+    if (consumers) {
+      for (let i = 0, consumer; i < consumers.length; i++) {
+        consumer = consumers[i];
+        consumer.stateInternals.propertyDidChange(consumer.property, value, oldValue);
+      }
     }
 
   }

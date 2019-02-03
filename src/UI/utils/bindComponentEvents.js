@@ -21,7 +21,6 @@ function bindComponentEvents(component, events) {
 
     }
 
-
   }
 
 }

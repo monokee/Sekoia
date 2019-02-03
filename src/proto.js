@@ -10,14 +10,13 @@ const CueInstanceProto = {
     target = typeof target === 'string' ? document.querySelector(target) : target instanceof Element ? target : null;
     if (!target) throw new TypeError(`Target is not HTMLElement or Selector of element that is in the DOM.`);
 
-    const rootState = CUE_LIB.state.import(this.state.module);
-    const rootComponent = CUE_LIB.ui.import(this.ui.component);
+    const rootState = STATE_MODULE.import(this.state.module);
+    const rootComponent = UI_COMPONENT.import(this.ui.component);
 
     this.state.instance = rootState(props);
     this.ui.element = rootComponent(this.state.instance);
 
     target.appendChild(this.ui.element);
-    this.lifeCycle.didMount.call(this);
 
     this.mounted = true;
 
@@ -31,7 +30,6 @@ const CueInstanceProto = {
       throw new Error(`Can't unmount Cue instance because it has not been mounted.`);
     }
 
-    this.lifeCycle.willUnmount.call(this);
     this.ui.element.parentElement.removeChild(this.ui.element);
 
     this.ui.element = null;

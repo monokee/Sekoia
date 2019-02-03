@@ -10,7 +10,6 @@
  * - Property change interception (willChange handlers)
  * - Change reaction handling (didChange handlers and external reactions for side-effects)
  * - Chain-able and micro-optimized computed properties
- * - State Event Bus for loosely exchanging messages with foreign modules and instances, no matter where they are in the state tree.
  */
 
 // Registered State Modules
@@ -33,7 +32,7 @@ const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
 
 // Meta Keys used for closure scope lookup && safely extending foreign objects
-const __CUE__ = Symbol('🍑');
+const __CUE__ = Symbol('Cue State Internals');
 const __TARGET__ = Symbol('Target Object');
 const __INTERCEPTED_METHODS__ = Symbol('Intercepted Methods');
 

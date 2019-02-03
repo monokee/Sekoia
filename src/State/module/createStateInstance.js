@@ -17,12 +17,12 @@ function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
     ? oAssign(oCreate(factory.prototype), deepClonePlainObject(module.defaults))
     : appendToArray(oSetPrototypeOf([], factory.prototype), deepCloneArray(module.defaults));
 
-  // 2. Assign Internals (__CUE__)
-  const internal = instance[__CUE__] = new StateInternals(_parent, _ownPropertyName);
+  // 2. Assign StateInternals to __CUE__ expando
+  const internal = instance[__CUE__] = new StateInternals(module, _parent, _ownPropertyName);
 
   // 3. Create Derivatives from module blueprints
-  let i, derivative, sourceProperty, dependencies, superDerivative;
-  module.computed.forEach(vDerivative => {
+  let vDerivative, i, derivative, sourceProperty, dependencies, superDerivative;
+  for (vDerivative of module.computed.values()) {
 
     // 3.0 Create instance
     derivative = new Derivative(vDerivative.ownPropertyName, vDerivative.computation, vDerivative.sourceProperties);
@@ -53,7 +53,33 @@ function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
     // (instance inherits from factory.prototype which contains forwarding-getters which trigger value computation in Derivative)
     derivative.fillCache(instance);
 
-  });
+  }
+
+  // 4. Wire up state transductions (providers, consumers)
+  // TODO: document this. outsource into a function because we need to reuse this from within interceptors after parent is available.
+  if (internal.parent !== null && module.providerDescriptions.size) {
+
+    // providers are instance based (strong pointers passed directly to consuming children)
+    const providers = injectProviders(internal, module.providerDescriptions);
+
+    // consumers are module based (weak references by module-name stored on the module objects of the providers)
+    // TODO: this should really ever only be done ONCE per module. this function creates instances. is there no other place to set these up?
+    let provider, consumers, consumingModules;
+    for (provider of providers.values())  {
+
+      consumers = provider.instance.module.consumers;
+      consumingModules = consumers.get(provider.property);
+
+      // only add module as consumer once (remember, this is not based on instances!)
+      if (!consumingModules) {
+        consumers.set(provider.property, [ name ]);
+      } else if (consumingModules.indexOf(name) === -1) {
+        consumingModules.push(name);
+      }
+
+    }
+
+  }
 
   return instance;
 
