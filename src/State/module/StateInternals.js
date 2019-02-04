@@ -19,7 +19,7 @@ class StateInternals {
   }
 
   /** Creates new instance of internals required for reactivity engine */
-  constructor(stateInstance, module, parent, ownPropertyName) {
+  constructor(stateInstance, module, parent = null, ownPropertyName = '') {
 
     this.instance = stateInstance; // the reactive host data instance that these internals are attached to
 

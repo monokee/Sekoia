@@ -107,14 +107,18 @@ function initializeStateModule(module, moduleInitializer) {
     if (prop === 'initialize') {
 
       if (isFunction(val)) {
-        module[prop] = val;
+        module.initialize = val;
       } else {
         throw new TypeError(`"${prop}" is a reserved word for Cue State Modules and must be a function but is of type "${typeof val}"`);
       }
 
     } else if (isFunction(val)) {
 
-      module.actions[prop] = val;
+      if (ARRAY_MUTATORS.has(prop)) {
+        throw new Error(`Illegal action name "${prop}" on "${module.name}". The action clashes with native Array.prototype.${prop}.`);
+      } else {
+        module.actions[prop] = val;
+      }
 
     }
 

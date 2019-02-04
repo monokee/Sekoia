@@ -18,26 +18,28 @@ function createStateFactory(module) {
 
   if (module.static) {
 
-    let statik;
+    let statik, internal;
 
     StateFactory = props => {
-      statik[__CUE__].isInitializing = true;
+      internal.isInitializing = true;
       module.initialize.call(statik, props);
-      statik[__CUE__].isInitializing = false;
+      internal.isInitializing = false;
       return statik;
     };
 
     StateFactory.prototype = {}; // the prototype is an object (which inherits from Object.prototype)
 
     statik = createProxy(createStateInstance(StateFactory, module));
+    internal = statik[__CUE__];
 
   } else {
 
     StateFactory = props => {
       const instance = createProxy(createStateInstance(StateFactory, module));
-      instance[__CUE__].isInitializing = true;
+      const internal = instance[__CUE__];
+      internal.isInitializing = true;
       module.initialize.call(instance, props);
-      instance[__CUE__].isInitializing = false;
+      internal.isInitializing = false;
       return instance;
     };
 

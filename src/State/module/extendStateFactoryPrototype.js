@@ -10,7 +10,8 @@
 function extendStateFactoryPrototype(stateFactory, module) {
 
   // Computed Properties (module.computed is es6 Map to guarantee property order!)
-  for (const key of module.computed.keys()) {
+  let key;
+  for (key of module.computed.keys()) {
     oDefineProperty(stateFactory.prototype, key, {
       get() {
         return this[__CUE__].derivedProperties.get(key).value;
@@ -21,7 +22,7 @@ function extendStateFactoryPrototype(stateFactory, module) {
   }
 
   // Actions
-  for (const key in module.actions) {
+  for (key in module.actions) {
     stateFactory.prototype[key] = module.actions[key];
   }
 

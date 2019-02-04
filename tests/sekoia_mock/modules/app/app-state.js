@@ -31,22 +31,20 @@ Cue.State('Root.Child', Module => ({
       return {top: y, left: x};
     },
     positionInPixels({position}) {
+      console.log(position); // TODO: position is undefined here... why?
       return `Top: ${position.top}px | Left: ${position.left}px `;
     },
-    positionAndName({name, positionInPixels}) {
-      console.log('positionAndNameComputedProperty');
+    positionAndName({name, positionInPixels}) { // TODO: this doesn't seem to pull in "name" correctly because the entire computation is now unavailable!
       return `Local(computed): "${positionInPixels}", Injected: "${name}"`;
     }
   },
 
   initialize(props) {
-    console.log('set x');
     this.x = props.x;
-    console.log('set y');
     this.y = props.y;
     this.disabled = props.disabled;
     // TODO: injected prop is definitely undefined in initialize. not good. it has to be forwarded to the source (Root in this case)
-    console.log('injected name (at initialize time)', this.name);
+    //console.log('injected name (at initialize time)', this.name);
   },
 
   willChange: { //TODO: implement interceptors

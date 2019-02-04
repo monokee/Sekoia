@@ -52,7 +52,7 @@ function proxySetHandler(target, prop, value) {
       instance.propertyDidChange(prop, value, oldValue);
 
       // also queue reactions of the parent (when an immediate property of an object changes, the object itself has changed.) value on parent is this target object, the "oldTarget" a shallow copy of it.
-      if (instance.parent) {
+      if (instance.parent !== null) {
         const parentInstance = instance.parent[__CUE__];
         parentInstance.propertyDidChange.call(parentInstance, instance.ownPropertyName, target, isArray(target) ? target.slice() : oAssign({}, target));
       }

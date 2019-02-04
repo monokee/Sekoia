@@ -48,7 +48,7 @@ Cue.Plugin('cue-fn', Library => {
       //   },
       //   response: function({data}) {
       //     runs on main thread in response to postMessage call from worker thread.
-      //     console.log(typeof data);
+      //     log(typeof data);
       //   }
       // });
       //

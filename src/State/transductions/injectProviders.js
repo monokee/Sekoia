@@ -33,7 +33,6 @@ function injectProviders(childStateInternals, providersToInstall) {
 
         // -> inject the provider!
         childStateInternals.providersOf.set(targetProperty, {sourceInstance: parent, sourceProperty, targetModule, targetProperty});
-        console.log('Provider injected into childStateInternals:', childStateInternals);
 
       } else {
 
