@@ -12,8 +12,11 @@
  * - Chain-able and micro-optimized computed properties
  */
 
-// Registered State Modules
+// Registered State Modules: name -> lazy factory
 const CUE_STATE_MODULES = new Map();
+
+// Internals of State Modules for internally passing module data around: name -> object
+const CUE_STATE_INTERNALS = new Map();
 
 // State Flags
 let isReacting = false; // is a reaction currently in process?
@@ -30,6 +33,10 @@ const DERIVATIVE_INSTALLER = {
 // Traversal Directions (needed for dependency branch walking)
 const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
+
+// Used to identify the two supported state container types: plain arrays and plain objects
+const TYPE_ARRAY = 1;
+const TYPE_OBJECT = 2;
 
 // Meta Keys used for closure scope lookup && safely extending foreign objects
 const __CUE__ = Symbol('Cue State Internals');

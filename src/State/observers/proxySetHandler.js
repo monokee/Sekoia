@@ -15,35 +15,55 @@ function proxySetHandler(target, prop, value) {
   if (!isReacting) {
 
     const instance = target[__CUE__];
-    const oldValue = instance.valueCache.get(prop);
+
+    let provider = instance.providersOf.get(prop);
+
+    if (provider) {
+      // forward the set request to the root of the data (it will ripple back through the system from there!)
+      const rootProvider = getRootProvider(provider);
+      rootProvider.sourceInstance.instance[rootProvider.sourceProperty] = value;
+      return true;
+    }
 
     if (value) {
 
       const nestedInstance = value[__CUE__];
 
       if (nestedInstance && nestedInstance.parent === null) {
+
         nestedInstance.parent = target;
         nestedInstance.ownPropertyName = prop;
+
+        if (nestedInstance.module.providersToInstall.size > 0) {
+          injectProviders(nestedInstance, nestedInstance.providersToInstall);
+        }
+
       }
 
     }
 
+    // get old value from cache
+    const oldValue = instance.valueCache.get(prop);
+
+    // compare to cache
     if (value !== oldValue) {
 
-      let inQueue = instance.propertyDidChange(prop, value, oldValue);
+      // queue reactions
+      instance.propertyDidChange(prop, value, oldValue);
 
-      if (instance.parent !== null) {
-        const oldTarget = isArray(target) ? target.slice() : oAssign({}, target);
-        inQueue += instance.parent.propertyDidChange.call(instance.parent, instance.ownPropertyName, target, oldTarget);
-      }
+      // also queue reactions of the parent (when an immediate property of an object changes, the object itself has changed.) value on parent is this target object, the "oldTarget" a shallow copy of it.
+      instance.parent && instance.parent.propertyDidChange.call(instance.parent, instance.ownPropertyName, target, instance.type === TYPE_OBJECT ? oAssign({}, target) : target.slice());
 
-      _set(target, prop, value);
+      // mutate the target object (this will not mutate the "oldTarget" shallow copy we created above)
+      target[prop] = value;
+
+      // update the cache
       instance.valueCache.set(prop, value);
 
-      if (inQueue > 0 && !isAccumulating) {
-        react();
-      }
+      // run through all reactions in the queue
+      react();
 
+      // done.
       return true;
 
     }

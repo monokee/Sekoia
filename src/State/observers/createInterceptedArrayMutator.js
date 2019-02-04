@@ -29,7 +29,6 @@ function createInterceptedArrayMutator(nativeMethod) {
       const result = _apply(nativeMethod, target, args); // apply method, potentially mutate target
 
       if (!areArraysShallowEqual(oldTarget, target)) {
-        // TODO: if willChange handler(s), run those, then re-evaluate, then propertyDidChange
         if (instance.parent.propertyDidChange.call(instance.parent, instance.ownPropertyName, target, oldTarget)) {
           if (!isAccumulating) {
             react();

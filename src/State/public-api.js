@@ -20,7 +20,9 @@ const CUE_STATE_API = {
       throw new Error(`A State Module has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
     }
 
-    CUE_STATE_MODULES.set(name, createStateFactoryInitializer(name, moduleInitializer));
+    const module = { name };
+    CUE_STATE_INTERNALS.set(name, module);
+    CUE_STATE_MODULES.set(name, createStateFactoryInitializer(module, moduleInitializer));
 
   }
 

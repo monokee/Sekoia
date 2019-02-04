@@ -4,7 +4,6 @@
  * Properties and methods are required for reactivity engine embedded into every Cue State Instance
  * @class StateInternals
  * */
-
 class StateInternals {
 
   /**
@@ -15,31 +14,31 @@ class StateInternals {
    * @param {string} [ownPropertyName]  - The property name of the stateInstance on the parent object graph
    * */
   static assignTo(stateInstance, module, parent, ownPropertyName) {
-    stateInstance[__CUE__] = new this(module, parent, ownPropertyName);
+    stateInstance[__CUE__] = new this(module, stateInstance, parent, ownPropertyName);
     return stateInstance;
   }
 
-  /** Creates new instance of internals required for reactivity */
-  constructor(module, parent = null, ownPropertyName = '') {
+  /** Creates new instance of internals required for reactivity engine */
+  constructor(stateInstance, module, parent, ownPropertyName) {
 
-    this.module = module;
+    this.instance = stateInstance; // the reactive host data instance that these internals are attached to
 
-    this.parent = parent;
-    this.ownPropertyName = ownPropertyName;
+    this.parent = parent; // may be null at construction time
+    this.ownPropertyName = ownPropertyName; // may be unknown at construction time
 
-    this.isInitializing = false;
+    this.isInitializing = false; // flag set while the "initialize" method of state instances is being executed. (blocks certain ops)
 
     this.valueCache = new Map(); // 1D map [propertyName -> currentValue]
     this.observersOf = new Map(); // 1D map [propertyName -> handler]
     this.derivativesOf = new Map(); // 2D map [propertyName -> 1D array[...Derivatives]]
     this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
+    this.providersOf = new Map(); // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-    // when consumers of a parent prop "get" a consumed prop, the "get" request is forwarded to the provider (parentState[nameOfPropAsDefinedByParent]).
-    // when a state has providers of a property, mutation calls (set, delete, arrayMutators) are forwarded to the provider (parentState[nameOfPropAsDefinedByParent]).
-    // when a state has consumers of a property, it propagates the mutationHandler "propertyDidChange" downwards to its consumers (mutate: childState[nameOfPropAsDefinedByChild]).
-
-    this.consumersOf = new Map(); // 2D map [propertyName -> 1D array[...Consumers]]  Consumer = {stateInternals: childStateInstance[__CUE__], property: nameOfPropAsDefinedByChild}
-    this.providersOf = new Map(); // 1D map [propertyName -> Provider]                Provider = {stateInternals: parentStateInstance[__CUE__], property: nameOfPropAsDefinedByParent}
+    // only a pointer to the module (shared)
+    this.module = module;
+    this.type = module.type;
+    this.name = module.name;
+    this.consumersOf = module.consumersOf; // 2D map [propertyName -> [...ConsumerDescriptions]] ConsumerDescription = {targetModule: nameOfTargetModule, targetProperty: nameOfPropertyAsDefinedOnChild}
 
   }
 
@@ -145,7 +144,6 @@ class StateInternals {
 
     const observers = this.observersOf.get(prop);
     const derivatives = this.derivativesOf.get(prop);
-    const consumers = this.consumersOf.get(prop);
 
     // 1. recurse over direct dependencies
     if (observers || derivatives) {
@@ -156,12 +154,81 @@ class StateInternals {
       }
     }
 
-    // 2. propagate change to consuming child modules
+    const consumers = this.consumersOf.get(prop);
+
+    // 2. if the changed property has consumers, find them and recurse
     if (consumers) {
-      for (let i = 0, consumer; i < consumers.length; i++) {
-        consumer = consumers[i];
-        consumer.stateInternals.propertyDidChange(consumer.property, value, oldValue);
+      this.cueConsumers(this, consumers, prop, value, oldValue);
+    }
+  }
+
+}
+
+// these special classes are optimized for either array or object traversal:
+
+class ArrayStateInternals extends StateInternals {
+
+  constructor(stateInstance, module, parent = null, ownPropertyName = '') {
+    super(stateInstance, module, parent, ownPropertyName);
+  }
+
+  cueConsumers(providerInstance, consumers, prop, value, oldValue) {
+
+    // Find consumer instances and recurse into each branch
+    for (let i = 0, childState; i < this.instance.length; i++) { // we loop over each immediate child
+
+      childState = this.instance[i]; // a property on the child
+
+      if (childState && (childState = childState[__CUE__])) { // property is a child state instance
+
+        let provider;
+        for (provider of childState.providersOf.values()) { // TODO: we can probably cache the iterator returned from values()!
+          if (provider.sourceInstance === providerInstance && provider.sourceProperty === prop) {
+            // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
+            childState.propertyDidChange.call(childState, provider.targetProperty, value, oldValue); // continue recursion in this branch
+          }
+        }
+
+        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the found provided prop is provided further)
+        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value, oldValue);
+
       }
+
+    }
+
+  }
+
+}
+
+class ObjectStateInternals extends StateInternals {
+
+  constructor(stateInstance, module, parent = null, ownPropertyName = '') {
+    super(stateInstance, module, parent, ownPropertyName);
+  }
+
+  cueConsumers(providerInstance, consumers, prop, value, oldValue) {
+
+    // Find consumer instances and recurse into each branch
+    const thisInstanceKeys = oKeys(this.instance);
+    for (let i = 0, childState; i < thisInstanceKeys.length; i++) { // we loop over each immediate child
+
+      childState = this.instance[thisInstanceKeys[i]]; // a property on the child
+
+      if (childState && (childState = childState[__CUE__])) { // property is a child state instance
+
+        let provider;
+        for (provider of childState.providersOf.values()) { // TODO: we can probably cache the iterator returned from values()!
+          if (provider.sourceInstance === providerInstance && provider.sourceProperty === prop) {
+            // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
+            childState.propertyDidChange.call(childState, provider.targetProperty, value, oldValue); // continue recursion in this branch
+          }
+        }
+
+        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the found provided prop is provided further)
+        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value, oldValue);
+
+      }
+
     }
 
   }

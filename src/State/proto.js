@@ -14,7 +14,7 @@ oAssign(STATE_MODULE, {
    */
   import: name => {
     const state = CUE_STATE_MODULES.get(name);
-    if (!state) throw new ReferenceError(`Can't import State Module because nothing is registered under "${name}".`);
+    if (!state) throw new ReferenceError(`Can't import undefined State Module "${name}".`);
     return state;
    },
 
@@ -23,14 +23,14 @@ oAssign(STATE_MODULE, {
    * @method
    * @param   {string} sourcePath                         - the path to the property on the module. ie "MyModule.SubModule.propA" where "MyModule.SubModule" is the module and "propA" the property to inject from that module.
    * @param   {object} [options = {readOnly: false}]      - optional options object that can indicate whether an injected property has both read-write (default) or read-only capabilities.
-   * @returns {ProviderDescription}                              - Object describing the relationship between consumers and providers. Reused and enhanced throughout module instantiation cycle.
+   * @returns {ProviderDescription}                       - Object describing the relationship between consumers and providers. Reused and enhanced throughout module instantiation cycle.
    */
   inject: (sourcePath, options = { readOnly: false }) => {
     const fragments = sourcePath.split('.');
-    const providerModule = fragments.slice(0, -1).join('.');
-    const providedProperty = fragments[fragments.length - 1];
-    if (!CUE_STATE_MODULES.has(providerModule)) throw new ReferenceError(`Won't be able to inject "${providedProperty}" because State Module "${providerModule}" is undefined.`);
-    return new ProviderDescription(providerModule, providedProperty, options.readOnly);
+    const sourceModule = fragments.slice(0, -1).join('.');
+    const sourceProperty = fragments[fragments.length - 1];
+    if (!CUE_STATE_MODULES.has(sourceModule)) throw new ReferenceError(`Can't inject "${sourceProperty}" from undefined State Module "${sourceModule}".`);
+    return new ProviderDescription(sourceModule, sourceProperty, options.readOnly);
   }
 
 });

@@ -20,7 +20,15 @@ function proxyGetHandler(target, prop) {
     return target;
   }
 
-  const value = _get(target, prop);
+  const internal = target[__CUE__];
+  const provider = internal.providersOf.get(prop);
+
+  if (provider) {
+    const rootProvider = getRootProvider(provider);
+    return rootProvider.sourceInstance.instance[rootProvider.sourceProperty];
+  }
+
+  const value = target[prop];
 
   // if falsy or proxy, quick return
   if (!value || value[__CUE__]) {
@@ -29,16 +37,16 @@ function proxyGetHandler(target, prop) {
 
   // if array mutator, create/return cached intercepted mutator
   if (ARRAY_MUTATORS.has(prop) && isFunction(value)) {
-    const cache = target[__INTERCEPTED_METHODS__];
+    const cache = _get(target, __INTERCEPTED_METHODS__);
     return cache.get(prop) || (cache.set(prop, createInterceptedArrayMutator(value))).get(prop);
   }
 
   // proxify nested objects that are not the result of a computation
-  if (typeof value === 'object') {
-    const internal = target[__CUE__];
-    if (!internal.derivedProperties.has(prop)) {
-      return createProxy(StateInternals.assignTo(value, internal.module, target, prop));
-    }
+  if (typeof value === 'object' && !internal.derivedProperties.has(prop)) {
+    return createProxy(isArray(value)
+      ? ArrayStateInternals.assignTo(value, internal.module, target, prop)
+      : ObjectStateInternals.assignTo(value, internal.module, target, prop)
+    );
   }
 
   return value;

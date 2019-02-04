@@ -3,22 +3,20 @@
  * Creates a reusable State Module. A module is a blueprint from which factories can create instances of State.
  * When moduleInitializer argument is a function it must be called with "Module" utility object as the first argument to make it available in the returned, public module configuration object.
  * @function initializeStateModule
- * @param   {string}            name              - The name of the module. Can be namespaced. Has to be unique.
+ * @param   {object}            module            - The shared module object to which this function will add static module data (at this point it only contains the name).
  * @param   {(object|function)} moduleInitializer - The module configuration. When it is a function it is called with the "Module" utility object and must return a plain configuration pojo.
- * @returns {object}            module            - A reusable module blueprint from which a factory can create new instances of state.
  * */
 
-function initializeStateModule(name, moduleInitializer) {
+function initializeStateModule(module, moduleInitializer) {
 
-  const TYPE_ARRAY = 1;
-  const TYPE_OBJECT = 2;
+  // when function, we call it with STATE_MODULE namespace so that the "Module" utility namespace object is publicly available (see proto.js)
   const config = isFunction(moduleInitializer) ? moduleInitializer(STATE_MODULE) : moduleInitializer;
 
   if (!isPlainObject(config)) {
-    throw new TypeError(`Can't create State Module because the config function does not return a plain object.`);
+    throw new TypeError(`Can't create State Module "${module.name}" because the config function does not return a plain object.`);
   }
 
-  const type = isArray(config.props) ? TYPE_ARRAY : isPlainObject(config.props) ? TYPE_OBJECT : 0;
+  const type = isArray(config.props) ? TYPE_ARRAY : isPlainObject(config.props) ? TYPE_OBJECT : -1;
 
   if (type !== TYPE_ARRAY && type !== TYPE_OBJECT) {
     throw new TypeError(`State Module requires "props" object (plain object or array) containing default and optional computed properties.`);
@@ -33,59 +31,33 @@ function initializeStateModule(name, moduleInitializer) {
    * @property {Map}      computed                  - contains public "props" that are functions (will be resolved by dependency order)
    * @property {Map}      interceptors              - contains public "willChange" methods that intercept property changes before they are written to state instances TODO: willChange - not implemented
    * @property {Map}      reactions                 - contains public "didChange" methods which trigger side-effects after a property on a state instance has changed TODO: didChange - not implemented
-   * @property {Map}      providerDescriptions      - contains ProviderDescription objects for properties that are being injected into the state from a parent state.
-   * @property {Map}      consumers                 - contains ConsumerDescription objects that will be used by instances to find child state instances that match the description.
+   * @property {Map}      providersToInstall        - contains ProviderDescription objects for properties that are being injected into the state from a parent state. Will be used at instantiation time, will be cleared
+   * @property {Map}      consumersOf               - contains ConsumerDescription objects that will be used by instances to find child state instances that match the description. Persisted throughout and passed to StateInternals!
    * @property {function} initialize                - a pseudo-constructor function which, when defined, is called initially after an internal state-instance has been created. Defaults to NOOP.
    * @property {object}   actions                   - contains any methods from public module (except built-ins like initialize). These methods will be shared on the module prototype.
    * @property {boolean}  static                    - indicates whether module.defaults should be cloned for each instance (true, default behaviour) or shared between all instances (false)
    * @property {object}   imports                   - contains sub-modules this modules extends itself with
    */
 
-  const module = {
-    name: name,
+  oAssign(module, {
+    type: type,
     defaults: type === TYPE_ARRAY ? [] : {},
     computed: new Map(),
     interceptors: new Map(),
     reactions: new Map(),
-    providerDescriptions: new Map(),
-    consumers: new Map(),
+    providersToInstall: new Map(),
+    consumersOf: new Map(),
     initialize: NOOP,
     actions: {},
     static: config.static === true,
     imports: config.imports
-  };
+  });
 
-  // 1. Split props into default and computed properties
+  // 1. Split props into defaults, computed properties and injected properties.
+  // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances of this module.
 
   let prop, i, val;
-  if (type === TYPE_ARRAY) {
-
-    for (i = 0; i < config.props.length; i++) {
-
-      val = config.props[i];
-
-      if (isFunction(val)) {
-
-        module.computed.set(i, {
-          ownPropertyName: i,
-          computation: val,
-          sourceProperties: [],
-          subDerivatives: [],
-          superDerivatives: []
-        });
-
-      } else if (val instanceof ProviderDescription) {
-        
-        module.providerDescriptions.set(i, val);
-
-      } else {
-
-        module.defaults.push(val);
-
-      }
-    }
-
-  } else if (type === TYPE_OBJECT) {
+  if (type === TYPE_OBJECT) {
 
     for (prop in config.props) {
 
@@ -102,8 +74,21 @@ function initializeStateModule(name, moduleInitializer) {
         });
 
       } else if (val instanceof ProviderDescription) {
-        
-        module.providerDescriptions.set(prop, val);
+
+        // We found a property that wants to inject data from a parent state. The source of the requested data is described in the ProviderDescription that was created when the property called Module.inject(...).
+        // The data model and property of the requested data have thus been described. Here we map the name of the requesting property to the ProviderDescription:
+        module.providersToInstall.set(prop, val);
+        // Also extend the providerDescription with the source (we can use this later to avoid an extra loop)
+        val.targetModule = name;
+        val.targetProperty = prop;
+        // We will use this mapping when this module gets instantiated: If this module has write-access to the provider (readOnly = false) we will install a strong pointer to the parent state into the consuming child instance.
+        // This is very performant and safe to do because whenever a parent state loses context, so will all of the child node graphs in its descending namespace.
+
+        // Now we also have to create the inverse relationship ie. install this module as a consumer of the providing module under the respectively mapped property names.
+        // To avoid memory leaks and the need for manual disposing, the approach for the inverse is different: We will not install strong pointers of consuming child instances into providing parent instances.
+        // Instead, we simply create a consumer that has the string name of the module that is consuming from it. At mutation-time a stateInstance will query its underlying module for any consumers and traverse down
+        // its object-children and update any instances that match the consumer module description along the way to the furthest leaves. (make like a tree, McFly!)
+        referenceConsumer(name, prop, val.sourceModule, val.sourceProperty);
 
       } else {
 
@@ -111,6 +96,36 @@ function initializeStateModule(name, moduleInitializer) {
 
       }
 
+    }
+
+  } else if (type === TYPE_ARRAY) {
+
+    for (i = 0; i < config.props.length; i++) {
+
+      val = config.props[i];
+
+      if (isFunction(val)) {
+
+        module.computed.set(i, {
+          ownPropertyName: i,
+          computation: val,
+          sourceProperties: [],
+          subDerivatives: [],
+          superDerivatives: []
+        });
+
+      } else if (val instanceof ProviderDescription) {
+
+        module.providersToInstall.set(i, val);
+        val.targetModule = name;
+        val.targetProperty = i;
+        referenceConsumer(name, i, val.sourceModule, val.sourceProperty);
+
+      } else {
+
+        module.defaults.push(val);
+
+      }
     }
 
   }
@@ -155,7 +170,5 @@ function initializeStateModule(name, moduleInitializer) {
     if (!isFunction(val)) throw new TypeError(`Module.didChange handler for "${prop}" is not a function.`);
     module.reactions.set(prop, val);
   }
-
-  return module;
 
 }

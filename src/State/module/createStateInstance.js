@@ -2,7 +2,6 @@
 /**
  * Creates a new instance of a State Module
  * @function createStateInstance
- * @param {string}            type                - Either 'object' or 'array'. Indicates the modules base type.
  * @param {function}          factory             - StateFactory function used to create this instance. We care about its prototype Object (which is already inheriting from base type).
  * @param {object}            module              - The module blueprint containing data and method objects that are shared between all instances.
  * @param {object}            [_parent]           - If known at instantiation time, the parent object graph to which the new instance is attached in the state tree.
@@ -10,15 +9,18 @@
  * @returns {(object|array)}  instance            - A new instance of the state module. Deep cloned from the defaults and with the correct prototype chain for its base type.
  * */
 
-function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
+function createStateInstance(factory, module, _parent, _ownPropertyName) {
 
-  // 1. Create base instance
-  const instance = type === 'object'
-    ? oAssign(oCreate(factory.prototype), deepClonePlainObject(module.defaults))
-    : appendToArray(oSetPrototypeOf([], factory.prototype), deepCloneArray(module.defaults));
-
-  // 2. Assign StateInternals to __CUE__ expando
-  const internal = instance[__CUE__] = new StateInternals(module, _parent, _ownPropertyName);
+  // 1. Create base instance by deep cloning the default props
+  // 2. Create internals needed for Reactivity engine
+  let instance, internal;
+  if (module.type === TYPE_OBJECT) {
+    instance = oAssign(oCreate(factory.prototype), deepClonePlainObject(module.defaults));
+    internal = instance[__CUE__] = new ObjectStateInternals(instance, module, _parent, _ownPropertyName);
+  } else if (module.type === TYPE_ARRAY) {
+    instance = appendToArray(oSetPrototypeOf([], factory.prototype), deepCloneArray(module.defaults));
+    internal = instance[__CUE__] = new ArrayStateInternals(instance, module, _parent, _ownPropertyName);
+  }
 
   // 3. Create Derivatives from module blueprints
   let vDerivative, i, derivative, sourceProperty, dependencies, superDerivative;
@@ -55,30 +57,9 @@ function createStateInstance(type, factory, module, _parent, _ownPropertyName) {
 
   }
 
-  // 4. Wire up state transductions (providers, consumers)
-  // TODO: document this. outsource into a function because we need to reuse this from within interceptors after parent is available.
-  if (internal.parent !== null && module.providerDescriptions.size) {
-
-    // providers are instance based (strong pointers passed directly to consuming children)
-    const providers = injectProviders(internal, module.providerDescriptions);
-
-    // consumers are module based (weak references by module-name stored on the module objects of the providers)
-    // TODO: this should really ever only be done ONCE per module. this function creates instances. is there no other place to set these up?
-    let provider, consumers, consumingModules;
-    for (provider of providers.values())  {
-
-      consumers = provider.instance.module.consumers;
-      consumingModules = consumers.get(provider.property);
-
-      // only add module as consumer once (remember, this is not based on instances!)
-      if (!consumingModules) {
-        consumers.set(provider.property, [ name ]);
-      } else if (consumingModules.indexOf(name) === -1) {
-        consumingModules.push(name);
-      }
-
-    }
-
+  // 4. If parent is already available here (not guaranteed, also checked in proxy handlers)
+  if (internal.parent !== null && module.providersToInstall.size) {
+    injectProviders(internal, module.providersToInstall);
   }
 
   return instance;
