@@ -16,7 +16,7 @@ function proxySetHandler(target, prop, value) {
 
     const instance = target[__CUE__];
 
-    let provider = instance.providersOf.get(prop);
+    const provider = instance.providersOf.get(prop);
 
     if (provider) {
       // forward the set request to the root of the data (it will ripple back through the system from there!)

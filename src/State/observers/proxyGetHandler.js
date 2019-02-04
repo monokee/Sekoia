@@ -37,7 +37,7 @@ function proxyGetHandler(target, prop) {
 
   // if array mutator, create/return cached intercepted mutator
   if (ARRAY_MUTATORS.has(prop) && isFunction(value)) {
-    const cache = _get(target, __INTERCEPTED_METHODS__);
+    const cache = target[__INTERCEPTED_METHODS__];
     return cache.get(prop) || (cache.set(prop, createInterceptedArrayMutator(value))).get(prop);
   }
 

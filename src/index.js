@@ -30,8 +30,6 @@ const oGetPrototypeOf = OBJ.getPrototypeOf;
 const oProtoToString = OBJ.prototype.toString;
 
 // Reflect methods
-const _set = Reflect.set;
-const _get = Reflect.get;
 const _apply = Reflect.apply;
 const _delete = Reflect.deleteProperty;
 
