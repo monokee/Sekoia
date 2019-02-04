@@ -2,25 +2,20 @@
 /**
  * Creates a new instance of a State Module
  * @function createStateInstance
- * @param {function}          factory             - StateFactory function used to create this instance. We care about its prototype Object (which is already inheriting from base type).
+ * @param {function}          factory             - StateFactory function used to create this instance. We care about its prototype Object.
  * @param {object}            module              - The module blueprint containing data and method objects that are shared between all instances.
  * @param {object}            [_parent]           - If known at instantiation time, the parent object graph to which the new instance is attached in the state tree.
  * @param {string}            [_ownPropertyName]  - If known at instantiation time, the property name of the new state instance on the parent object graph in the state tree.
- * @returns {(object|array)}  instance            - A new instance of the state module. Deep cloned from the defaults and with the correct prototype chain for its base type.
+ * @returns {object}          instance            - A new instance of the state module. Deep cloned from the defaults.
  * */
 
 function createStateInstance(factory, module, _parent, _ownPropertyName) {
 
   // 1. Create base instance by deep cloning the default props
+  const instance = oAssign(oCreate(factory.prototype), deepClonePlainObject(module.defaults));
+
   // 2. Create internals needed for Reactivity engine
-  let instance, internal;
-  if (module.type === TYPE_OBJECT) {
-    instance = oAssign(oCreate(factory.prototype), deepClonePlainObject(module.defaults));
-    internal = instance[__CUE__] = new ObjectStateInternals(instance, module, _parent, _ownPropertyName);
-  } else if (module.type === TYPE_ARRAY) {
-    instance = appendToArray(oSetPrototypeOf([], factory.prototype), deepCloneArray(module.defaults));
-    internal = instance[__CUE__] = new ArrayStateInternals(instance, module, _parent, _ownPropertyName);
-  }
+  const internal = instance[__CUE__] = new StateInternals(instance, module, _parent, _ownPropertyName);
 
   // 3. Create Derivatives from module blueprints
   let vDerivative, i, derivative, sourceProperty, dependencies, superDerivative;
@@ -55,11 +50,6 @@ function createStateInstance(factory, module, _parent, _ownPropertyName) {
     // (instance inherits from factory.prototype which contains forwarding-getters which trigger value computation in Derivative)
     derivative.fillCache(instance);
 
-  }
-
-  // 4. If parent is already available here (not guaranteed, also checked in proxy handlers)
-  if (internal.parent !== null && module.providersToInstall.size) {
-    injectProviders(internal, module.providersToInstall);
   }
 
   return instance;

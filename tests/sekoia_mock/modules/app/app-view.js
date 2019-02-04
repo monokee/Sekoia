@@ -1,4 +1,4 @@
-Cue.UI('App-UI', Component => ({
+Cue.UI('Root-UI', Component => ({
 
   template: (
     `<div id="app" class="app">
@@ -76,8 +76,8 @@ Cue.UI('App-UI', Component => ({
     //Scopes: Component.import('Utils.ScopesView')
   },
 
-  initialize(appState) {
-    this.state = appState;
+  initialize(state) {
+    this.state = state;
     const {top, viewer, myButton, bottom} = this.refs();
     this.top = top;
     this.bottom = bottom;
@@ -88,7 +88,7 @@ Cue.UI('App-UI', Component => ({
   bindEvents: {
     contextmenu(e) {
       e.preventDefault();
-      this.state.disabled = !this.state.disabled;
+      this.state.child.disabled = !this.state.child.disabled;
     },
     mousedown: {
       '.sectionMid'(e) {
@@ -98,8 +98,8 @@ Cue.UI('App-UI', Component => ({
     mousemove: {
       '.sectionMid'(e) {
         if (!this.md) return;
-        this.state.x = e.clientX;
-        this.state.y = e.clientY;
+        this.state.child.x = e.clientX;
+        this.state.child.y = e.clientY;
       }
     },
     mouseup(e) {
@@ -112,21 +112,15 @@ Cue.UI('App-UI', Component => ({
   renderState: {
 
     name(o) {
+      // TODO: the definition of this function triggers a GET on root which has the correct value. where is this bugggggggg
+      console.log('renderState: name (likely on Root?)');
       this.bottom.textContent = o.value;
     },
-    secondsPassed(o) {
-      this.viewer.textContent = `Seconds passed (ticker): ${o.value}`;
-    },
-    positionInPixels(o) {
-      this.bottom.textContent = `Mouse Coordinates ${o.value}`;
-    },
-    disabled(o) {
-      if (o.value === true) {
-        this.addClass('disabled');
-      } else {
-        this.removeClass('disabled');
-      }
+
+    child(o) {
+      this.viewer.textContent = `Child data has changed! PositionAndName: ${o.value.positionAndName}`;
     }
+
   }
 
 }));

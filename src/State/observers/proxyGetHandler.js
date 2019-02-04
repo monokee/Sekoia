@@ -22,9 +22,12 @@ function proxyGetHandler(target, prop) {
 
   const internal = target[__CUE__];
   const provider = internal.providersOf.get(prop);
+  console.log('Get request made to prop:', prop, 'on:', internal.module.name, 'value:', target[prop]);
 
   if (provider) {
+    console.log('value is provided!', prop);
     const rootProvider = getRootProvider(provider);
+    console.log('from instance:', rootProvider.sourceInstance, 'property:', rootProvider.sourceProperty);
     return rootProvider.sourceInstance.instance[rootProvider.sourceProperty];
   }
 
@@ -43,10 +46,7 @@ function proxyGetHandler(target, prop) {
 
   // proxify nested objects that are not the result of a computation
   if (typeof value === 'object' && !internal.derivedProperties.has(prop)) {
-    return createProxy(isArray(value)
-      ? ArrayStateInternals.assignTo(value, internal.module, target, prop)
-      : ObjectStateInternals.assignTo(value, internal.module, target, prop)
-    );
+    return createProxy(StateInternals.assignTo(value, internal.module, target, prop));
   }
 
   return value;

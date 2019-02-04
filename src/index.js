@@ -25,13 +25,11 @@ const OBJ_ID = '[object Object]';
 const oAssign = OBJ.assign;
 const oCreate = OBJ.create;
 const oDefineProperty = OBJ.defineProperty;
-const oSetPrototypeOf = OBJ.setPrototypeOf;
 const oGetPrototypeOf = OBJ.getPrototypeOf;
 const oProtoToString = OBJ.prototype.toString;
 
 // Reflect methods
 const _apply = Reflect.apply;
-const _delete = Reflect.deleteProperty;
 
 // Utility methods
 const oKeys = OBJ.keys;

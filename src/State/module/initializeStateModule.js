@@ -16,10 +16,8 @@ function initializeStateModule(module, moduleInitializer) {
     throw new TypeError(`Can't create State Module "${module.name}" because the config function does not return a plain object.`);
   }
 
-  const type = isArray(config.props) ? TYPE_ARRAY : isPlainObject(config.props) ? TYPE_OBJECT : -1;
-
-  if (type !== TYPE_ARRAY && type !== TYPE_OBJECT) {
-    throw new TypeError(`State Module requires "props" object (plain object or array) containing default and optional computed properties.`);
+  if (!isPlainObject(config.props)) {
+    throw new TypeError(`State Module requires "props" pojo containing default and optional computed properties.`);
   }
 
   /**
@@ -40,8 +38,7 @@ function initializeStateModule(module, moduleInitializer) {
    */
 
   oAssign(module, {
-    type: type,
-    defaults: type === TYPE_ARRAY ? [] : {},
+    defaults: {},
     computed: new Map(),
     interceptors: new Map(),
     reactions: new Map(),
@@ -56,76 +53,42 @@ function initializeStateModule(module, moduleInitializer) {
   // 1. Split props into defaults, computed properties and injected properties.
   // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances of this module.
 
-  let prop, i, val;
-  if (type === TYPE_OBJECT) {
+  let prop, val;
+  for (prop in config.props) {
 
-    for (prop in config.props) {
+    val = config.props[prop];
 
-      val = config.props[prop];
+    if (isFunction(val)) {
 
-      if (isFunction(val)) {
+      module.computed.set(prop, {
+        ownPropertyName: prop,
+        computation: val,
+        sourceProperties: [],
+        subDerivatives: [],
+        superDerivatives: []
+      });
 
-        module.computed.set(prop, {
-          ownPropertyName: prop,
-          computation: val,
-          sourceProperties: [],
-          subDerivatives: [],
-          superDerivatives: []
-        });
+    } else if (val instanceof ProviderDescription) {
 
-      } else if (val instanceof ProviderDescription) {
+      // We found a property that wants to inject data from a parent state. The source of the requested data is described in the ProviderDescription that was created when the property called Module.inject(...).
+      // The data model and property of the requested data have thus been described. Here we map the name of the requesting property to the ProviderDescription:
+      module.providersToInstall.set(prop, val);
+      // Also extend the providerDescription with the source (we can use this later to avoid an extra loop)
+      val.targetModule = module.name;
+      val.targetProperty = prop;
+      // We will use this mapping when this module gets instantiated: If this module has write-access to the provider (readOnly = false) we will install a strong pointer to the parent state into the consuming child instance.
+      // This is very performant and safe to do because whenever a parent state loses context, so will all of the child node graphs in its descending namespace.
 
-        // We found a property that wants to inject data from a parent state. The source of the requested data is described in the ProviderDescription that was created when the property called Module.inject(...).
-        // The data model and property of the requested data have thus been described. Here we map the name of the requesting property to the ProviderDescription:
-        module.providersToInstall.set(prop, val);
-        // Also extend the providerDescription with the source (we can use this later to avoid an extra loop)
-        val.targetModule = name;
-        val.targetProperty = prop;
-        // We will use this mapping when this module gets instantiated: If this module has write-access to the provider (readOnly = false) we will install a strong pointer to the parent state into the consuming child instance.
-        // This is very performant and safe to do because whenever a parent state loses context, so will all of the child node graphs in its descending namespace.
+      // Now we also have to create the inverse relationship ie. install this module as a consumer of the providing module under the respectively mapped property names.
+      // To avoid memory leaks and the need for manual disposing, the approach for the inverse is different: We will not install strong pointers of consuming child instances into providing parent instances.
+      // Instead, we simply create a consumer that has the string name of the module that is consuming from it. At mutation-time a stateInstance will query its underlying module for any consumers and traverse down
+      // its object-children and update any instances that match the consumer module description along the way to the furthest leaves. (make like a tree, McFly!)
+      referenceConsumer(module.name, prop, val.sourceModule, val.sourceProperty);
 
-        // Now we also have to create the inverse relationship ie. install this module as a consumer of the providing module under the respectively mapped property names.
-        // To avoid memory leaks and the need for manual disposing, the approach for the inverse is different: We will not install strong pointers of consuming child instances into providing parent instances.
-        // Instead, we simply create a consumer that has the string name of the module that is consuming from it. At mutation-time a stateInstance will query its underlying module for any consumers and traverse down
-        // its object-children and update any instances that match the consumer module description along the way to the furthest leaves. (make like a tree, McFly!)
-        referenceConsumer(name, prop, val.sourceModule, val.sourceProperty);
+    } else {
 
-      } else {
+      module.defaults[prop] = val;
 
-        module.defaults[prop] = val;
-
-      }
-
-    }
-
-  } else if (type === TYPE_ARRAY) {
-
-    for (i = 0; i < config.props.length; i++) {
-
-      val = config.props[i];
-
-      if (isFunction(val)) {
-
-        module.computed.set(i, {
-          ownPropertyName: i,
-          computation: val,
-          sourceProperties: [],
-          subDerivatives: [],
-          superDerivatives: []
-        });
-
-      } else if (val instanceof ProviderDescription) {
-
-        module.providersToInstall.set(i, val);
-        val.targetModule = name;
-        val.targetProperty = i;
-        referenceConsumer(name, i, val.sourceModule, val.sourceProperty);
-
-      } else {
-
-        module.defaults.push(val);
-
-      }
     }
 
   }

@@ -36,7 +36,6 @@ class StateInternals {
 
     // only a pointer to the module (shared)
     this.module = module;
-    this.type = module.type;
     this.name = module.name;
     this.consumersOf = module.consumersOf; // 2D map [propertyName -> [...ConsumerDescriptions]] ConsumerDescription = {targetModule: nameOfTargetModule, targetProperty: nameOfPropertyAsDefinedOnChild}
 
@@ -160,59 +159,17 @@ class StateInternals {
     if (consumers) {
       this.cueConsumers(this, consumers, prop, value, oldValue);
     }
-  }
 
-}
-
-// these special classes are optimized for either array or object traversal:
-
-class ArrayStateInternals extends StateInternals {
-
-  constructor(stateInstance, module, parent = null, ownPropertyName = '') {
-    super(stateInstance, module, parent, ownPropertyName);
   }
 
   cueConsumers(providerInstance, consumers, prop, value, oldValue) {
 
     // Find consumer instances and recurse into each branch
-    for (let i = 0, childState; i < this.instance.length; i++) { // we loop over each immediate child
 
-      childState = this.instance[i]; // a property on the child
+    let key, childState;
+    for (key in this.instance) {
 
-      if (childState && (childState = childState[__CUE__])) { // property is a child state instance
-
-        let provider;
-        for (provider of childState.providersOf.values()) { // TODO: we can probably cache the iterator returned from values()!
-          if (provider.sourceInstance === providerInstance && provider.sourceProperty === prop) {
-            // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
-            childState.propertyDidChange.call(childState, provider.targetProperty, value, oldValue); // continue recursion in this branch
-          }
-        }
-
-        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the found provided prop is provided further)
-        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value, oldValue);
-
-      }
-
-    }
-
-  }
-
-}
-
-class ObjectStateInternals extends StateInternals {
-
-  constructor(stateInstance, module, parent = null, ownPropertyName = '') {
-    super(stateInstance, module, parent, ownPropertyName);
-  }
-
-  cueConsumers(providerInstance, consumers, prop, value, oldValue) {
-
-    // Find consumer instances and recurse into each branch
-    const thisInstanceKeys = oKeys(this.instance);
-    for (let i = 0, childState; i < thisInstanceKeys.length; i++) { // we loop over each immediate child
-
-      childState = this.instance[thisInstanceKeys[i]]; // a property on the child
+      childState = this.instance[key];
 
       if (childState && (childState = childState[__CUE__])) { // property is a child state instance
 

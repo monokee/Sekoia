@@ -8,7 +8,7 @@
  */
 function referenceConsumer(targetModule, targetProperty, sourceModule, sourceProperty) {
 
-  const ConsumerReference = {targetModule, targetProperty};
+  const ConsumerReference = {targetModule, targetProperty, sourceModule, sourceProperty};
 
   // This is guaranteed to be available because it has to be a parent (ie something that had to be there before the child) to be a provider!
   const source = CUE_STATE_INTERNALS.get(sourceModule);

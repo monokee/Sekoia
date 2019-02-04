@@ -30,8 +30,10 @@ function injectProviders(childStateInternals, providersToInstall) {
       if (parent) { // found a parent instance that matches the consuming child module name
 
         parent = parent[__CUE__];
-        // -> Add the provider!
+
+        // -> inject the provider!
         childStateInternals.providersOf.set(targetProperty, {sourceInstance: parent, sourceProperty, targetModule, targetProperty});
+        console.log('Provider injected into childStateInternals:', childStateInternals);
 
       } else {
 

@@ -29,13 +29,13 @@ function proxySetHandler(target, prop, value) {
 
       const nestedInstance = value[__CUE__];
 
-      if (nestedInstance && nestedInstance.parent === null) {
+      if (nestedInstance && !nestedInstance.parent) {
 
         nestedInstance.parent = target;
         nestedInstance.ownPropertyName = prop;
 
         if (nestedInstance.module.providersToInstall.size > 0) {
-          injectProviders(nestedInstance, nestedInstance.providersToInstall);
+          injectProviders(nestedInstance, nestedInstance.module.providersToInstall);
         }
 
       }
@@ -52,7 +52,10 @@ function proxySetHandler(target, prop, value) {
       instance.propertyDidChange(prop, value, oldValue);
 
       // also queue reactions of the parent (when an immediate property of an object changes, the object itself has changed.) value on parent is this target object, the "oldTarget" a shallow copy of it.
-      instance.parent && instance.parent.propertyDidChange.call(instance.parent, instance.ownPropertyName, target, instance.type === TYPE_OBJECT ? oAssign({}, target) : target.slice());
+      if (instance.parent) {
+        const parentInstance = instance.parent[__CUE__];
+        parentInstance.propertyDidChange.call(parentInstance, instance.ownPropertyName, target, isArray(target) ? target.slice() : oAssign({}, target));
+      }
 
       // mutate the target object (this will not mutate the "oldTarget" shallow copy we created above)
       target[prop] = value;

@@ -26,7 +26,11 @@ function proxyDeleteHandler(target, prop) {
       const oldValue = instance.valueCache.get(prop);
 
       instance.propertyDidChange(prop, undefined, oldValue);
-      instance.parent && instance.parent.propertyDidChange.call(instance.parent, instance.ownPropertyName, target, instance.type === TYPE_OBJECT ? oAssign({}, target) : target.slice());
+
+      if (instance.parent) {
+        const parentInstance = instance.parent[__CUE__];
+        parentInstance.propertyDidChange.call(parentInstance, instance.ownPropertyName, target, isArray(target) ? target.slice() : oAssign({}, target));
+      }
 
       delete target[prop];
       instance.valueCache.delete(prop);

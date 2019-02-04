@@ -16,15 +16,20 @@
 <script src="modules/app/app-state.js"></script>
 <script src="modules/app/app-view.js"></script>
 
-<script type="text/javascript">
+<script>
 
   const app = Cue({
-    state: 'App-State',
-    ui: 'App-UI'
+    state: 'Root',
+    ui: 'Root-UI'
   });
 
   app.mount(document.body, {
-    name: 'Example'
+    name: 'Cue.js Example',
+    child: {
+      x: 420,
+      y: 3301,
+      disabled: false
+    }
   });
 
 </script>

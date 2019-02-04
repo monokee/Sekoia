@@ -34,10 +34,6 @@ const DERIVATIVE_INSTALLER = {
 const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
 
-// Used to identify the two supported state container types: plain arrays and plain objects
-const TYPE_ARRAY = 1;
-const TYPE_OBJECT = 2;
-
 // Meta Keys used for closure scope lookup && safely extending foreign objects
 const __CUE__ = Symbol('Cue State Internals');
 const __TARGET__ = Symbol('Target Object');
