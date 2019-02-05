@@ -47,6 +47,21 @@ function createStateInstance(factory, module, _parent, _ownPropertyName) {
     }
 
     // 3.4 Fill internal cache of Derivative
+    //TODO: this is problematic because it doesn't account for provided properties.
+    // Providers are only injected when the object is being attached to the node graph and this happens after this instantiation.
+    // So here, when the derivative calls fillCache on the instance, it pulls in all of its sourceProperties from instance to fill up its internal cache.
+    // However:
+    // A Provided Property is not anywhere to be found on the instance. Not on the instance directly (like default props) and neither on __proto__ (like the forwarding getters to superDerivatives).
+    // So how do we solve this?
+    // I think we should defer ANY further initialization into the proxySetHandler where we can guarantee that an instance has been attached to a parent node graph.
+    // There we will:
+    // 1. Assign parent/ownPropertyName.
+    // 2. Inject providers.
+    // 3. Create Derivatives and fill their cache. (this entire loop!)
+    // 4. Call instance.initialize() (because now everything is available in the method body!)
+    // For this to work provided properties should be installed as forwarding getters on the prototype like computed properties. (they are conceptually similar after all)
+    // These operations should be grouped into an internal "instanceDidMount" call that executes this initialization logic. (I'm now beginning to realize that we're essentially internalizing life-cycle. nice!)
+    //
     // (instance inherits from factory.prototype which contains forwarding-getters which trigger value computation in Derivative)
     derivative.fillCache(instance);
 

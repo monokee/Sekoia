@@ -31,10 +31,9 @@ Cue.State('Root.Child', Module => ({
       return {top: y, left: x};
     },
     positionInPixels({position}) {
-      console.log(position); // TODO: position is undefined here... why?
       return `Top: ${position.top}px | Left: ${position.left}px `;
     },
-    positionAndName({name, positionInPixels}) { // TODO: this doesn't seem to pull in "name" correctly because the entire computation is now unavailable!
+    positionAndName({name, positionInPixels}) {
       return `Local(computed): "${positionInPixels}", Injected: "${name}"`;
     }
   },
