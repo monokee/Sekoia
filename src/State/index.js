@@ -18,6 +18,9 @@ const CUE_STATE_MODULES = new Map();
 // Internals of State Modules for internally passing module data around: name -> object
 const CUE_STATE_INTERNALS = new Map();
 
+// Root State Store (is an array because it can have an infinite number of composites attached to it)
+const CUE_STATE_ROOT = [];
+
 // State Flags
 let isReacting = false; // is a reaction currently in process?
 let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?

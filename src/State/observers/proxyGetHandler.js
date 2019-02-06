@@ -11,12 +11,12 @@
  */
 function proxyGetHandler(target, prop) {
 
-  if (typeof prop === 'symbol') { // quick internal returns
+  if (typeof prop === 'symbol') { // internal recursion
 
     // note: only other available symbol that is not explicitly checked here is __TARGET__ so we return that if the other symbols dont match.
     return prop === __CUE__ ? target[__CUE__] : prop === __INTERCEPTED_METHODS__ ? target[__INTERCEPTED_METHODS__] : target;
 
-  } else if (!target.hasOwnProperty(prop)) { // quick prototype access
+  } else if (!target.hasOwnProperty(prop)) { // access prototype (computed/provided forwarders, actions, imports and native methods on sub-prototype)
 
     // this check works because we throw at registration time if a custom prototype method matches array mutator!
     return !ARRAY_MUTATORS.has(prop)
@@ -25,24 +25,13 @@ function proxyGetHandler(target, prop) {
 
   } else { // ownProperty access...
 
-    const internal = target[__CUE__];
-    const provider = internal.providersOf.get(prop);
-
-    if (provider) { // forward get to root provider
-      const rootProvider = getRootProvider(provider);
-      return rootProvider.sourceInstance.instance[rootProvider.sourceProperty];
-    }
-
     const value = target[prop];
 
-    // if value is falsy or value has cue instance, return value.
-    // if value is object that is not computed, wrap object and return proxy.
-    // else return value.
-    return !value || value[__CUE__]
-      ? value
-      : typeof value === 'object' && !internal.derivedProperties.has(prop)
-        ? createProxy(StateInternals.assignTo(value, internal.module, target, prop))
-        : value;
+    if (!value || value[__CUE__] || typeof value !== 'object') {
+      return value;
+    } else {
+      return createProxy(StateInternals.assignTo(value, target[__CUE__].module, target, prop));
+    }
 
   }
 

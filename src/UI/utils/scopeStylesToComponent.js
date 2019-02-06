@@ -8,7 +8,7 @@ function scopeStylesToComponent(styles, template) {
 
   for (className in styles) {
 
-    uniqueClassName = createUniqueClassName(className);
+    uniqueClassName = createUID(className);
 
     ruleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName} {}`, CUE_UI_STYLESHEET.cssRules.length);
     ruleStyle = CUE_UI_STYLESHEET.cssRules[ruleIndex].style;

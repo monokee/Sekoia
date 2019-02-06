@@ -1,10 +1,8 @@
 
-const CUE_EVENT_BUS_API = {};
+CUE_API.EventBus = wrap(() => {
 
-{ // wrap in extra closure
-
-  const CUE_EVENTS = new Map();
-  const CUE_EVENTS_ARGS_ERROR = `Can't add listener because the provided arguments are invalid.`;
+  const eventStore = new Map();
+  const eventError = `Can't add listener because the provided arguments are invalid.`;
 
   let _type, _handler, _scope, _events, _event, _disposable = [];
 
@@ -14,15 +12,14 @@ const CUE_EVENT_BUS_API = {};
       scope  : scope,
       once   : once
     };
-    if (CUE_EVENTS.has(type)) {
-      CUE_EVENTS.get(type).push(event);
+    if (eventStore.has(type)) {
+      eventStore.get(type).push(event);
     } else {
-      CUE_EVENTS.set(type, [event]);
+      eventStore.set(type, [event]);
     }
   };
 
   const addEvents = (events, scope, once) => {
-
     for (_type in events) {
       _handler = events[_type];
       if (isFunction(_handler)) {
@@ -32,8 +29,8 @@ const CUE_EVENT_BUS_API = {};
       }
     }
   };
-
-  oAssign(CUE_EVENT_BUS_API, {
+  
+  return {
 
     on: (type, handler, scope) => {
       if (isObjectLike(type)) {
@@ -43,7 +40,7 @@ const CUE_EVENT_BUS_API = {};
         _scope = isObjectLike(scope) ? scope : null;
         addEvent(type, handler, _scope, false);
       } else {
-        throw new TypeError(CUE_EVENTS_ARGS_ERROR);
+        throw new TypeError(eventError);
       }
     },
 
@@ -55,29 +52,29 @@ const CUE_EVENT_BUS_API = {};
         _scope = isObjectLike(scope) ? scope : null;
         addEvent(type, handler, _scope, true);
       } else {
-        throw new TypeError(CUE_EVENTS_ARGS_ERROR);
+        throw new TypeError(eventError);
       }
     },
 
     off: type => {
-      CUE_EVENTS.delete(type);
+      eventStore.delete(type);
     },
 
     trigger: (type, ...payload) => {
-      if ((_events = CUE_EVENTS.get(type))) {
+      if ((_events = eventStore.get(type))) {
         for (let i = 0; i < _events.length; i++) {
           _event = _events[i];
           _event.handler.apply(_event.scope, payload);
           if (_event.once) _disposable.push(_event);
         }
         if (_disposable.length) {
-          CUE_EVENTS.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
+          eventStore.set(type, _events.filter(event => _disposable.indexOf(event) === -1));
           _disposable.splice(0, _disposable.length);
         }
         _events = null;
       }
     }
-
-  });
-
-}
+    
+  }
+  
+});

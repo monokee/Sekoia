@@ -1,7 +1,7 @@
 Cue.State('Root', Module => ({
 
   imports: {
-    Child: Module.import('Root.Child')
+    Child: Module.import('Root-Child')
   },
 
   props: {
@@ -16,7 +16,7 @@ Cue.State('Root', Module => ({
 
 }));
 
-Cue.State('Root.Child', Module => ({
+Cue.State('Root-Child', Module => ({
 
   imports: {
     //Limbs: Module.import('Character.Limbs')
@@ -42,8 +42,7 @@ Cue.State('Root.Child', Module => ({
     this.x = props.x;
     this.y = props.y;
     this.disabled = props.disabled;
-    // TODO: injected prop is definitely undefined in initialize. not good. it has to be forwarded to the source (Root in this case)
-    //console.log('injected name (at initialize time)', this.name);
+    console.log('init Root.Child', this);
   },
 
   willChange: { //TODO: implement interceptors

@@ -8,7 +8,7 @@ function scopeKeyframesToComponent(keyframes) {
 
   for (name in keyframes) {
 
-    uniqueName = createUniqueClassName(name);
+    uniqueName = createUID(name);
 
     framesIndex = CUE_UI_STYLESHEET.insertRule(`@keyframes ${uniqueName} {}`, CUE_UI_STYLESHEET.cssRules.length);
     framesSheet = CUE_UI_STYLESHEET.cssRules[framesIndex];

@@ -16,33 +16,20 @@ function proxySetHandler(target, prop, value) {
 
     const instance = target[__CUE__];
 
-    const provider = instance.providersOf.get(prop);
+    // Mount instances onto their parent
+    const nestedInstance = value ? value[__CUE__] : undefined;
+    nestedInstance && !nestedInstance.parent && nestedInstance.instanceDidMount.call(nestedInstance, target, prop);
 
-    if (provider) {
-      // forward the set request to the root of the data (it will ripple back through the system from there!)
-      const rootProvider = getRootProvider(provider);
-      rootProvider.sourceInstance.instance[rootProvider.sourceProperty] = value;
+    // Forward set request to root provider (TODO: should we check here if provider has write-access?)
+    if (instance.providersOf.has(prop)) {
+      // triggers forwarding setter on prototype until we arrive at the root provider.
+      // at the root provider this check will fail (no more providers) and the actual property will be set.
+      target[prop] = value;
       return true;
     }
 
-    if (value) {
+    // Handle normal set requests
 
-      const nestedInstance = value[__CUE__];
-
-      if (nestedInstance && !nestedInstance.parent) {
-
-        nestedInstance.parent = target;
-        nestedInstance.ownPropertyName = prop;
-
-        if (nestedInstance.module.providersToInstall.size > 0) {
-          injectProviders(nestedInstance, nestedInstance.module.providersToInstall);
-        }
-
-      }
-
-    }
-
-    // get old value from cache
     const oldValue = instance.valueCache.get(prop);
 
     // compare to cache
@@ -66,7 +53,6 @@ function proxySetHandler(target, prop, value) {
       // run through all reactions in the queue
       react();
 
-      // done.
       return true;
 
     }

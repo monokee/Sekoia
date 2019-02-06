@@ -8,13 +8,13 @@
  *
  */
 
-const _CUE_VERSION_ = 0.9;
-
 // Cue Scoped Utils and Helpers (available anywhere in the library)
+// A lot of these are used for better minification.
 const NOOP = ()=>{};
 
 // All mutating array methods
 const ARRAY_MUTATORS = new Set(['copyWithin','fill','pop','push','reverse','shift','sort','splice','unshift']);
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
 
 // Builtins
 const OBJ = Object;
@@ -40,9 +40,20 @@ const isPlainObject = o => isObjectLike(o) && (oProtoToString.call(o) === OBJ_ID
 const isFunction = fn => typeof fn === 'function';
 const wrap = fn => fn();
 
+let uid = 0;
+const createUID = name => {
+  let n, o = '', alphaHex = uid.toString(26).split('');
+  while ((n = alphaHex.shift())) o += ALPHABET[parseInt(n, 26)];
+  uid++;
+  return `${name||'cue'}_${o}`;
+};
+
 // Cue Library Object
 const LIB = {};
 // Cue State Library Object
 const STATE_MODULE = oCreate(LIB);
 // Cue UI Library Object
 const UI_COMPONENT = oCreate(LIB);
+
+// Cue API Object that internal modules attach their public api to (properties will be exposed on global.Cue)
+const CUE_API = {};

@@ -10,11 +10,12 @@ const SOURCE_DIR = 'src';
 const BUILD_DIR = 'build';
 
 const MODULES = {
-  eventBus: SOURCE_DIR + '/EventBus',
-  state:    SOURCE_DIR + '/State',
-  ui:       SOURCE_DIR + '/UI',
-  plugin:   SOURCE_DIR + '/Plugin',
-  library:  SOURCE_DIR + '/Library',
+  eventBus:   SOURCE_DIR + '/EventBus',
+  state:      SOURCE_DIR + '/State',
+  ui:         SOURCE_DIR + '/UI',
+  plugin:     SOURCE_DIR + '/Plugin',
+  composite:  SOURCE_DIR + '/Composite',
+  library:    SOURCE_DIR + '/Library',
 };
 
 const FILES = {
@@ -52,7 +53,6 @@ const FILES = {
     `${MODULES.state}/module/StateInternals.js`,
     `${MODULES.state}/module/createStateInstance.js`,
     `${MODULES.state}/module/createStateFactory.js`,
-    `${MODULES.state}/module/extendStateFactoryPrototype.js`,
     `${MODULES.state}/module/initializeStateModule.js`,
     `${MODULES.state}/module/createStateFactoryInitializer.js`,
 
@@ -66,7 +66,6 @@ const FILES = {
     `${MODULES.ui}/proto.js`,
 
     `${MODULES.ui}/utils/CueStylesheet.js`,
-    `${MODULES.ui}/utils/createUniqueClassName.js`,
     `${MODULES.ui}/utils/replaceClassNameInElement.js`,
     `${MODULES.ui}/utils/scopeStylesToComponent.js`,
     `${MODULES.ui}/utils/scopeKeyframesToComponent.js`,
@@ -87,8 +86,10 @@ const FILES = {
     `${MODULES.plugin}/index.js`,
     `${MODULES.plugin}/public-api.js`,
   ],
+  composite: [
+    `${MODULES.composite}/CueComposite.js`
+  ],
   publicAPI: [
-    `${SOURCE_DIR}/proto.js`,
     `${SOURCE_DIR}/public-api.js`
   ],
   library: [
@@ -110,6 +111,7 @@ gulp.task('build-lib', function() {
       ...FILES.state,
       ...FILES.ui,
       ...FILES.plugin,
+      ...FILES.composite,
       ...FILES.publicAPI,
       ...FILES.library
     ])

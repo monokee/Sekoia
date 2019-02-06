@@ -1,7 +1,7 @@
 
-const CUE_PLUGINS_API = {
+CUE_API.Plugin = {
 
-  Plugin: (name, installer, autoinstall) => {
+  register: (name, installer, autoinstall) => {
 
     if (!isPluginNameValid(name)) {
       throw new Error(`Plugin must be defined with a namespaced-name (vendor-plugin) of type string as the first argument.`);

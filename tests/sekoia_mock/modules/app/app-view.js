@@ -78,11 +78,9 @@ Cue.UI('Root-UI', Component => ({
 
   initialize(state) {
     this.state = state;
-    const {top, viewer, myButton, bottom} = this.refs();
-    this.top = top;
+    const {viewer, bottom} = this.refs();
     this.bottom = bottom;
     this.viewer = viewer;
-    this.myButton = myButton;
   },
 
   bindEvents: {
@@ -98,6 +96,7 @@ Cue.UI('Root-UI', Component => ({
     mousemove: {
       '.sectionMid'(e) {
         if (!this.md) return;
+        console.log('mousemove. settings state.child.x');
         this.state.child.x = e.clientX;
         this.state.child.y = e.clientY;
       }
@@ -112,8 +111,6 @@ Cue.UI('Root-UI', Component => ({
   renderState: {
 
     name(o) {
-      // TODO: the definition of this function triggers a GET on root which has the correct value. where is this bugggggggg
-      console.log('renderState: name (likely on Root?)');
       this.bottom.textContent = o.value;
     },
 
