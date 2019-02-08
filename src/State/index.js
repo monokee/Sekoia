@@ -18,8 +18,8 @@ const CUE_STATE_MODULES = new Map();
 // Internals of State Modules for internally passing module data around: name -> object
 const CUE_STATE_INTERNALS = new Map();
 
-// Root State Store (is an array because it can have an infinite number of composites attached to it)
-const CUE_STATE_ROOT = [];
+// Root State Store
+const CUE_ROOT_STATE = {};
 
 // State Flags
 let isReacting = false; // is a reaction currently in process?
@@ -39,8 +39,11 @@ const TRAVERSE_UP = 1;
 
 // Meta Keys used for closure scope lookup && safely extending foreign objects
 const __CUE__ = Symbol('Cue State Internals');
+const __IS_STATE_INTERNAL__ = Symbol('Instance of StateInternals');
 const __TARGET__ = Symbol('Target Object');
 const __INTERCEPTED_METHODS__ = Symbol('Intercepted Methods');
+
+const MUTATION_WHILE_REACTING_WARNING = `State mutation ignored. Don't mutate state in a reaction. Refactor to computed properties instead.`;
 
 // Reaction Queue
 const MAIN_QUEUE = [];

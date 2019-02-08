@@ -18,17 +18,6 @@
 
 <script>
 
-  //TODO: This never mounts to anything so instanceDidMount is never called
-  // I would love a Cue instance to be a lego brick that can be composed further into another context using the same, albeit simpler mechanics that cue instances use internally.
-  // how can this be achieved?
-  // app.mount can be mounted onto another app instance.
-  // when it is mounted onto another app instance, the state is composed and attached.
-  // when app is not mounted into another app instance but onto a dom element, we attach the store to the global cue root store object.
-  // all changes of instances attached to the root store will bubble to this special root store which is always guaranteed to the be the global object of an application, no matter how
-  // fragmented it is internally.
-  // nice.
-
-  //
   const app = Cue({
     state: 'Root',
     ui: 'Root-UI'
@@ -42,6 +31,10 @@
       y: 3301,
       disabled: false
     }
+  });
+
+  Cue.on('logRootState', state => {
+    console.table(state);
   });
 
 </script>

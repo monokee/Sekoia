@@ -18,11 +18,14 @@ function proxySetHandler(target, prop, value) {
 
     // Mount instances onto their parent
     const nestedInstance = value ? value[__CUE__] : undefined;
-    nestedInstance && !nestedInstance.parent && nestedInstance.instanceDidMount.call(nestedInstance, target, prop);
 
-    // Forward set request to root provider (TODO: should we check here if provider has write-access?)
+    if (nestedInstance && nestedInstance.parentInternals === null) {
+      nestedInstance.instanceDidMount.call(nestedInstance, target, prop);
+    }
+
+    // Forward set request to root provider
     if (instance.providersOf.has(prop)) {
-      // triggers forwarding setter on prototype until we arrive at the root provider.
+      // triggers forwarding setter on prototype until we arrive at the root provider (warns if setting a read-only)
       // at the root provider this check will fail (no more providers) and the actual property will be set.
       target[prop] = value;
       return true;
@@ -36,12 +39,11 @@ function proxySetHandler(target, prop, value) {
     if (value !== oldValue) {
 
       // queue reactions
-      instance.propertyDidChange(prop, value, oldValue);
+      instance.propertyDidChange.call(instance, prop, value, oldValue);
 
       // also queue reactions of the parent (when an immediate property of an object changes, the object itself has changed.) value on parent is this target object, the "oldTarget" a shallow copy of it.
-      if (instance.parent !== null) {
-        const parentInstance = instance.parent[__CUE__];
-        parentInstance.propertyDidChange.call(parentInstance, instance.ownPropertyName, target, isArray(target) ? target.slice() : oAssign({}, target));
+      if (instance.parentInternals && instance.parentInternals[__IS_STATE_INTERNAL__]) {
+        instance.parentInternals.propertyDidChange.call(instance.parentInternals, instance.ownPropertyName, target, isArray(target) ? target.slice() : oAssign({}, target));
       }
 
       // mutate the target object (this will not mutate the "oldTarget" shallow copy we created above)

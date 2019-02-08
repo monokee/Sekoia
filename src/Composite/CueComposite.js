@@ -3,17 +3,14 @@ class CueComposite {
 
   constructor(config) {
 
-    if (!isObjectLike(config)) throw new TypeError('[Cue]: config is not an object.');
+    if (!isObjectLike(config)) throw new TypeError('Cue config must be an object.');
 
-    this.state = {
-      module: config.state,
-      instance: null
-    };
+    this.stateModule = config.state;
+    this.stateInstance = null;
+    this.stateInternals = null;
 
-    this.ui = {
-      component: config.ui,
-      element: null
-    };
+    this.uiComponent = config.ui;
+    this.uiElement = null;
 
     this.mounted = false;
 
@@ -23,35 +20,39 @@ class CueComposite {
 
     if (this.mounted === true) throw new Error('Cue instance already mounted.');
 
-    if (typeof this.state.module === 'string') {
-      this.state.module = STATE_MODULE.import(this.state.module);
-    } else if (typeof this.state.module === 'function' || typeof this.state.module === 'object') {
-      const uniqueModuleName = createUID('cue_module');
-      CUE_API.State.register(uniqueModuleName, this.state.module);
-      this.state.module = STATE_MODULE.import(uniqueModuleName);
+    // Assign / Register the State Module
+    let stateModuleName;
+    if (typeof this.stateModule === 'string') {
+      stateModuleName = this.stateModule;
+    } else if (typeof this.stateModule === 'function' || typeof this.stateModule === 'object') {
+      stateModuleName = createUID('cue_module');
+      CUE_API.State.register(stateModuleName, this.stateModule);
     }
 
-    if (typeof this.ui.component === 'string') {
-      this.ui.component = UI_COMPONENT.import(this.ui.component);
-    } else if (typeof this.ui.component === 'function' || typeof this.ui.component === 'object') {
-      const uniqueComponentName = createUID('cue_component');
-      CUE_API.UI.register(uniqueComponentName, this.ui.component);
-      this.ui.component = UI_COMPONENT.import(uniqueComponentName);
+    // Assign / Register the UI Component
+    let uiComponentName;
+    if (typeof this.uiComponent === 'string') {
+      uiComponentName = this.uiComponent;
+    } else if (typeof this.uiComponent === 'function' || typeof this.uiComponent === 'object') {
+      uiComponentName = createUID('cue_component');
+      CUE_API.UI.register(uiComponentName, this.uiComponent);
     }
 
+    const stateFactory = STATE_MODULE.import(stateModuleName);
+    const uiFactory = UI_COMPONENT.import(uiComponentName);
+
+    // Parse the Target UI Element
     target = typeof target === 'string' ? document.querySelector(target) : target instanceof Element ? target : undefined;
-    
     if (!target) throw new TypeError(`Target must be a valid DOM Element or DOM Selector String.`);
 
-    // instantiate
-    this.state.instance = this.state.module(props);
-    this.ui.element = this.ui.component(this.state.instance);
+    // Create State Instance (this returns a proxy)
+    const stateInstance = this.stateInstance = stateFactory(props);
+    const stateInternals = this.stateInternals = stateInstance[__CUE__];
+    stateInternals.instanceDidMount.call(stateInternals, CUE_ROOT_STATE, stateModuleName);
 
-    //TODO: now, where do I attach the state? I could attach it to an arbitrary root store. does this superstate have to be persisted structurally? can props be injected into the superstate?
-    // if so, we have to return the unique id of the state if it has been automatically created so that it can be referenced somehow. Think about this. Draw it out. Write the code how you would
-    // ideally want to write it. Think in Legos.
-
-    target.appendChild(this.ui.element);
+    // Create UI Element and append it to the target
+    const uiElement = this.uiElement = uiFactory(stateInstance);
+    target.appendChild(uiElement);
 
     this.mounted = true;
 
@@ -65,12 +66,32 @@ class CueComposite {
       throw new Error(`Can't unmount Cue instance because it has not been mounted.`);
     }
 
-    this.ui.element.parentElement.removeChild(this.ui.element);
+    this.uiElement.parentElement.removeChild(this.uiElement);
 
-    this.ui.element = null;
-    this.state.instance = null;
+    this.uiElement = null;
+    this.stateInstance = null;
+    this.stateInternals = null;
 
     this.mounted = false;
+
+    return this;
+
+  }
+
+  getState(asJSON) {
+    if (!this.stateInstance) {
+      throw new ReferenceError(`State can't be "${typeof this.stateInstance}" when getting it. Mount the Cue Instance first.`);
+    } else {
+      return this.stateInternals.retrieveState.call(this.stateInternals, asJSON);
+    }
+  }
+
+  setState(props) {
+    if (!this.stateInstance) {
+      throw new ReferenceError(`State can't be "${typeof this.stateInstance}" when setting it. Mount the Cue Instance first.`);
+    } else {
+      this.stateInternals.applyState.call(this.stateInternals, props);
+    }
 
     return this;
 

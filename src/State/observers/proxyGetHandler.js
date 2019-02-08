@@ -17,20 +17,33 @@ function proxyGetHandler(target, prop) {
     return prop === __CUE__ ? target[__CUE__] : prop === __INTERCEPTED_METHODS__ ? target[__INTERCEPTED_METHODS__] : target;
 
   } else if (!target.hasOwnProperty(prop)) { // access prototype (computed/provided forwarders, actions, imports and native methods on sub-prototype)
-
     // this check works because we throw at registration time if a custom prototype method matches array mutator!
     return !ARRAY_MUTATORS.has(prop)
       ? target[prop] // forward to the prototype
-      : target[__INTERCEPTED_METHODS__].get(prop) || (target[__INTERCEPTED_METHODS__].set(prop, createInterceptedArrayMutator(value))).get(prop); // cache an array mutator
+      : target[__INTERCEPTED_METHODS__].get(prop) || (target[__INTERCEPTED_METHODS__].set(prop, createInterceptedArrayMutator(prop, target[prop]))).get(prop); // cache an array mutator
 
   } else { // ownProperty access...
 
     const value = target[prop];
 
     if (!value || value[__CUE__] || typeof value !== 'object') {
+
       return value;
+
     } else {
-      return createProxy(StateInternals.assignTo(value, target[__CUE__].module, target, prop));
+
+      const parentModule = target[__CUE__].module;
+
+      const subState = createStateInstance(isArray(value)
+        ? createArrayWithCustomPrototype(value, parentModule.prototype)
+        : createObjectWithCustomPrototype(value, parentModule.prototype),
+        parentModule
+      );
+
+      subState.internals.subInstanceDidMount.call(subState.internals, target, prop);
+
+      return (target[prop] = subState.proxyState);
+
     }
 
   }

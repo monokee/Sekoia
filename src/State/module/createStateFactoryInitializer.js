@@ -11,19 +11,28 @@
 
 function createStateFactoryInitializer(module, initializer) {
 
+  // A function that runs once to initialize itself, then overwrites itself with the factory function it creates for subsequent calls
   return props => {
 
-    // lazily initialize the core module the first time an instance is created from it.
-    initializeStateModule(module, initializer);
+    // 1. lazily initialize the core state module
+    module = buildStateModule(module, initializer);
 
-    // Create a Factory Function that will be used to instantiate the module
-    const StateFactory = createStateFactory(module);
+    // 2. build the inheritable prototype for state module
+    const prototype = buildStateModulePrototype(module);
 
-    // Overwrite this initialization function with the StateFactory for subsequent calls
+    // 3. create a state factory function
+    const StateFactory = props => {
+      // 3.1. Create an object by deep cloning default data that inherits from prototype.
+      const data = oAssign(oCreate(prototype), deepClonePlainObject(module.defaults));
+      // 3.2. Enhance the cloned data with reactive Cue Internals and return the PROXY STATE object.
+      return createStateInstance(data, module, props).proxyState;
+    };
+
+    // 4. overwrite this initialization function with the StateFactory for subsequent calls
     CUE_STATE_MODULES.set(name, StateFactory);
 
-    // Call the StateFactory and return the result
-    return StateFactory.call(null, props);
+    // 5. call the StateFactory and return the result
+    return StateFactory.call(prototype, props);
 
   }
   

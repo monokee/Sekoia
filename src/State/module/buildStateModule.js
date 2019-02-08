@@ -2,12 +2,13 @@
 /**
  * Creates a reusable State Module. A module is a blueprint from which factories can create instances of State.
  * When moduleInitializer argument is a function it must be called with "Module" utility object as the first argument to make it available in the returned, public module configuration object.
- * @function initializeStateModule
+ * @function buildStateModule
  * @param   {object}            module            - The shared module object to which this function will add static module data (at this point it only contains the name).
  * @param   {(object|function)} moduleInitializer - The module configuration. When it is a function it is called with the "Module" utility object and must return a plain configuration pojo.
+ * @returns {object}            module            - The extended module
  * */
 
-function initializeStateModule(module, moduleInitializer) {
+function buildStateModule(module, moduleInitializer) {
 
   // when function, we call it with STATE_MODULE namespace so that the "Module" utility namespace object is publicly available (see proto.js)
   const config = isFunction(moduleInitializer) ? moduleInitializer(STATE_MODULE) : moduleInitializer;
@@ -20,35 +21,15 @@ function initializeStateModule(module, moduleInitializer) {
     throw new TypeError(`State Module requires "props" pojo containing default and optional computed properties.`);
   }
 
-  /**
-   * Module is the internal representation of a state component from which instances can be created.
-   * Properties on the internal module differ from those on the public interface.
-   * @namespace module
-   * @property {string}   name                      - the unique name of the module.
-   * @property {object}   defaults                  - contains public "props" that are not functions
-   * @property {Map}      computed                  - contains public "props" that are functions (will be resolved by dependency order)
-   * @property {Map}      interceptors              - contains public "willChange" methods that intercept property changes before they are written to state instances TODO: willChange - not implemented
-   * @property {Map}      reactions                 - contains public "didChange" methods which trigger side-effects after a property on a state instance has changed TODO: didChange - not implemented
-   * @property {Map}      providersToInstall        - contains ProviderDescription objects for properties that are being injected into the state from a parent state. Will be used at instantiation time, will be cleared
-   * @property {Map}      consumersOf               - contains ConsumerDescription objects that will be used by instances to find child state instances that match the description. Persisted throughout and passed to StateInternals!
-   * @property {function} initialize                - a pseudo-constructor function which, when defined, is called initially after an internal state-instance has been created. Defaults to NOOP.
-   * @property {object}   actions                   - contains any methods from public module (except built-ins like initialize). These methods will be shared on the module prototype.
-   * @property {boolean}  static                    - indicates whether module.defaults should be cloned for each instance (true, default behaviour) or shared between all instances (false)
-   * @property {object}   imports                   - contains sub-modules this modules extends itself with
-   */
-
-  oAssign(module, {
-    defaults: {},
-    computed: new Map(),
-    interceptors: new Map(),
-    reactions: new Map(),
-    providersToInstall: new Map(),
-    consumersOf: new Map(),
-    initialize: NOOP,
-    actions: {},
-    static: config.static === true,
-    imports: config.imports
-  });
+  module.defaults = {};
+  module.computed = new Map();
+  module.interceptors = new Map();
+  module.reactions = new Map();
+  module.providersToInstall = new Map();
+  module.consumersOf = new Map();
+  module.initialize = NOOP;
+  module.actions = {};
+  module.imports = config.imports;
 
   // 1. Split props into defaults, computed properties and injected properties.
   // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances of this module.
@@ -137,5 +118,7 @@ function initializeStateModule(module, moduleInitializer) {
     if (!isFunction(val)) throw new TypeError(`Module.didChange handler for "${prop}" is not a function.`);
     module.reactions.set(prop, val);
   }
+
+  return module;
 
 }

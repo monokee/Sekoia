@@ -71,11 +71,6 @@ Cue.UI('Root-UI', Component => ({
 
   },
 
-  imports: {
-    //mySubComponent: Component.import('MySubUIComponent'),
-    //Scopes: Component.import('Utils.ScopesView')
-  },
-
   initialize(state) {
     this.state = state;
     const {viewer, bottom} = this.refs();
@@ -84,9 +79,10 @@ Cue.UI('Root-UI', Component => ({
   },
 
   bindEvents: {
-    contextmenu(e) {
-      e.preventDefault();
-      this.state.child.disabled = !this.state.child.disabled;
+    click: {
+      '.myButton'(e) {
+        Cue.trigger('logRootState', this.state.get());
+      }
     },
     mousedown: {
       '.sectionMid'(e) {
@@ -96,12 +92,12 @@ Cue.UI('Root-UI', Component => ({
     mousemove: {
       '.sectionMid'(e) {
         if (!this.md) return;
-        console.log('mousemove. settings state.child.x');
-        this.state.child.x = e.clientX;
-        this.state.child.y = e.clientY;
+        this.state.children[0].x = e.clientX;
+        this.state.children[0].y = e.clientY;
       }
     },
     mouseup(e) {
+      console.log(this.state);
       if (e.which === 1) {
         this.md = false;
       }
@@ -114,8 +110,11 @@ Cue.UI('Root-UI', Component => ({
       this.bottom.textContent = o.value;
     },
 
-    child(o) {
-      this.viewer.textContent = `Child data has changed! PositionAndName: ${o.value.positionAndName}`;
+    children(o) {
+      if (o.value.length) {
+        console.log('render:children', o.value);
+        this.viewer.textContent = `Some child's data has changed! PositionAndName: ${o.value[0].positionAndName}`;
+      }
     }
 
   }

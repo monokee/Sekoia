@@ -1,23 +1,38 @@
 
 /**
- * Creates a new instance of a State Module
- * @function createStateInstance
- * @param {function}          factory             - StateFactory function used to create this instance. We care about its prototype Object.
- * @param {object}            module              - The module blueprint containing data and method objects that are shared between all instances.
- * @param {object}            props               - Props passed to the factory function creating this instance.
- * @param {object}            [_parent]           - If known at instantiation time, the parent object graph to which the new instance is attached in the state tree.
- * @param {string}            [_ownPropertyName]  - If known at instantiation time, the property name of the new state instance on the parent object graph in the state tree.
- * @returns {object}          instance            - A new instance of the state module. Deep cloned from the defaults.
- * */
+ * Creates a state instance from a data object and a module blueprint. The data is expected to be unique in the state tree (no circular reference).
+ * When available, the parent object and the ownPropertyName of the data object on the parent object can be passed.
+ * When called from a StateFactory function, props can be passed in so that the internals can later pass those props into the initialize function of the instance.
+ * @param {object}          data              - The data that will be turned into a cue state instance.
+ * @param {object}          module            - The module blueprint the instance inherits from.
+ * @param {(object|null)}   [props]           - When this function is called from a StateFactory that received props, we pass those props into the internals so that we can later call a modules initialize method with these props.
+ */
+function createStateInstance(data, module, props = null) {
 
-function createStateInstance(factory, module, props, _parent, _ownPropertyName) {
+  // 1. Attach Internals to "data" under private __CUE__ symbol.
+  const internals = data[__CUE__] = new StateInternals(module);
 
-  // 1. Create base instance by deep cloning the default props
-  const instance = oAssign(oCreate(factory.prototype), deepClonePlainObject(module.defaults));
+  // 2. Wrap "data" into a reactive proxy
+  const proxyState = new Proxy(data, {
+    get: proxyGetHandler,
+    set: proxySetHandler,
+    deleteProperty: proxyDeleteHandler
+  });
 
-  // 2. Create internals needed for Reactivity engine
-  instance[__CUE__] = new StateInternals(instance, module, props, _parent, _ownPropertyName);
+  // 3. Give Internals explicit reference to both the plain "data" and the wrapped proxy
+  internals.plainState = data;
+  internals.proxyState = proxyState;
 
-  return instance;
+  // 4. When called from a StateFactory, pass initial props to Internals
+  if (props !== null) {
+    internals.initialProps = props;
+  }
+
+  // 5. Return
+  return {
+    plainState: data,
+    proxyState: proxyState,
+    internals: internals
+  }
 
 }

@@ -50,10 +50,10 @@ const FILES = {
     `${MODULES.state}/reactions/cueAccumulated.js`,
     `${MODULES.state}/reactions/react.js`,
 
+    `${MODULES.state}/module/buildStateModule.js`,
+    `${MODULES.state}/module/buildStateModulePrototype.js`,
     `${MODULES.state}/module/StateInternals.js`,
     `${MODULES.state}/module/createStateInstance.js`,
-    `${MODULES.state}/module/createStateFactory.js`,
-    `${MODULES.state}/module/initializeStateModule.js`,
     `${MODULES.state}/module/createStateFactoryInitializer.js`,
 
     `${MODULES.state}/proto.js`,

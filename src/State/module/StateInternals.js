@@ -2,58 +2,83 @@
 /**
  * Attaches itself to a reactive state instance under private [__CUE__] symbol.
  * Properties and methods are required for reactivity engine embedded into every Cue State Instance
- * @class StateInternals
- * */
+ */
 class StateInternals {
 
-  /**
-   * Assign new StateInternals to private expando
-   * @param {object}  stateInstance     - The piece of state that the internals should be assigned to.
-   * @param {object}  module            - The module blueprint that the instance is based on.
-   * @param {object}  props             - The props passed to an initial factory function call that created the instance.
-   * @param {object} [parent]           - The parent object graph that the stateInstance is a child of
-   * @param {string} [ownPropertyName]  - The property name of the stateInstance on the parent object graph
-   * */
-  static assignTo(stateInstance, module, props, parent, ownPropertyName) {
-    stateInstance[__CUE__] = new this(module, stateInstance, props, parent, ownPropertyName);
-    return stateInstance;
-  }
+  constructor(module) {
 
-  /** Creates new instance of internals required for reactivity engine */
-  constructor(stateInstance, module, props, parent = null, ownPropertyName = '') {
+    // faster instanceof check
+    this[__IS_STATE_INTERNAL__] = true;
 
-    // INSTANCE SPECIFIC STUFF:
-    this.instance = stateInstance; // the reactive host data instance that these internals are attached to
-
-    this.parent = parent; // may be null at construction time
-    this.ownPropertyName = ownPropertyName; // may be unknown at construction time
-
-    this.initialProps = props; // can be nullified after the props have been merged into the state. required for calling "initialize" in instanceDidMount
-    this.isInitializing = false; // flag set while the "initialize" method of state instances is being executed. (blocks certain ops)
-
+    // value cache used for change detection
     this.valueCache = new Map(); // 1D map [propertyName -> currentValue]
-    this.observersOf = new Map(); // 1D map [propertyName -> handler]
-    this.derivativesOf = new Map(); // 2D map [propertyName -> 1D array[...Derivatives]]
-    this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
-    this.providersOf = new Map(); // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-    // MODULE STUFF: (pointers to the shared underlying module)
+    // Shortcut pointers to underlying module (shared by all instances of module)
     this.module = module;
     this.name = module.name;
     this.consumersOf = module.consumersOf; // 2D map [propertyName -> [...ConsumerDescriptions]] ConsumerDescription = {targetModule: nameOfTargetModule, targetProperty: nameOfPropertyAsDefinedOnChild}
 
+    // Will be assigned after construction
+    this.plainState = null; // the plain data object that these internals are attached to
+    this.proxyState = null; // the same data object but wrapped in a reactive proxy
+    this.parentInternals = null; // the [__CUE__] internals of the parent of the plain state data in the object node graph
+    this.ownPropertyName = ''; // the name of this instance on the parent node graph
+    this.initialProps = undefined; // when a factory function that created the state instance got passed any props, we store them here temporarily so that the props can later be passed up to the public initialize method.
+
   }
 
-  /**
-   * Add reaction handler to the list of "observersOf" under the property name they observe.
-   * @param   {object}    stateInstance     - The piece of state that should be observed
-   * @param   {string}    property          - The property name on the state instance that should be observed
-   * @param   {function}  handler           - The reaction that should be executed whenever the value of the observed property has changed
-   * @param   {object}    scope             - The "this" context the handler should be executed in (pre-bound)
-   * @param   {boolean}   [autorun = true]  - Whether the handler should be run once immediately after registration.
-   * @returns {function}  boundHandler      - The handler which has been bound to the passed scope.
-   */
-  addChangeReaction(stateInstance, property, handler, scope, autorun = true) {
+  retrieveState(asJSON) {
+
+    const state = {};
+
+    const ownProperties = oKeys(this.plainState);
+
+    for (let i = 0, prop, val, inst; i < ownProperties.length; i++) {
+
+      prop = ownProperties[i];
+      val = this.plainState[prop];
+
+      if (val && typeof val === 'object') {
+        inst = val ? val[__CUE__] : undefined;
+        if (inst) {
+          state[prop] = inst.retrieveState.call(inst, false);
+        } else {
+          state[prop] = isArray(val) ? deepCloneArray(val) : deepClonePlainObject(val);
+        }
+      } else {
+        state[prop] = val;
+      }
+    }
+
+    return asJSON ? JSON.stringify(state) : state;
+
+  }
+
+  applyState(props) {
+
+    // For batch-applying data collections from immutable sources.
+    // Internally reconciles the passed props with the existing state tree and only mutates the deltas.
+    // Immediate reactions of the mutated properties are collected on an accumulation stack.
+    // Only after the batch operation has finished, the accumulated reactions queue their dependencies and we react in a single flush.
+    //TODO: defer all recursive lookups involving provided properties (upstream/downstream) until after applyState is done reconciling.
+    // OR BETTER YET: completely work around any proxy interception for batch updates. create a specific set method that is called DIRECTLY from patchState
+    // that collects only unique immediate dependencies on an accumulation stack. after patchState has run, we explicitly cue up the dependencies of the accumulated dependencies (including setters to provided states)
+    // and only then react to the collective change in a single batch. This will be insanely performant because every change will only be evaluated and reacted to once. This is huge!
+    // THIS has the other advantage that I can also reduce the cue and react logic because we no longer have to check for accumulations as this is explicitly outsourced to a special callback.
+
+    if (props.constructor === String) {
+      props = JSON.parse(props);
+    }
+
+    isAccumulating = true;
+    patchState(this.parentInternals.proxyState, this.ownPropertyName, props);
+    isAccumulating = false;
+    cueAccumulated();
+    react();
+
+  }
+
+  addChangeReaction(property, handler, scope, autorun = true) {
 
     if (!isFunction(handler)) {
       throw new TypeError(`Property change reaction for "${property}" is not a function...`);
@@ -74,7 +99,7 @@ class StateInternals {
     }
 
     if (autorun === true) {
-      const val = stateInstance[property];
+      const val = this.plainState[property];
       boundHandler({value: val, oldValue: val});
     }
 
@@ -82,11 +107,6 @@ class StateInternals {
 
   }
 
-  /**
-   * Remove reaction handler(s) from "observersOf"
-   * @param {string}    property  - The property key of the state property that should be unobserved
-   * @param {function}  [handler] - The reaction handler to be removed. If not provided, remove all reactions for the passed property name
-   */
   removeChangeReaction(property, handler) {
 
     if (this.observersOf.has(property)) {
@@ -134,22 +154,22 @@ class StateInternals {
 
   }
 
-  /**
-   * Called from "set" interceptor when the instance has been attached to a parent node graph.
-   * Completes instance initialization logic. */
   instanceDidMount(parent, ownPropertyName) {
 
-    // For this to work provided properties should be installed as forwarding getters on the prototype like computed properties. (they are conceptually similar after all)
+    // COMPOSED INSTANCE
+    this.observersOf = new Map();       // 1D map [propertyName -> handler]
+    this.derivativesOf = new Map();     // 2D map [propertyName -> 1D array[...Derivatives]]
+    this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
+    this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-    // ALSO: The entire provider/consumer mechanism currently only works for root properties on an instance. If however an instance has specified a non-instance sub-object, should those properties
+    //TODO: The entire provider/consumer mechanism currently only works for root properties on an instance. If however an instance has specified a non-instance sub-object, should those properties
     // also be providable, and should they be consumable by properties on non-instance sub-objects of their children? If so, we need to change a few things:
     // - instead of property collection, we need to collect paths from the root instance of both providers and consumers.
     // - we need to explicitly forbid dots (.) in Module names and enforce other means of namespacing (hyphens etc) so that we can use dots exclusively for property path access.
     // - I think this feature should be provided because it would complete the idea and not come with much performance overhead (it's just an additional recursion into the sub-nodes of an instance).
-    //
 
     // 1. Assign Hierarchy
-    this.parent = parent;
+    this.parentInternals = parent[__CUE__] || CUE_ROOT_STATE; // will be undefined only when instance mounted to root store!
     this.ownPropertyName = ownPropertyName;
 
     // 2. Inject Providers
@@ -162,10 +182,25 @@ class StateInternals {
       this.installDerivatives();
     }
 
-    this.isInitializing = true;
-    this.module.initialize.call(this.instance, this.initialProps);
-    this.initialProps = undefined;
-    this.isInitializing = false;
+    // 4. Initialize instance with ProxyState as "this" and pass initialProps from factory (can be undefined)
+    this.module.initialize.call(this.proxyState, this.initialProps);
+    delete this.initialProps;
+
+  }
+
+  subInstanceDidMount(parent, ownPropertyName) {
+
+    // Variation of the instanceDidMount that is being called when a sub-state object has been created
+    // on an instance that is not based on an imported module. SubInstances inherit observers, derived and provided props from their parent module
+
+    const parentInternals = this.parentInternals = parent[__CUE__] || CUE_ROOT_STATE;
+    this.ownPropertyName = ownPropertyName;
+
+    // Inherit special properties from parent. These properties can only be owned by "smart" state that is based directly on a module.
+    this.observersOf = parentInternals.observersOf;
+    this.derivativesOf = parentInternals.derivativesOf;
+    this.derivedProperties = parentInternals.derivedProperties;
+    this.providersOf = parentInternals.derivedProperties;
 
   }
 
@@ -183,19 +218,17 @@ class StateInternals {
         targetProperty = description.targetProperty;
 
         // Traverse through the parent hierarchy until we find the first parent that has been created from a module that matches the name of the providerModule
-        let parent = this.parent;
+        let parentInternals = this.parentInternals;
 
-        while (parent && parent[__CUE__].name !== sourceModule) {
-          parent = parent[__CUE__].parent;
+        while (parentInternals && parentInternals.name !== sourceModule) {
+          parentInternals = parentInternals.parentInternals;
         }
 
-        if (parent) { // found a parent instance that matches the consuming child module name
-
-          parent = parent[__CUE__];
+        if (parentInternals) { // found a parent instance that matches the consuming child module name
 
           // -> inject the provider!
           // we have previously installed forwarding accessors on the prototype that will reach into the map on this instance:
-          this.providersOf.set(targetProperty, {sourceInstance: parent, sourceProperty, targetModule, targetProperty});
+          this.providersOf.set(targetProperty, {sourceInstance: parentInternals, sourceProperty, targetModule, targetProperty});
 
         } else {
 
@@ -215,7 +248,7 @@ class StateInternals {
     let vDerivative, i, derivative, sourceProperty, dependencies, superDerivative;
     for (vDerivative of this.module.computed.values()) {
 
-      // 3.0 Create instance
+      // 3.0 Create Derivative instance
       derivative = new Derivative(vDerivative.ownPropertyName, vDerivative.computation, vDerivative.sourceProperties);
 
       // 3.1 Install instance as derivedProp
@@ -241,21 +274,13 @@ class StateInternals {
       }
 
       // 3.4 Fill internal cache of Derivative
-      // (instance inherits from factory.prototype which contains forwarding-getters which trigger value computation in Derivative)
-      derivative.fillCache(this.instance);
+      // (plainState inherits from module.prototype which contains forwarding-getters which trigger value computation in Derivative)
+      derivative.fillCache(this.plainState);
 
     }
 
   }
 
-  /**
-   * Called from proxy interceptors when a value change of a state property has been detected.
-   * First it queues up the observers of the property and all direct + indirect derivatives of the property. (cueAll/cueImmediate)
-   * Then it propagates the change reaction recursively downwards by calling itself on all child instances that consume the property.
-   * @param   {string}  prop      - The property name of the changed value.
-   * @param   {*}       value     - The new value (after mutation)
-   * @param   {*}       oldValue  - The previous value (before mutation)
-   */
   propertyDidChange(prop, value, oldValue) {
 
     const observers = this.observersOf.get(prop);
@@ -284,9 +309,9 @@ class StateInternals {
     // Find consumer instances and recurse into each branch
 
     let key, childState;
-    for (key in this.instance) {
+    for (key in this.plainState) {
 
-      childState = this.instance[key];
+      childState = this.plainState[key];
 
       if (childState && (childState = childState[__CUE__])) { // property is a child state instance
 
@@ -298,7 +323,7 @@ class StateInternals {
           }
         }
 
-        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the found provided prop is provided further)
+        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the provided prop is also provided from another upstream state)
         childState.cueConsumers.call(childState, providerInstance, consumers, prop, value, oldValue);
 
       }

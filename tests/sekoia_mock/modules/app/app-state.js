@@ -6,21 +6,22 @@ Cue.State('Root', Module => ({
 
   props: {
     name: 'I am a superstate!',
-    child: {}
+    children: []
   },
 
   initialize(props) {
     this.name = props.name;
-    this.child = this.imports.Child(props.child);
+    console.log('initialize ROOT')
+    this.children.push(
+      this.imports.Child(props.child),
+      this.imports.Child(props.child),
+      this.imports.Child(props.child)
+    );
   }
 
 }));
 
 Cue.State('Root-Child', Module => ({
-
-  imports: {
-    //Limbs: Module.import('Character.Limbs')
-  },
 
   props: {
     x: 0,
@@ -42,7 +43,6 @@ Cue.State('Root-Child', Module => ({
     this.x = props.x;
     this.y = props.y;
     this.disabled = props.disabled;
-    console.log('init Root.Child', this);
   },
 
   willChange: { //TODO: implement interceptors

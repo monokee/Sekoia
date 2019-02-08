@@ -33,9 +33,7 @@ function installDependencies(allProperties, computedProperties) {
     try {
       // the computation itself will most definitely fail but we only care about the property dependencies so we can safely ignore all errors.
       derivative.computation.call(installer, installer);
-    } catch(e) {
-      console.warn(`Initial computation of ${derivative.ownPropertyName} failed.`, installer);
-    }
+    } catch(e) {}
 
   }
 
