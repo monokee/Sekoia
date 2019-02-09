@@ -39,11 +39,10 @@ const FILES = {
     `${MODULES.state}/derivatives/dependencyGetInterceptor.js`,
     `${MODULES.state}/derivatives/branchWalkers.js`,
 
-    `${MODULES.state}/observers/createProxy.js`,
-    `${MODULES.state}/observers/proxyGetHandler.js`,
-    `${MODULES.state}/observers/proxySetHandler.js`,
-    `${MODULES.state}/observers/proxyDeleteHandler.js`,
-    `${MODULES.state}/observers/createInterceptedArrayMutator.js`,
+    `${MODULES.state}/proxy/ArrayMutators.js`,
+    `${MODULES.state}/proxy/proxyGetHandler.js`,
+    `${MODULES.state}/proxy/proxySetHandler.js`,
+    `${MODULES.state}/proxy/proxyDeleteHandler.js`,
 
     `${MODULES.state}/reactions/cueAll.js`,
     `${MODULES.state}/reactions/cueImmediate.js`,
@@ -53,7 +52,7 @@ const FILES = {
     `${MODULES.state}/module/buildStateModule.js`,
     `${MODULES.state}/module/buildStateModulePrototype.js`,
     `${MODULES.state}/module/StateInternals.js`,
-    `${MODULES.state}/module/createStateInstance.js`,
+    `${MODULES.state}/module/createState.js`,
     `${MODULES.state}/module/createStateFactoryInitializer.js`,
 
     `${MODULES.state}/proto.js`,

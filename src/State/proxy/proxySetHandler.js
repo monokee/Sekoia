@@ -14,14 +14,13 @@ function proxySetHandler(target, prop, value) {
 
   if (!isReacting) {
 
-    const instance = target[__CUE__];
-
-    // Mount instances onto their parent
     const nestedInstance = value ? value[__CUE__] : undefined;
 
     if (nestedInstance && nestedInstance.parentInternals === null) {
       nestedInstance.instanceDidMount.call(nestedInstance, target, prop);
     }
+
+    const instance = target[__CUE__];
 
     // Forward set request to root provider
     if (instance.providersOf.has(prop)) {
@@ -39,12 +38,7 @@ function proxySetHandler(target, prop, value) {
     if (value !== oldValue) {
 
       // queue reactions
-      instance.propertyDidChange.call(instance, prop, value, oldValue);
-
-      // also queue reactions of the parent (when an immediate property of an object changes, the object itself has changed.) value on parent is this target object, the "oldTarget" a shallow copy of it.
-      if (instance.parentInternals && instance.parentInternals[__IS_STATE_INTERNAL__]) {
-        instance.parentInternals.propertyDidChange.call(instance.parentInternals, instance.ownPropertyName, target, isArray(target) ? target.slice() : oAssign({}, target));
-      }
+      instance.propertyDidChange.call(instance, prop, value);
 
       // mutate the target object (this will not mutate the "oldTarget" shallow copy we created above)
       target[prop] = value;

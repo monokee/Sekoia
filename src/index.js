@@ -1,20 +1,12 @@
 
 /*
  *
- * 🍑 Cue.js - Data Driven UI
+ * 🍑 Cue - Reactive Data-Driven Web Apps
  *
  * @author Jonathan M. Ochmann for color.io
  * Copyright 2019 Patchflyer GmbH
  *
  */
-
-// Cue Scoped Utils and Helpers (available anywhere in the library)
-// A lot of these are used for better minification.
-const NOOP = ()=>{};
-
-// All mutating array methods
-const ARRAY_MUTATORS = new Set(['copyWithin','fill','pop','push','reverse','shift','sort','splice','unshift']);
-const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
 
 // Builtins
 const OBJ = Object;
@@ -31,11 +23,9 @@ const oSetPrototypeOf = OBJ.setPrototypeOf;
 const oGetOwnPropertyDescriptors = OBJ.getOwnPropertyDescriptors;
 const oProtoToString = OBJ.prototype.toString;
 
-// Reflect methods
-const _apply = Reflect.apply;
-const _construct = Reflect.construct;
-
 // Utility methods
+const NOOP = ()=>{};
+const _construct = Reflect.construct;
 const oKeys = OBJ.keys;
 const isArray = ARR.isArray;
 const toArray = ARR.from;
@@ -45,6 +35,7 @@ const isFunction = fn => typeof fn === 'function';
 const wrap = fn => fn();
 
 let uid = 0;
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
 const createUID = name => {
   let n, o = '', alphaHex = uid.toString(26).split('');
   while ((n = alphaHex.shift())) o += ALPHABET[parseInt(n, 26)];

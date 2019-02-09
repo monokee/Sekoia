@@ -25,6 +25,8 @@ const CUE_ROOT_STATE = {};
 let isReacting = false; // is a reaction currently in process?
 let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
 const accumulatedDerivatives = []; // derivatives which are accumulated during batch operations (emptied after each batch!)
+// Reaction Queue
+const MAIN_QUEUE = [];
 
 // Global derivative installer payload
 const DERIVATIVE_INSTALLER = {
@@ -40,10 +42,8 @@ const TRAVERSE_UP = 1;
 // Meta Keys used for closure scope lookup && safely extending foreign objects
 const __CUE__ = Symbol('Cue State Internals');
 const __IS_STATE_INTERNAL__ = Symbol('Instance of StateInternals');
-const __TARGET__ = Symbol('Target Object');
-const __INTERCEPTED_METHODS__ = Symbol('Intercepted Methods');
 
-const MUTATION_WHILE_REACTING_WARNING = `State mutation ignored. Don't mutate state in a reaction. Refactor to computed properties instead.`;
+const STATE_TYPE_INSTANCE = 1;
+const STATE_TYPE_EXTENSION = 2;
 
-// Reaction Queue
-const MAIN_QUEUE = [];
+const ARRAY_MUTATOR_NAMES = new Set(['fill','push','unshift','splice','pop','shift','copyWithin','reverse','sort']);

@@ -32,7 +32,7 @@ function buildStateModule(module, moduleInitializer) {
   module.imports = config.imports;
 
   // 1. Split props into defaults, computed properties and injected properties.
-  // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances of this module.
+  // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances from this module.
 
   let prop, val;
   for (prop in config.props) {
@@ -63,7 +63,7 @@ function buildStateModule(module, moduleInitializer) {
       // Now we also have to create the inverse relationship ie. install this module as a consumer of the providing module under the respectively mapped property names.
       // To avoid memory leaks and the need for manual disposing, the approach for the inverse is different: We will not install strong pointers of consuming child instances into providing parent instances.
       // Instead, we simply create a consumer that has the string name of the module that is consuming from it. At mutation-time a stateInstance will query its underlying module for any consumers and traverse down
-      // its object-children and update any instances that match the consumer module description along the way to the furthest leaves. (make like a tree, McFly!)
+      // its object-children and update any instances that match the consumer module description along the way to the furthest leaves.
       referenceConsumer(module.name, prop, val.sourceModule, val.sourceProperty);
 
     } else {
@@ -95,7 +95,7 @@ function buildStateModule(module, moduleInitializer) {
 
     } else if (isFunction(val)) {
 
-      if (ARRAY_MUTATORS.has(prop)) {
+      if (ARRAY_MUTATOR_NAMES.has(prop)) {
         throw new Error(`Illegal action name "${prop}" on "${module.name}". The action clashes with native Array.prototype.${prop}.`);
       } else {
         module.actions[prop] = val;

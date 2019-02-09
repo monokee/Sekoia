@@ -13,7 +13,6 @@ function buildStateModulePrototype(module) {
 
     oDefineProperty(prototype, computedProp, {
       get() {
-        console.log('[get computed]', computedProp, this[__CUE__]);
         return this[__CUE__].derivedProperties.get(computedProp).value
       },
       set(meNot) {
@@ -82,10 +81,6 @@ function buildStateModulePrototype(module) {
       value: function(props) {
         this[__CUE__].applyState(props);
       }
-    },
-
-    [__INTERCEPTED_METHODS__]: {
-      value: new Map()
     }
 
   });

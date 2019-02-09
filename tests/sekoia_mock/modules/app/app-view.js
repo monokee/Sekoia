@@ -97,7 +97,6 @@ Cue.UI('Root-UI', Component => ({
       }
     },
     mouseup(e) {
-      console.log(this.state);
       if (e.which === 1) {
         this.md = false;
       }

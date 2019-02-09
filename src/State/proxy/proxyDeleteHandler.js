@@ -19,20 +19,14 @@ function proxyDeleteHandler(target, prop) {
       if (provider) {
         // forward the delete request to the root of the data (it will ripple back through the system from there!)
         const rootProvider = getRootProvider(provider);
-        delete rootProvider.sourceInstance.instance[rootProvider.sourceProperty];
+        delete rootProvider.sourceInstance.plainState[rootProvider.sourceProperty];
         return true;
       }
 
-      const oldValue = instance.valueCache.get(prop);
-
-      instance.propertyDidChange(prop, undefined, oldValue);
-
-      if (instance.parent) {
-        const parentInstance = instance.parent[__CUE__];
-        parentInstance.propertyDidChange.call(parentInstance, instance.ownPropertyName, target, isArray(target) ? target.slice() : oAssign({}, target));
-      }
+      instance.propertyDidChange.call(instance, prop, undefined);
 
       delete target[prop];
+
       instance.valueCache.delete(prop);
 
       react();

@@ -25,7 +25,7 @@ function createStateFactoryInitializer(module, initializer) {
       // 3.1. Create an object by deep cloning default data that inherits from prototype.
       const data = oAssign(oCreate(prototype), deepClonePlainObject(module.defaults));
       // 3.2. Enhance the cloned data with reactive Cue Internals and return the PROXY STATE object.
-      return createStateInstance(data, module, props).proxyState;
+      return createState(data, module, STATE_TYPE_INSTANCE, props).proxyState;
     };
 
     // 4. overwrite this initialization function with the StateFactory for subsequent calls

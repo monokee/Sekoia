@@ -5,10 +5,13 @@
  */
 class StateInternals {
 
-  constructor(module) {
+  constructor(module, type) {
 
     // faster instanceof check
     this[__IS_STATE_INTERNAL__] = true;
+
+    // STATE_TYPE_INSTANCE = 1 or STATE_TYPE_EXTENSION = 2
+    this.type = type;
 
     // value cache used for change detection
     this.valueCache = new Map(); // 1D map [propertyName -> currentValue]
@@ -28,30 +31,8 @@ class StateInternals {
   }
 
   retrieveState(asJSON) {
-
-    const state = {};
-
-    const ownProperties = oKeys(this.plainState);
-
-    for (let i = 0, prop, val, inst; i < ownProperties.length; i++) {
-
-      prop = ownProperties[i];
-      val = this.plainState[prop];
-
-      if (val && typeof val === 'object') {
-        inst = val ? val[__CUE__] : undefined;
-        if (inst) {
-          state[prop] = inst.retrieveState.call(inst, false);
-        } else {
-          state[prop] = isArray(val) ? deepCloneArray(val) : deepClonePlainObject(val);
-        }
-      } else {
-        state[prop] = val;
-      }
-    }
-
-    return asJSON ? JSON.stringify(state) : state;
-
+    const clone = isArray(this.plainState) ? deepCloneArray(this.plainState) : deepClonePlainObject(this.plainState);
+    return asJSON ? JSON.stringify(clone) : clone;
   }
 
   applyState(props) {
@@ -100,7 +81,7 @@ class StateInternals {
 
     if (autorun === true) {
       const val = this.plainState[property];
-      boundHandler({value: val, oldValue: val});
+      boundHandler({value: val, path: this.pathFromRootAsString}); // TODO: should we pass the path like this?
     }
 
     return boundHandler;
@@ -156,52 +137,53 @@ class StateInternals {
 
   instanceDidMount(parent, ownPropertyName) {
 
-    // COMPOSED INSTANCE
-    this.observersOf = new Map();       // 1D map [propertyName -> handler]
-    this.derivativesOf = new Map();     // 2D map [propertyName -> 1D array[...Derivatives]]
-    this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
-    this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
+    // find the nearest parent that is based on a module and build the path to the property
+    let rootInternals = parent[__CUE__];
+    let rootPropertyName = ownPropertyName;
+    let pathFromRoot = [ rootPropertyName ];
 
-    //TODO: The entire provider/consumer mechanism currently only works for root properties on an instance. If however an instance has specified a non-instance sub-object, should those properties
-    // also be providable, and should they be consumable by properties on non-instance sub-objects of their children? If so, we need to change a few things:
-    // - instead of property collection, we need to collect paths from the root instance of both providers and consumers.
-    // - we need to explicitly forbid dots (.) in Module names and enforce other means of namespacing (hyphens etc) so that we can use dots exclusively for property path access.
-    // - I think this feature should be provided because it would complete the idea and not come with much performance overhead (it's just an additional recursion into the sub-nodes of an instance).
-
-    // 1. Assign Hierarchy
-    this.parentInternals = parent[__CUE__] || CUE_ROOT_STATE; // will be undefined only when instance mounted to root store!
-    this.ownPropertyName = ownPropertyName;
-
-    // 2. Inject Providers
-    if (this.module.providersToInstall.size > 0) {
-      this.injectProviders();
+    while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE) {
+      rootInternals = rootInternals.rootInternals;
+      rootPropertyName = rootInternals.rootPropertyName;
+      pathFromRoot.unshift(rootPropertyName);
     }
 
-    // 3. Create Derivatives from module blueprints
-    if (this.module.computed.size > 0) {
-      this.installDerivatives();
-    }
+    this.rootInternals = rootInternals || CUE_ROOT_STATE;
+    this.rootPropertyName = rootPropertyName;
+    this.pathFromRoot = pathFromRoot;
+    this.pathFromRootAsString = pathFromRoot.join('.');
 
-    // 4. Initialize instance with ProxyState as "this" and pass initialProps from factory (can be undefined)
-    this.module.initialize.call(this.proxyState, this.initialProps);
-    delete this.initialProps;
+    // only "smart" state instances based on their own module have top-level observers, derivatives and providers.
+    // all non-module-based state extensions (objects and arrays written into the state of a module) pull in smart data from their nearest module-based parent.
+    if (this.type === STATE_TYPE_INSTANCE) {
+
+      this.observersOf = new Map();       // 1D map [propertyName -> handler]
+      this.derivativesOf = new Map();     // 2D map [propertyName -> 1D array[...Derivatives]]
+      this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
+      this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
+
+      // 2. Inject Providers
+      if (this.module.providersToInstall.size > 0) {
+        this.injectProviders();
+      }
+
+      // 3. Create Derivatives from module blueprints
+      if (this.module.computed.size > 0) {
+        this.installDerivatives();
+      }
+
+      // 4. Initialize instance with ProxyState as "this" and pass initialProps we originally received from factory
+      this.module.initialize.call(this.proxyState, this.initialProps);
+
+      // 5. We no longer need initialProps
+      delete this.initialProps;
+
+    }
 
   }
 
-  subInstanceDidMount(parent, ownPropertyName) {
-
-    // Variation of the instanceDidMount that is being called when a sub-state object has been created
-    // on an instance that is not based on an imported module. SubInstances inherit observers, derived and provided props from their parent module
-
-    const parentInternals = this.parentInternals = parent[__CUE__] || CUE_ROOT_STATE;
-    this.ownPropertyName = ownPropertyName;
-
-    // Inherit special properties from parent. These properties can only be owned by "smart" state that is based directly on a module.
-    this.observersOf = parentInternals.observersOf;
-    this.derivativesOf = parentInternals.derivativesOf;
-    this.derivedProperties = parentInternals.derivedProperties;
-    this.providersOf = parentInternals.derivedProperties;
-
+  instanceWillUnmount() {
+    console.log('[todo: instanceWillUnmount]', this);
   }
 
   injectProviders() {
@@ -213,22 +195,22 @@ class StateInternals {
       if (description.readOnly === false) {
 
         sourceModule = description.sourceModule;
-        sourceProperty = description.sourceProperty;
-        targetModule = description.targetModule;
-        targetProperty = description.targetProperty;
+        sourceProperty = description.sourceProperty;   // should only ever be a top-level property name on a module-based state instance.
+        targetModule = description.targetModule;      // guaranteed to be the name of a module.
+        targetProperty = description.targetProperty; // guaranteed to be a top-level property name on a module-based state instance.
 
         // Traverse through the parent hierarchy until we find the first parent that has been created from a module that matches the name of the providerModule
-        let parentInternals = this.parentInternals;
+        let rootInternals = this.rootInternals;
 
-        while (parentInternals && parentInternals.name !== sourceModule) {
-          parentInternals = parentInternals.parentInternals;
+        while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE && rootInternals.name !== sourceModule) {
+          rootInternals = rootInternals.rootInternals;
         }
 
-        if (parentInternals) { // found a parent instance that matches the consuming child module name
+        if (rootInternals) { // found a parent instance that matches the consuming child module name
 
           // -> inject the provider!
           // we have previously installed forwarding accessors on the prototype that will reach into the map on this instance:
-          this.providersOf.set(targetProperty, {sourceInstance: parentInternals, sourceProperty, targetModule, targetProperty});
+          this.providersOf.set(targetProperty, {sourceInstance: rootInternals, sourceProperty, targetModule, targetProperty});
 
         } else {
 
@@ -281,50 +263,81 @@ class StateInternals {
 
   }
 
-  propertyDidChange(prop, value, oldValue) {
+  propertyDidChange(prop, value) {
 
-    const observers = this.observersOf.get(prop);
-    const derivatives = this.derivativesOf.get(prop);
+    // if im an extensionState and one of my properties has changed, i will forward the change to my nearest module parent which will receive a change event for a property that i am attached to. a path will be available in the event handler.
+    // if im an instanceState, i will only notify my immediate property observers.
 
-    // 1. recurse over direct dependencies
-    if (observers || derivatives) {
-      if (isAccumulating) {
-        cueImmediate(prop, value, oldValue, observers, derivatives, false);
-      } else {
-        cueAll(prop, value, oldValue, observers, derivatives, false);
+    if (this.type === STATE_TYPE_EXTENSION) { // forward all changes to the nearest root parent
+
+      const root = this.rootInternals;
+      const rootProp = this.rootPropertyName;
+      const rootVal = root.plainState[rootProp];
+      const path = this.pathFromRootAsString + '.' + prop;
+
+      const observers = root.observersOf.get(rootProp);
+      const derivatives = root.derivativesOf.get(rootProp);
+
+      // 1. recurse over direct dependencies
+      if (observers || derivatives) {
+        if (isAccumulating) {
+          cueImmediate(rootProp, rootVal, path, observers, derivatives, false);
+        } else {
+          cueAll(rootProp, rootVal, path, observers, derivatives, false);
+        }
       }
-    }
 
-    const consumers = this.consumersOf.get(prop);
+      const consumers = root.consumersOf.get(rootProp);
 
-    // 2. if the changed property has consumers, find them and recurse
-    if (consumers) {
-      this.cueConsumers(this, consumers, prop, value, oldValue);
+      if (consumers) {
+        root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
+      }
+
+    } else if (this.type === STATE_TYPE_INSTANCE) { // react on self
+
+      const observers = this.observersOf.get(prop);
+      const derivatives = this.derivativesOf.get(prop);
+
+      if (observers || derivatives) {
+        if (isAccumulating) {
+          cueImmediate(prop, value, prop, observers, derivatives, false);
+        } else {
+          cueAll(prop, value, prop, observers, derivatives, false);
+        }
+      }
+
+      const consumers = this.consumersOf.get(prop);
+
+      // 2. if the changed property has consumers, find them and recurse
+      if (consumers) {
+        this.cueConsumers(this, consumers, prop, value, prop);
+      }
+
     }
 
   }
 
-  cueConsumers(providerInstance, consumers, prop, value, oldValue) {
+  cueConsumers(providerInstance, consumers, prop, value) {
 
     // Find consumer instances and recurse into each branch
 
     let key, childState;
-    for (key in this.plainState) {
+    for (key in this.plainState) { // TODO: this will loop over prototype.
 
       childState = this.plainState[key];
 
       if (childState && (childState = childState[__CUE__])) { // property is a child state instance
 
         let provider;
-        for (provider of childState.providersOf.values()) { // TODO: we can probably cache the iterator returned from values()!
+        for (provider of childState.providersOf.values()) {
           if (provider.sourceInstance === providerInstance && provider.sourceProperty === prop) {
             // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
-            childState.propertyDidChange.call(childState, provider.targetProperty, value, oldValue); // continue recursion in this branch
+            childState.propertyDidChange.call(childState, provider.targetProperty, value); // continue recursion in this branch
           }
         }
 
         // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the provided prop is also provided from another upstream state)
-        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value, oldValue);
+        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value);
 
       }
 

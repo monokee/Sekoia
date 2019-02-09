@@ -9,12 +9,12 @@
 function deepClonePlainObject(o) {
 
   const clone = {};
+  const keys = oKeys(o);
 
-  let i, v;
-
-  for (i in o) {
-    v = o[i];
-    clone[i] = isArray(v) ? deepCloneArray(v) : isObjectLike(v) ? deepClonePlainObject(v) : v;
+  for (let i = 0, prop, val; i < keys.length; i++) {
+    prop = keys[i];
+    val = o[prop];
+    clone[prop] = !val ? val : isArray(val) ? deepCloneArray(val) : typeof val === 'object' ? deepClonePlainObject(val) : val;
   }
 
   return clone;
@@ -32,9 +32,9 @@ function deepCloneArray(a) {
 
   const clone = [];
 
-  for (let i = 0, v; i < a.length; i++) {
-    v = a[i];
-    clone[i] = isArray(v) ? deepCloneArray(v) : isObjectLike(v) ? deepClonePlainObject(v) : v;
+  for (let i = 0, val; i < a.length; i++) {
+    val = a[i];
+    clone[i] = !val ? val : isArray(val) ? deepCloneArray(val) : typeof val === 'object' ? deepClonePlainObject(val) : val;
   }
 
   return clone;
