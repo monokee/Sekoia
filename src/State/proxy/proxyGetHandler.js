@@ -11,41 +11,42 @@
  */
 function proxyGetHandler(target, prop) {
 
-  if (!target.hasOwnProperty(prop)) { // access prototype (computed/provided forwarders, actions, imports and native methods on sub-prototype)
-    // this works because we throw at registration time if a custom prototype property matches array mutators!
-    return ARRAY_MUTATORS[prop] || target[prop];
+  if (prop === __CUE__)
+    return target[__CUE__];
+  if (prop === 'imports')
+    return target[__CUE__].imports;
 
-  } else { // ownProperty access...
+  const internals = target[__CUE__];
 
-    const value = target[prop];
+  if (internals.internalGetters.has(prop)) {
+    return internals.internalGetters.get(prop)(internals);
+  }
 
-    if (prop === __CUE__ || !value || value[__CUE__] || typeof value !== 'object') {
+  const value = target[prop];
 
-      return value;
+  if (!value || value[__CUE__] || typeof value !== 'object') {
 
-    } else {
+    return value;
 
-      // find the root parent that is based on a real module (ie not inheriting)
-      let rootParent = target[__CUE__];
-      while (rootParent.type !== STATE_TYPE_INSTANCE) rootParent = rootParent.parentInternals;
-      const rootModule = rootParent.module;
+  } else {
 
-      // Create a reactive state extension
-      const extension = createState(isArray(value)
-        ? createArrayWithCustomPrototype(value, rootModule.prototype)
-        : createObjectWithCustomPrototype(value, rootModule.prototype),
-        rootModule,
-        STATE_TYPE_EXTENSION
-      );
+    console.count('[get] create subState');
 
-      // Mount the reactive extension onto the target
-      target[prop] = extension.proxyState;
-      extension.internals.instanceDidMount.call(extension.internals, target, prop);
-
-      // Return the proxy
-      return extension.proxyState;
-
+    // find the root parent that is based on a real module (ie not inheriting)
+    let rootParent = target[__CUE__];
+    while (rootParent.type !== STATE_TYPE_INSTANCE) {
+      rootParent = rootParent.rootInternals;
     }
+
+    // Create a reactive state extension
+    const extension = createState(value, rootParent.module, STATE_TYPE_EXTENSION, null);
+
+    // Mount the reactive extension onto the target
+    target[prop] = extension.proxyState;
+    extension.internals.instanceDidMount(target, prop);
+
+    // Return the proxy
+    return extension.proxyState;
 
   }
 

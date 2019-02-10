@@ -16,46 +16,10 @@ class StateInternals {
     // value cache used for change detection
     this.valueCache = new Map(); // 1D map [propertyName -> currentValue]
 
-    // Shortcut pointers to underlying module (shared by all instances of module)
+    // Pointer to underlying module (shared by all instances of module)
     this.module = module;
-    this.name = module.name;
-    this.consumersOf = module.consumersOf; // 2D map [propertyName -> [...ConsumerDescriptions]] ConsumerDescription = {targetModule: nameOfTargetModule, targetProperty: nameOfPropertyAsDefinedOnChild}
-
-    // Will be assigned after construction
-    this.plainState = null; // the plain data object that these internals are attached to
-    this.proxyState = null; // the same data object but wrapped in a reactive proxy
-    this.parentInternals = null; // the [__CUE__] internals of the parent of the plain state data in the object node graph
-    this.ownPropertyName = ''; // the name of this instance on the parent node graph
-    this.initialProps = undefined; // when a factory function that created the state instance got passed any props, we store them here temporarily so that the props can later be passed up to the public initialize method.
-
-  }
-
-  retrieveState(asJSON) {
-    const clone = isArray(this.plainState) ? deepCloneArray(this.plainState) : deepClonePlainObject(this.plainState);
-    return asJSON ? JSON.stringify(clone) : clone;
-  }
-
-  applyState(props) {
-
-    // For batch-applying data collections from immutable sources.
-    // Internally reconciles the passed props with the existing state tree and only mutates the deltas.
-    // Immediate reactions of the mutated properties are collected on an accumulation stack.
-    // Only after the batch operation has finished, the accumulated reactions queue their dependencies and we react in a single flush.
-    //TODO: defer all recursive lookups involving provided properties (upstream/downstream) until after applyState is done reconciling.
-    // OR BETTER YET: completely work around any proxy interception for batch updates. create a specific set method that is called DIRECTLY from patchState
-    // that collects only unique immediate dependencies on an accumulation stack. after patchState has run, we explicitly cue up the dependencies of the accumulated dependencies (including setters to provided states)
-    // and only then react to the collective change in a single batch. This will be insanely performant because every change will only be evaluated and reacted to once. This is huge!
-    // THIS has the other advantage that I can also reduce the cue and react logic because we no longer have to check for accumulations as this is explicitly outsourced to a special callback.
-
-    if (props.constructor === String) {
-      props = JSON.parse(props);
-    }
-
-    isAccumulating = true;
-    patchState(this.parentInternals.proxyState, this.ownPropertyName, props);
-    isAccumulating = false;
-    cueAccumulated();
-    react();
+    this.imports = module.imports;
+    this.mounted = false;
 
   }
 
@@ -81,7 +45,7 @@ class StateInternals {
 
     if (autorun === true) {
       const val = this.plainState[property];
-      boundHandler({value: val, path: this.pathFromRootAsString}); // TODO: should we pass the path like this?
+      boundHandler({value: val, path: property});
     }
 
     return boundHandler;
@@ -140,7 +104,7 @@ class StateInternals {
     // find the nearest parent that is based on a module and build the path to the property
     let rootInternals = parent[__CUE__];
     let rootPropertyName = ownPropertyName;
-    let pathFromRoot = [ rootPropertyName ];
+    let pathFromRoot = [];
 
     while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE) {
       rootInternals = rootInternals.rootInternals;
@@ -148,14 +112,21 @@ class StateInternals {
       pathFromRoot.unshift(rootPropertyName);
     }
 
-    this.rootInternals = rootInternals || CUE_ROOT_STATE;
+    this.rootInternals = rootInternals;
     this.rootPropertyName = rootPropertyName;
     this.pathFromRoot = pathFromRoot;
-    this.pathFromRootAsString = pathFromRoot.join('.');
+    this.propertyPathPrefix = pathFromRoot.length > 0 ? `${pathFromRoot.join('.')}.` : ''; // note the trailing dot
 
     // only "smart" state instances based on their own module have top-level observers, derivatives and providers.
     // all non-module-based state extensions (objects and arrays written into the state of a module) pull in smart data from their nearest module-based parent.
     if (this.type === STATE_TYPE_INSTANCE) {
+
+      this.name = this.module.name;
+
+      this.internalGetters = this.module.internalGetters;
+      this.internalSetters = this.module.internalSetters;
+
+      this.consumersOf = this.module.consumersOf;
 
       this.observersOf = new Map();       // 1D map [propertyName -> handler]
       this.derivativesOf = new Map();     // 2D map [propertyName -> 1D array[...Derivatives]]
@@ -163,12 +134,12 @@ class StateInternals {
       this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
       // 2. Inject Providers
-      if (this.module.providersToInstall.size > 0) {
+      if (this.module.providersToInstall.size) {
         this.injectProviders();
       }
 
       // 3. Create Derivatives from module blueprints
-      if (this.module.computed.size > 0) {
+      if (this.module.derivativesToInstall.size) {
         this.installDerivatives();
       }
 
@@ -178,7 +149,19 @@ class StateInternals {
       // 5. We no longer need initialProps
       delete this.initialProps;
 
+    } else if (this.type === STATE_TYPE_EXTENSION) {
+
+      // Extensions don't have derived or provided properties. They don't have their own imports and
+      // they don't have actions. Only module-based state instances have these.
+
+      // extension only have getters when they are arrays (intercepted mutators)
+      this.internalGetters = isArray(this.plainState) ? ARRAY_MUTATOR_GETTERS : EMPTY_MAP;
+      // extensions don't have any internal setters
+      this.internalSetters = EMPTY_MAP;
+
     }
+
+    this.mounted = true;
 
   }
 
@@ -188,16 +171,16 @@ class StateInternals {
 
   injectProviders() {
 
-    let description, sourceModule, sourceProperty, targetModule, targetProperty;
+    let description, sourceModule, sourceProperty, targetModule, targetProperty, rootProvider;
     for (description of this.module.providersToInstall.values()) {
 
       // only install providers onto children when they are allowed to mutate the providing parent state
       if (description.readOnly === false) {
 
-        sourceModule = description.sourceModule;
-        sourceProperty = description.sourceProperty;   // should only ever be a top-level property name on a module-based state instance.
-        targetModule = description.targetModule;      // guaranteed to be the name of a module.
-        targetProperty = description.targetProperty; // guaranteed to be a top-level property name on a module-based state instance.
+        sourceModule = description.sourceModule;        // the name of the module-based source state that the provided property comes from
+        sourceProperty = description.sourceProperty;   // the top-level property name on a state instance created from sourceModule.
+        targetModule = description.targetModule;      // the name of the module that is consuming the property (here its this.module.name!)
+        targetProperty = description.targetProperty; // the top-level property name on this instance that is consuming from the parent
 
         // Traverse through the parent hierarchy until we find the first parent that has been created from a module that matches the name of the providerModule
         let rootInternals = this.rootInternals;
@@ -208,9 +191,18 @@ class StateInternals {
 
         if (rootInternals) { // found a parent instance that matches the consuming child module name
 
-          // -> inject the provider!
-          // we have previously installed forwarding accessors on the prototype that will reach into the map on this instance:
-          this.providersOf.set(targetProperty, {sourceInstance: rootInternals, sourceProperty, targetModule, targetProperty});
+          // now we have to check if the found state instance is the actual source of the provided property or if it is also consuming it from another parent state.
+          rootProvider = rootInternals.providersOf.get(sourceProperty);
+
+          if (rootProvider) { // the provider is a middleman that receives the data from another parent.
+            rootProvider = getRootProvider(rootProvider);
+          } else {
+            rootProvider = {sourceInternals: rootInternals, sourceProperty, targetModule, targetProperty};
+          }
+
+          // -> inject the rootProvider. We now have direct access to the data source on a parent, no matter how many levels of indirection the data has taken to arrive here.
+          // all get and set requests to this piece of data will be directly forwarded to the source. Forwarded set mutations will recursively traverse back down through the state tree and notify each consumer along the way.
+          this.providersOf.set(targetProperty, rootProvider);
 
         } else {
 
@@ -228,7 +220,7 @@ class StateInternals {
   installDerivatives() {
 
     let vDerivative, i, derivative, sourceProperty, dependencies, superDerivative;
-    for (vDerivative of this.module.computed.values()) {
+    for (vDerivative of this.module.derivativesToInstall.values()) {
 
       // 3.0 Create Derivative instance
       derivative = new Derivative(vDerivative.ownPropertyName, vDerivative.computation, vDerivative.sourceProperties);
@@ -255,9 +247,8 @@ class StateInternals {
         superDerivative.subDerivatives.push(derivative);
       }
 
-      // 3.4 Fill internal cache of Derivative
-      // (plainState inherits from module.prototype which contains forwarding-getters which trigger value computation in Derivative)
-      derivative.fillCache(this.plainState);
+      // 3.4 Fill internal cache of Derivative with proxy. (traps will get values from other resolved derivatives and provided props)
+      derivative.fillCache(this.proxyState);
 
     }
 
@@ -273,12 +264,11 @@ class StateInternals {
       const root = this.rootInternals;
       const rootProp = this.rootPropertyName;
       const rootVal = root.plainState[rootProp];
-      const path = this.pathFromRootAsString + '.' + prop;
-
-      const observers = root.observersOf.get(rootProp);
-      const derivatives = root.derivativesOf.get(rootProp);
+      const path = this.propertyPathPrefix + prop;
 
       // 1. recurse over direct dependencies
+      const observers = root.observersOf.get(rootProp);
+      const derivatives = root.derivativesOf.get(rootProp);
       if (observers || derivatives) {
         if (isAccumulating) {
           cueImmediate(rootProp, rootVal, path, observers, derivatives, false);
@@ -287,8 +277,8 @@ class StateInternals {
         }
       }
 
+      // 2. Notify consumers of the property
       const consumers = root.consumersOf.get(rootProp);
-
       if (consumers) {
         root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
       }
@@ -322,7 +312,7 @@ class StateInternals {
     // Find consumer instances and recurse into each branch
 
     let key, childState;
-    for (key in this.plainState) { // TODO: this will loop over prototype.
+    for (key in this.plainState) {
 
       childState = this.plainState[key];
 

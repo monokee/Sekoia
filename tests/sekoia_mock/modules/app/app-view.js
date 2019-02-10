@@ -27,9 +27,11 @@ Cue.UI('Root-UI', Component => ({
       flex: '0 1 auto',
       userSelect: 'none',
       boxSizing: 'borderBox',
+
       '&.disabled': {
         cursor: 'not-allowed'
       }
+
     },
 
     sectionTop: {
@@ -43,9 +45,11 @@ Cue.UI('Root-UI', Component => ({
       width: '100%',
       flex: '1 1 auto',
       border: '1px solid #ebebeb',
+
       '&:hover': {
         background: 'red'
       }
+
     },
 
     sectionBottom: {
@@ -62,16 +66,19 @@ Cue.UI('Root-UI', Component => ({
       borderRadius: '500px',
       outline: 'none',
       border: 'none',
+
       '&:focus': {
         outline: 'none',
         border: 'none',
         backgroundColor: '#ffb400'
       }
+
     }
 
   },
 
   initialize(state) {
+
     this.state = state;
     const {viewer, bottom} = this.refs();
     this.bottom = bottom;
@@ -111,8 +118,7 @@ Cue.UI('Root-UI', Component => ({
 
     children(o) {
       if (o.value.length) {
-        console.log('render:children', o.value);
-        this.viewer.textContent = `Some child's data has changed! PositionAndName: ${o.value[0].positionAndName}`;
+        this.viewer.textContent = `Some child-data has changed! PositionAndName: ${o.value[0].positionAndName}`;
       }
     }
 

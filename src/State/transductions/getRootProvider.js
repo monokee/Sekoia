@@ -5,6 +5,6 @@
  * @return {object}         - The root provider of the initially passed provider. Might be the initially passed provider if it doesn't have superProviders.
  */
 function getRootProvider(provider) {
-  const superProvider = provider.sourceInstance.providersOf.get(provider.sourceProperty);
+  const superProvider = provider.sourceInternals.providersOf.get(provider.sourceProperty);
   return superProvider ? getRootProvider(superProvider) : provider;
 }

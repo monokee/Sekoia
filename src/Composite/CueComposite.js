@@ -82,7 +82,7 @@ class CueComposite {
     if (!this.stateInstance) {
       throw new ReferenceError(`State can't be "${typeof this.stateInstance}" when getting it. Mount the Cue Instance first.`);
     } else {
-      return this.stateInternals.retrieveState.call(this.stateInternals, asJSON);
+      return this.stateInternals.proxyState['get'](asJSON);
     }
   }
 
@@ -90,7 +90,7 @@ class CueComposite {
     if (!this.stateInstance) {
       throw new ReferenceError(`State can't be "${typeof this.stateInstance}" when setting it. Mount the Cue Instance first.`);
     } else {
-      this.stateInternals.applyState.call(this.stateInternals, props);
+      this.stateInternals.proxyState['set'](props);
     }
 
     return this;

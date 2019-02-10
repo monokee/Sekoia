@@ -8,15 +8,35 @@
  */
 function referenceConsumer(targetModule, targetProperty, sourceModule, sourceProperty) {
 
+  // TODO: as an optimization, we should count the number of instances that consume a property.
+  //  that way we can stop the dynamic lookup when all instances have been notified at runtime!
+
   const ConsumerReference = {targetModule, targetProperty, sourceModule, sourceProperty};
 
-  // This is guaranteed to be available because it has to be a parent (ie something that had to be there before the child) to be a provider!
   const source = CUE_STATE_INTERNALS.get(sourceModule);
 
   if (source.consumersOf.has(sourceProperty)) {
-    source.consumersOf.get(sourceProperty).push(ConsumerReference);
+
+    const consumers = source.consumersOf.get(sourceProperty);
+
+    let exists = false, i = -1;
+    while (++i < consumers.length && exists === false) {
+      if (
+        consumers[i].targetModule === targetModule
+        && consumers[i].targetProperty === targetProperty
+        && consumers[i].sourceModule === sourceModule
+        && consumers[i].sourceProperty === sourceProperty
+      ) exists = true;
+    }
+
+    if (exists === false) {
+      source.consumersOf.get(sourceProperty).push(ConsumerReference);
+    }
+
   } else {
+
     source.consumersOf.set(sourceProperty, [ ConsumerReference ]);
+
   }
 
 }

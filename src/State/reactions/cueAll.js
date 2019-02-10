@@ -6,18 +6,18 @@
  * @function cueAll
  * @param {string}  prop            - The property which has been mutated.
  * @param {*}       value           - The result of the mutation.
- * @param {*}       oldValue        - The previous value of the property.
+ * @param {string}  path            - The path of the property relative to the nearest model-based instance.
  * @param {Array}   observers       - Reaction handlers observing the property.
  * @param {Array}   derivatives     - Derivatives that are being derived from the property.
  * @param {boolean} stopPropagation - Whether or not a derivative has been flagged to be the last observed derivative in its dependency branch. Used for recursion.
  */
-function cueAll(prop, value, oldValue, observers, derivatives, stopPropagation) {
+function cueAll(prop, value, path, observers, derivatives, stopPropagation) {
 
   let i, l, item;
 
   if (observers) {
 
-    const o_O = {value: value, oldValue: oldValue};
+    const o_O = {value, path};
 
     // add pairs of unique [reactionHandler, observationObject] to queue
     for (i = 0; i < observers.length; i++) {
@@ -37,16 +37,15 @@ function cueAll(prop, value, oldValue, observers, derivatives, stopPropagation) 
     }
 
     // recompute value and recurse
-    let previous, result;
+    let result;
 
     for (i = 0; i < l; i++) {
 
       item = derivatives[i];
-      previous = item._value; // uses internal _value
       result = item.value; // calls "getter" -> recomputes _value
 
       if (item.hasChanged) { // has value changed after recomputation -> recurse
-        cueAll(item.ownPropertyName, result, previous, item.observers, item.subDerivatives, item.stopPropagation);
+        cueAll(item.ownPropertyName, result, item.ownPropertyName, item.observers, item.subDerivatives, item.stopPropagation);
       }
 
     }

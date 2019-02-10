@@ -1,4 +1,3 @@
-
 /**
  * Intercept "set" requests of properties in a reactive state object.
  * Only sets properties when not currently reacting to state changes. Disallows and console.warns when mutating state inside of reactions.
@@ -12,50 +11,36 @@
  */
 function proxySetHandler(target, prop, value) {
 
-  if (!isReacting) {
+  const internals = target[__CUE__];
 
-    const nestedInstance = value ? value[__CUE__] : undefined;
+  // Mount unmounted sub-state
+  const nestedInternals = value ? value[__CUE__] : undefined;
+  if (nestedInternals && nestedInternals.mounted === false) {
+    nestedInternals.instanceDidMount.call(nestedInternals, target, prop);
+  }
 
-    if (nestedInstance && nestedInstance.parentInternals === null) {
-      nestedInstance.instanceDidMount.call(nestedInstance, target, prop);
-    }
+  // Forward set requests
+  if (internals.internalSetters.has(prop)) {
+    internals.internalSetters.get(prop)(internals, value);
+    return true;
+  }
 
-    const instance = target[__CUE__];
+  // Handle normal set requests
+  if (value !== internals.valueCache.get(prop)) {
 
-    // Forward set request to root provider
-    if (instance.providersOf.has(prop)) {
-      // triggers forwarding setter on prototype until we arrive at the root provider (warns if setting a read-only)
-      // at the root provider this check will fail (no more providers) and the actual property will be set.
-      target[prop] = value;
-      return true;
-    }
+    // mutate the target object
+    target[prop] = value;
 
-    // Handle normal set requests
+    // queue reactions
+    internals.propertyDidChange.call(internals, prop, value);
 
-    const oldValue = instance.valueCache.get(prop);
+    // update the cache
+    internals.valueCache.set(prop, value);
 
-    // compare to cache
-    if (value !== oldValue) {
+    // run through all reactions in the queue
+    react();
 
-      // queue reactions
-      instance.propertyDidChange.call(instance, prop, value);
-
-      // mutate the target object (this will not mutate the "oldTarget" shallow copy we created above)
-      target[prop] = value;
-
-      // update the cache
-      instance.valueCache.set(prop, value);
-
-      // run through all reactions in the queue
-      react();
-
-      return true;
-
-    }
-
-  } else {
-
-    console.warn(`Setting of "${prop}" ignored. Don't mutate state in a reaction. Refactor to computed properties or willChange/didChange handlers instead.`);
+    return true;
 
   }
 

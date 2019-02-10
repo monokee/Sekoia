@@ -6,11 +6,11 @@
  * @param   {object}            module            - The shared module object to which this function will add static module data (at this point it only contains the name).
  * @param   {(object|function)} moduleInitializer - The module configuration. When it is a function it is called with the "Module" utility object and must return a plain configuration pojo.
  * @returns {object}            module            - The extended module
- * */
+ */
 
 function buildStateModule(module, moduleInitializer) {
 
-  // when function, we call it with STATE_MODULE namespace so that the "Module" utility namespace object is publicly available (see proto.js)
+  // when function, we call it with STATE_MODULE namespace so that the "Module" utility namespace object is publicly available
   const config = isFunction(moduleInitializer) ? moduleInitializer(STATE_MODULE) : moduleInitializer;
 
   if (!isPlainObject(config)) {
@@ -21,27 +21,36 @@ function buildStateModule(module, moduleInitializer) {
     throw new TypeError(`State Module requires "props" pojo containing default and optional computed properties.`);
   }
 
-  module.defaults = {};
-  module.computed = new Map();
-  module.interceptors = new Map();
-  module.reactions = new Map();
-  module.providersToInstall = new Map();
-  module.consumersOf = new Map();
-  module.initialize = NOOP;
-  module.actions = {};
+  // static module properties
   module.imports = config.imports;
+  module.defaults = {};
+  module.initialize = NOOP;
+  module.consumersOf = new Map();
+
+  // All internal getters (extended below)
+  module.internalGetters = new Map([
+    ['get', () => retrieveState],
+    ['set', () => applyState]
+  ]);
+
+  // All internal setters (extended below)
+  module.internalSetters = new Map();
+
+  // these have to be installed by each instance of the module on mount.
+  module.derivativesToInstall = new Map();
+  module.providersToInstall = new Map();
+
 
   // 1. Split props into defaults, computed properties and injected properties.
   // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances from this module.
 
-  let prop, val;
-  for (prop in config.props) {
+  for (const prop in config.props) {
 
-    val = config.props[prop];
+    const val = config.props[prop];
 
     if (isFunction(val)) {
 
-      module.computed.set(prop, {
+      module.derivativesToInstall.set(prop, {
         ownPropertyName: prop,
         computation: val,
         sourceProperties: [],
@@ -49,22 +58,40 @@ function buildStateModule(module, moduleInitializer) {
         superDerivatives: []
       });
 
-    } else if (val instanceof ProviderDescription) {
+      module.internalGetters.set(prop, internals => {
+        return internals.derivedProperties.get(prop).value;
+      });
 
+    } else if (val instanceof ProviderDescription) {
       // We found a property that wants to inject data from a parent state. The source of the requested data is described in the ProviderDescription that was created when the property called Module.inject(...).
-      // The data model and property of the requested data have thus been described. Here we map the name of the requesting property to the ProviderDescription:
-      module.providersToInstall.set(prop, val);
-      // Also extend the providerDescription with the source (we can use this later to avoid an extra loop)
+
+      // 1. Extend the providerDescription with the source (we can use this later to avoid an extra loop)
       val.targetModule = module.name;
       val.targetProperty = prop;
+
+      // 2. map the name of the requesting property to the ProviderDescription:
+      module.providersToInstall.set(prop, val);
       // We will use this mapping when this module gets instantiated: If this module has write-access to the provider (readOnly = false) we will install a strong pointer to the parent state into the consuming child instance.
-      // This is very performant and safe to do because whenever a parent state loses context, so will all of the child node graphs in its descending namespace.
 
       // Now we also have to create the inverse relationship ie. install this module as a consumer of the providing module under the respectively mapped property names.
       // To avoid memory leaks and the need for manual disposing, the approach for the inverse is different: We will not install strong pointers of consuming child instances into providing parent instances.
-      // Instead, we simply create a consumer that has the string name of the module that is consuming from it. At mutation-time a stateInstance will query its underlying module for any consumers and traverse down
+      // Instead, we create a consumer that has the string name of the module that is consuming from it. At mutation-time a stateInstance will query its underlying module for any consumers and traverse down
       // its object-children and update any instances that match the consumer module description along the way to the furthest leaves.
       referenceConsumer(module.name, prop, val.sourceModule, val.sourceProperty);
+
+      module.internalGetters.set(prop, internals => {
+        const rootProvider = internals.providersOf.get(prop);
+        return rootProvider.sourceInternals.plainState[rootProvider.sourceProperty];
+      });
+
+      if (val.readOnly === false) {
+
+        module.internalSetters.set(prop, (internals, value) => {
+          const rootProvider = internals.providersOf.get(prop);
+          rootProvider.sourceInternals.proxyState[rootProvider.sourceProperty] = value;
+        });
+
+      }
 
     } else {
 
@@ -75,15 +102,15 @@ function buildStateModule(module, moduleInitializer) {
   }
 
   // 2. Install dependencies of derivatives by connecting properties
-  installDependencies(config.props, module.computed);
+  installDependencies(config.props, module.derivativesToInstall);
 
   // 2.1 Resolve dependencies and sort derivatives topologically
-  module.computed = OrderedDerivatives.from(module.computed);
+  module.derivativesToInstall = OrderedDerivatives.from(module.derivativesToInstall);
 
-  // 3. Collect all methods except "initialize" on action object which will be shared on the prototype (like class methods)
-  for (prop in config) {
+  // 3. Collect all methods except "initialize"
+  for (const prop in config) {
 
-    val = config[prop];
+    const val = config[prop];
 
     if (prop === 'initialize') {
 
@@ -95,28 +122,14 @@ function buildStateModule(module, moduleInitializer) {
 
     } else if (isFunction(val)) {
 
-      if (ARRAY_MUTATOR_NAMES.has(prop)) {
-        throw new Error(`Illegal action name "${prop}" on "${module.name}". The action clashes with native Array.prototype.${prop}.`);
+      if (!module.internalGetters.has(prop)) {
+        module.internalGetters.set(prop, val);
       } else {
-        module.actions[prop] = val;
+        throw new Error(`Module method name "${prop}" clashes with a property from "props" or with a default Cue property ("get" and "set" are reserved properties). Make sure that props and method names are distinct.`);
       }
 
     }
 
-  }
-
-  // 4. Collect interceptors
-  for (prop in config.willChange) {
-    val = config.willChange[prop];
-    if (!isFunction(val)) throw new TypeError(`Module.willChange handler for "${prop}" is not a function.`);
-    module.interceptors.set(prop, val);
-  }
-
-  // 5. Collect watchers
-  for (prop in config.didChange) {
-    val = config.didChange[prop];
-    if (!isFunction(val)) throw new TypeError(`Module.didChange handler for "${prop}" is not a function.`);
-    module.reactions.set(prop, val);
   }
 
   return module;

@@ -12,9 +12,9 @@ Cue.State('Root', Module => ({
   initialize(props) {
     this.name = props.name;
     this.children.push(
-      this.imports.Child(props.child), // these will not inherit computed properties etc from their parent because they are MODULE based (so they have their own!)
-      this.imports.Child(props.child), // if these were not module based, they WOULD inherit properties from their parent module. The difference is made between module based and non-module based state.
-      this.imports.Child(props.child)  // if a piece of state is based on its own module, it has its own computeds and providers. if not, it is regarded as an extension of its parent. StateExtension vs StateInstance
+      this.imports.Child(props.child),
+      this.imports.Child(props.child),
+      this.imports.Child(props.child)
     );
   }
 
@@ -42,19 +42,6 @@ Cue.State('Root-Child', Module => ({
     this.x = props.x;
     this.y = props.y;
     this.disabled = props.disabled;
-  },
-
-  willChange: { //TODO: implement interceptors
-    soloCount(o) {
-      if (o.value > 99) {
-        o.value = o.oldValue;
-        Module.trigger('WARNINGS.maximumSoloItemsReached');
-      }
-    }
-  },
-
-  didChange: { //TODO: implement self-observing reactions
-
   }
 
 }));

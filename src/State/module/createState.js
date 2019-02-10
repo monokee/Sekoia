@@ -8,7 +8,7 @@
  * @param {number}          type    - Either 1 when state is created from a module or 2 when state is created as a nested sub-state of a module based parent state.
  * @param {(object|null)}   [props] - When this function is called from a StateFactory that received props, we pass those props into the internals so that we can later call a modules initialize method with these props.
  */
-function createState(data, module, type, props = null) {
+function createState(data, module, type, props) {
 
   // 1. Attach Internals to "data" under private __CUE__ symbol.
   const internals = data[__CUE__] = new StateInternals(module, type);
@@ -25,7 +25,7 @@ function createState(data, module, type, props = null) {
   internals.proxyState = proxyState;
 
   // 4. When called from a StateFactory, pass initial props to Internals
-  if (props !== null) {
+  if (arguments.length === 4) {
     internals.initialProps = props;
   }
 
