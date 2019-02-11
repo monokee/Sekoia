@@ -196,38 +196,25 @@
       return this;
     }
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
 
     let hasChanged = false;
 
-    if (value && value[__CUE__]) { // have to mount a sub-instance onto the array
+    if (typeof value === 'object' && value !== null) {
+      value = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
+    }
 
-      if (this.length > 1)
-        throw new Error(`You can not fill an Array with multiple copies of the same state instance.`);
-
-      const oldValue = array[0];
-
+    for (let i = start, oldValue; i < end; i++) {
+      oldValue = array[i];
       if (oldValue !== value) {
-        array[0] = value;
+        array[i] = value;
         hasChanged = true;
-        value[__CUE__].instanceDidMount(array, 0);
       }
-
-    } else { // normal fill with change detection and change event handling
-
-      for (let i = start, oldValue; i < end; i++) {
-        oldValue = array[i];
-        if (oldValue !== value) {
-          array[i] = value;
-          hasChanged = true;
-        }
-      }
-
     }
 
     if (hasChanged) {
-      instance.propertyDidChange();
+      internals.propertyDidChange();
       react();
     }
 
@@ -239,18 +226,31 @@
 
     if (rest.length > 0) {
 
-      const instance = this[__CUE__];
-      const array = instance.plainState;
+      const internals = this[__CUE__];
+      const array = internals.plainState;
 
-      for (let i = 0, value, subState; i < rest.length; i++) { // fragmented push calls to determine if added values are states that have to be mounted
+      for (let i = 0, value, subInternals; i < rest.length; i++) {
+
         value = rest[i];
-        array.push(value);
-        if (value && (subState = value[__CUE__])) { // if we push subStates into the array, mount the subStates
-          subState.instanceDidMount(array, i);
+
+        if (typeof value === 'object' && value !== null) {
+
+          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+
+          if (subInternals.mounted === false) {
+            array.push(subInternals.proxyState);
+            subInternals.instanceDidMount(array, array.length - 1);
+          }
+
+        } else {
+
+          array.push(value);
+
         }
+
       }
 
-      instance.propertyDidChange();
+      internals.propertyDidChange();
       react();
 
     }
@@ -263,33 +263,45 @@
 
     if (rest.length > 0) {
 
-      const instance = this[__CUE__];
-      const array = instance.plainState;
+      const internals = this[__CUE__];
+      const array = internals.plainState;
 
       let i = rest.length,
-        value, oldValue, subState;
-      while (--i >= 0) { // fragmented unshift calls to know if the value added into first index needs to be mounted
+        value, subInternals;
+      while (--i >= 0) {
+
         value = rest[i];
-        oldValue = array[0];
-        array.unshift(value);
-        if (value && (subState = value[__CUE__])) { // mount if value is subState
-          subState.instanceDidMount(array, 0);
+
+        if (typeof value === 'object' && value !== null) {
+
+          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+
+          if (subInternals.mounted === false) {
+            array.unshift(subInternals.proxyState);
+            subInternals.instanceDidMount(array, 0);
+          }
+
+        } else {
+
+          array.unshift(value);
+
         }
+
       }
 
-      instance.propertyDidChange();
+      internals.propertyDidChange();
       react();
 
     }
 
-    return this.length; // comply with default push return
+    return this.length; // comply with default unshift return
 
   }
 
   function intercepted_array_splice(start, deleteCount, ...items) {
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
 
     const len = array.length;
     const actualStart = start < 0 ? Math.max((len + start), 0) : Math.min(start, len);
@@ -309,7 +321,7 @@
     if (actualDeleteCount > 0) {
 
       let i = actualStart + actualDeleteCount,
-        value, oldValue, subState;
+        oldValue, subState;
 
       while (--i >= actualStart) {
 
@@ -330,22 +342,31 @@
     // 2. add elements to array, check if they have to be mounted and cue the property.
     if (insertCount > 0) {
 
-      for (let i = 0, value, arrayIndex, oldValue, subState; i < insertCount; i++) {
+      for (let i = 0, value, arrayIndex, subInternals; i < insertCount; i++) {
 
         value = items[i];
         arrayIndex = actualStart + i;
 
-        array.splice(arrayIndex, 0, value);
+        if (typeof value === 'object' && value !== null) {
 
-        if (value && (subState = value[__CUE__])) { // if we splice subStates into the array, mount the subStates
-          subState.instanceDidMount(array, arrayIndex);
+          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+
+          if (subInternals.mounted === false) {
+            array.splice(arrayIndex, 0, subInternals.proxyState);
+            subInternals.instanceDidMount(array, arrayIndex);
+          }
+
+        } else {
+
+          array.splice(arrayIndex, 0, value);
+
         }
 
       }
 
     }
 
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
 
     return deleted;
@@ -354,23 +375,23 @@
 
   function intercepted_array_pop() {
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
 
     if (array.length === 0) {
       return undefined;
     }
 
     const last = array[array.length - 1];
-    const subState = last ? last[__CUE__] : undefined;
+    const subInternals = last ? last[__CUE__] : undefined;
 
-    if (subState) {
-      subState.instanceWillUnmount();
+    if (subInternals) {
+      subInternals.instanceWillUnmount();
     }
 
     delete array[array.length - 1];
 
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
 
     return last;
@@ -379,23 +400,23 @@
 
   function intercepted_array_shift() {
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
 
     if (array.length === 0) {
       return undefined;
     }
 
     const last = array[0];
-    const subState = last ? last[__CUE__] : undefined;
+    const subInternals = last ? last[__CUE__] : undefined;
 
-    if (subState) {
-      subState.instanceWillUnmount();
+    if (subInternals) {
+      subInternals.instanceWillUnmount();
     }
 
     array.shift();
 
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
 
     return last;
@@ -404,8 +425,8 @@
 
   function intercepted_array_copyWithin(target, start = 0, end = this.length) {
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
 
     const len = array.length;
     let to = target < 0 ? Math.max((len + target), 0) : Math.min(target, len);
@@ -442,7 +463,7 @@
       count -= 1;
     }
 
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
 
     return array;
@@ -451,12 +472,18 @@
 
   function intercepted_array_reverse() {
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
+
+    //TODO: what are the implications of this? if we're shuffling cue objects in an array we're rewriting their properties. This changes a number of things about them like: ownPropertyName, pathFromRoot
+    // Additionally, if a previously mounted cue state object is being attached to a new parent, we should also be able to conveniently re-wire the objects internals.
+    // unfortunately, this requires recursively re-writing all of the objects state-children as well. but I think we can do it because we only need to re-write some internal properties (paths!)
+    // some checks need to be performed here that disallow re-attaching objects if they consume properties from ancestors which would no longer be ancestors after the reattachment.
+    // BIG TODO.
 
     array.reverse();
 
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
 
     return array;
@@ -465,12 +492,12 @@
 
   function intercepted_array_sort(compareFunction) {
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
 
     array.sort(compareFunction);
 
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
 
     return array;
@@ -1221,7 +1248,6 @@
       }
     }
   }
-
   /**
    * Intercept "get" requests of properties in a reactive state object.
    * When prop is special symbol key, interceptor can return special data for recursive access etc.
@@ -1234,44 +1260,15 @@
    */
   function proxyGetHandler(target, prop) {
 
-    if (prop === __CUE__)
-      return target[__CUE__];
-    if (prop === 'imports')
-      return target[__CUE__].imports;
-
     const internals = target[__CUE__];
 
-    if (internals.internalGetters.has(prop)) {
-      return internals.internalGetters.get(prop)(internals);
-    }
-
-    const value = target[prop];
-
-    if (!value || value[__CUE__] || typeof value !== 'object') {
-
-      return value;
-
-    } else {
-
-      console.count('[get] create subState');
-
-      // find the root parent that is based on a real module (ie not inheriting)
-      let rootParent = target[__CUE__];
-      while (rootParent.type !== STATE_TYPE_INSTANCE) {
-        rootParent = rootParent.rootInternals;
-      }
-
-      // Create a reactive state extension
-      const extension = createState(value, rootParent.module, STATE_TYPE_EXTENSION, null);
-
-      // Mount the reactive extension onto the target
-      target[prop] = extension.proxyState;
-      extension.internals.instanceDidMount(target, prop);
-
-      // Return the proxy
-      return extension.proxyState;
-
-    }
+    return prop === __CUE__ ?
+      internals :
+      prop === 'imports' ?
+      internals.imports :
+      internals.internalGetters.has(prop) ?
+      internals.internalGetters.get(prop) :
+      target[prop];
 
   }
   /**
@@ -1289,34 +1286,38 @@
 
     const internals = target[__CUE__];
 
-    // Mount unmounted sub-state
-    const nestedInternals = value ? value[__CUE__] : undefined;
-    if (nestedInternals && nestedInternals.mounted === false) {
-      nestedInternals.instanceDidMount.call(nestedInternals, target, prop);
-    }
-
-    // Forward set requests
     if (internals.internalSetters.has(prop)) {
       internals.internalSetters.get(prop)(internals, value);
       return true;
     }
 
-    // Handle normal set requests
     if (value !== internals.valueCache.get(prop)) {
 
-      // mutate the target object
-      target[prop] = value;
+      if (typeof value === 'object' && value !== null) { // any object
 
-      // queue reactions
-      internals.propertyDidChange.call(internals, prop, value);
+        const subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
 
-      // update the cache
-      internals.valueCache.set(prop, value);
+        if (subInternals.mounted === false) {
 
-      // run through all reactions in the queue
-      react();
+          target[prop] = subInternals.proxyState; // attach the proxy
+          subInternals.instanceDidMount(target, prop); // mount
 
-      return true;
+          internals.propertyDidChange(prop, subInternals.proxyState);
+          internals.valueCache.set(prop, subInternals.proxyState);
+          react();
+          return true;
+
+        }
+
+      } else {
+
+        target[prop] = value;
+        internals.propertyDidChange(prop, value);
+        internals.valueCache.set(prop, value);
+        react();
+        return true;
+
+      }
 
     }
 
@@ -1325,42 +1326,28 @@
   /**
    * Intercept "delete" requests of properties in a reactive state object
    * @function proxyDeleteHandler
-   * @param {object} target         - the state instance from which a property should be deleted.
+   * @param {object} target         - the state internals from which a property should be deleted.
    * @param {string} prop           - the property that should be deleted from the target.
    * @returns {(boolean|undefined)} - true if property has been deleted, else undefined.
    */
   function proxyDeleteHandler(target, prop) {
 
-    if (!isReacting) {
+    if (target.hasOwnProperty(prop)) {
 
-      if (target.hasOwnProperty(prop)) {
+      const internals = target[__CUE__];
+      const value = target[prop];
 
-        const instance = target[__CUE__];
-
-        const provider = instance.providersOf.get(prop);
-
-        if (provider) {
-          // forward the delete request to the root of the data (it will ripple back through the system from there!)
-          const rootProvider = getRootProvider(provider);
-          delete rootProvider.sourceInstance.plainState[rootProvider.sourceProperty];
-          return true;
-        }
-
-        instance.propertyDidChange.call(instance, prop, undefined);
-
-        delete target[prop];
-
-        instance.valueCache.delete(prop);
-
-        react();
-
-        return true;
-
+      const subInternals = value ? value[__CUE__] : undefined;
+      if (subInternals) {
+        subInternals.instanceWillUnmount();
       }
 
-    } else {
+      delete target[prop];
+      internals.valueCache.delete(prop);
+      internals.propertyDidChange.call(internals, prop, undefined);
+      react();
 
-      console.warn(`Deletion of "${prop}" ignored. Don't mutate state in a reaction. Refactor to computed properties instead.`);
+      return true;
 
     }
 
@@ -1661,9 +1648,14 @@
       this.imports = module.imports;
       this.mounted = false;
 
+      this.internalGetters = EMPTY_MAP;
+      this.internalSetters = EMPTY_MAP;
+
     }
 
     addChangeReaction(property, handler, scope, autorun = true) {
+
+      console.log('ADD CHANGE REACTION', property, this);
 
       if (!isFunction(handler)) {
         throw new TypeError(`Property change reaction for "${property}" is not a function...`);
@@ -1742,13 +1734,23 @@
 
     }
 
+    instanceDidChangePropertyName(ownPropertyName) {
+      this.ownPropertyName = ownPropertyName;
+      // TODO: rewrite pathFromRoot and propertyPathPrefix
+    }
+
     instanceDidMount(parent, ownPropertyName) {
 
-      // find the nearest parent that is based on a module and build the path to the property
-      let rootInternals = parent[__CUE__];
-      let rootPropertyName = ownPropertyName;
-      let pathFromRoot = [];
+      // This method is called when an instance has been attached to a parent node graph.
+      console.log(`%c [StateInternals](instanceDidMount) "${ownPropertyName}"`, 'background: gainsboro; color: black;');
 
+      this.parentInternals = parent[__CUE__];
+      let rootInternals = this.parentInternals;
+      this.ownPropertyName = ownPropertyName;
+      let rootPropertyName = this.ownPropertyName; //something
+
+      // Find the root internals (root !== parent. root is the closest module-based ancestor)
+      const pathFromRoot = [];
       while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE) {
         rootInternals = rootInternals.rootInternals;
         rootPropertyName = rootInternals.rootPropertyName;
@@ -1776,31 +1778,23 @@
         this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
         this.providersOf = new Map(); // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-        // 2. Inject Providers
         if (this.module.providersToInstall.size) {
           this.injectProviders();
         }
 
-        // 3. Create Derivatives from module blueprints
         if (this.module.derivativesToInstall.size) {
           this.installDerivatives();
         }
 
-        // 4. Initialize instance with ProxyState as "this" and pass initialProps we originally received from factory
-        this.module.initialize.call(this.proxyState, this.initialProps);
+        if (this.mounted === false && this.initialProps) { // only call "initialize" when an instance has not been mounted, never when it is being re-attached.
+          this.module.initialize.call(this.proxyState, this.initialProps);
+          delete this.initialProps;
+        }
 
-        // 5. We no longer need initialProps
-        delete this.initialProps;
+      } else if (this.type === STATE_TYPE_EXTENSION && isArray(this.plainState)) {
 
-      } else if (this.type === STATE_TYPE_EXTENSION) {
-
-        // Extensions don't have derived or provided properties. They don't have their own imports and
-        // they don't have actions. Only module-based state instances have these.
-
-        // extension only have getters when they are arrays (intercepted mutators)
-        this.internalGetters = isArray(this.plainState) ? ARRAY_MUTATOR_GETTERS : EMPTY_MAP;
-        // extensions don't have any internal setters
-        this.internalSetters = EMPTY_MAP;
+        // When a state extension is an array, we intercept array mutator methods on it.
+        this.internalGetters = ARRAY_MUTATOR_GETTERS;
 
       }
 
@@ -1931,7 +1925,7 @@
           root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
         }
 
-      } else if (this.type === STATE_TYPE_INSTANCE) { // react on self
+      } else { // react on self
 
         const observers = this.observersOf.get(prop);
         const derivatives = this.derivativesOf.get(prop);
@@ -1996,6 +1990,8 @@
    */
   function createState(data, module, type, props) {
 
+    console.log('%c createState from::::', 'background: paleGreen; color: darkGreen;', data);
+
     // 1. Attach Internals to "data" under private __CUE__ symbol.
     const internals = data[__CUE__] = new StateInternals(module, type);
 
@@ -2011,11 +2007,41 @@
     internals.proxyState = proxyState;
 
     // 4. When called from a StateFactory, pass initial props to Internals
-    if (arguments.length === 4) {
-      internals.initialProps = props;
+    if (props) internals.initialProps = props;
+
+    // 5. Recursively createState for all object children that are not yet states.
+    // TODO: don't mount sub-instances here. Do this in instanceDidMount, recursively for the children. only create state here.
+    if (isArray(data)) {
+
+      for (let i = 0, val; i < data.length; i++) {
+        val = data[i];
+        if (typeof val === 'object' && val !== null) {
+          val = val[__CUE__] || createState(val, module, STATE_TYPE_EXTENSION, null).internals;
+          if (val.mounted === false) {
+            data[i] = val.proxyState;
+            //val.instanceDidMount(data, i);
+          }
+        }
+      }
+
+    } else {
+
+      const keys = oKeys(data);
+      for (let i = 0, key, val; i < keys.length; i++) {
+        key = keys[i];
+        val = data[key];
+        if (typeof val === 'object' && val !== null) {
+          val = val[__CUE__] || createState(val, module, STATE_TYPE_EXTENSION, null).internals;
+          if (val.mounted === false) {
+            data[key] = val.proxyState;
+            //val.instanceDidMount(data, key);
+          }
+        }
+      }
+
     }
 
-    // 5. Return
+    // 6. Return
     return {
       plainState: data,
       proxyState: proxyState,

@@ -2,42 +2,28 @@
 /**
  * Intercept "delete" requests of properties in a reactive state object
  * @function proxyDeleteHandler
- * @param {object} target         - the state instance from which a property should be deleted.
+ * @param {object} target         - the state internals from which a property should be deleted.
  * @param {string} prop           - the property that should be deleted from the target.
  * @returns {(boolean|undefined)} - true if property has been deleted, else undefined.
  */
 function proxyDeleteHandler(target, prop) {
+  
+  if (target.hasOwnProperty(prop)) {
 
-  if (!isReacting) {
+    const internals = target[__CUE__];
+    const value = target[prop];
 
-    if (target.hasOwnProperty(prop)) {
-
-      const instance = target[__CUE__];
-
-      const provider = instance.providersOf.get(prop);
-
-      if (provider) {
-        // forward the delete request to the root of the data (it will ripple back through the system from there!)
-        const rootProvider = getRootProvider(provider);
-        delete rootProvider.sourceInstance.plainState[rootProvider.sourceProperty];
-        return true;
-      }
-
-      instance.propertyDidChange.call(instance, prop, undefined);
-
-      delete target[prop];
-
-      instance.valueCache.delete(prop);
-
-      react();
-
-      return true;
-
+    const subInternals = value ? value[__CUE__] : undefined;
+    if (subInternals) {
+      subInternals.instanceWillUnmount();
     }
 
-  } else {
+    delete target[prop];
+    internals.valueCache.delete(prop);
+    internals.propertyDidChange.call(internals, prop, undefined);
+    react();
 
-    console.warn(`Deletion of "${prop}" ignored. Don't mutate state in a reaction. Refactor to computed properties instead.`);
+    return true;
 
   }
 

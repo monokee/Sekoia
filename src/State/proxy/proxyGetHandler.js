@@ -1,4 +1,3 @@
-
 /**
  * Intercept "get" requests of properties in a reactive state object.
  * When prop is special symbol key, interceptor can return special data for recursive access etc.
@@ -11,43 +10,14 @@
  */
 function proxyGetHandler(target, prop) {
 
-  if (prop === __CUE__)
-    return target[__CUE__];
-  if (prop === 'imports')
-    return target[__CUE__].imports;
-
   const internals = target[__CUE__];
 
-  if (internals.internalGetters.has(prop)) {
-    return internals.internalGetters.get(prop)(internals);
-  }
-
-  const value = target[prop];
-
-  if (!value || value[__CUE__] || typeof value !== 'object') {
-
-    return value;
-
-  } else {
-
-    console.count('[get] create subState');
-
-    // find the root parent that is based on a real module (ie not inheriting)
-    let rootParent = target[__CUE__];
-    while (rootParent.type !== STATE_TYPE_INSTANCE) {
-      rootParent = rootParent.rootInternals;
-    }
-
-    // Create a reactive state extension
-    const extension = createState(value, rootParent.module, STATE_TYPE_EXTENSION, null);
-
-    // Mount the reactive extension onto the target
-    target[prop] = extension.proxyState;
-    extension.internals.instanceDidMount(target, prop);
-
-    // Return the proxy
-    return extension.proxyState;
-
-  }
+  return prop === __CUE__
+    ? internals
+    : prop === 'imports'
+      ? internals.imports
+      : internals.internalGetters.has(prop)
+        ? internals.internalGetters.get(prop)
+        : target[prop];
 
 }

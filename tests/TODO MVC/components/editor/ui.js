@@ -48,6 +48,10 @@ Cue.UI('Todo-Editor', Component => ({
       justifyContent: 'center'
     },
 
+    filterButtons: {
+      display: 'flex'
+    },
+
     filterButton: {
       margin: '0 0.5em',
       cursor: 'pointer',
@@ -79,6 +83,7 @@ Cue.UI('Todo-Editor', Component => ({
   },
 
   initialize(state) {
+    console.log('%c [Todo-Editor](initialize)', 'background: lightcyan; color: dodgerblue;');
 
     this.state = state;
 
@@ -130,6 +135,8 @@ Cue.UI('Todo-Editor', Component => ({
     },
 
     todos(o) {
+
+      // o.value is not a proxy here. however, its children are. how?
 
       if(o.value.length === 0) {
         this.addClass(this.footer, 'hidden');

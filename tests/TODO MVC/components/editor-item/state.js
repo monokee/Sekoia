@@ -6,6 +6,7 @@ Cue.State('Todo-Item', Module => ({
   },
 
   initialize(props) {
+    console.log('%c [Todo-Item](initialize)', 'background: cornsilk; color: chocolate;');
     this.text = props.text || this.text;
     this.isComplete = props.isComplete || this.isComplete;
   }

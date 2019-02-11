@@ -10,38 +10,25 @@ function intercepted_array_fill(value, start = 0, end = this.length) {
     return this;
   }
 
-  const instance = this[__CUE__];
-  const array = instance.plainState;
+  const internals = this[__CUE__];
+  const array = internals.plainState;
 
   let hasChanged = false;
 
-  if (value && value[__CUE__]) { // have to mount a sub-instance onto the array
+  if (typeof value === 'object' && value !== null) {
+    value = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
+  }
 
-    if (this.length > 1)
-      throw new Error(`You can not fill an Array with multiple copies of the same state instance.`);
-
-    const oldValue = array[0];
-
+  for (let i = start, oldValue; i < end; i++) {
+    oldValue = array[i];
     if (oldValue !== value) {
-      array[0] = value;
+      array[i] = value;
       hasChanged = true;
-      value[__CUE__].instanceDidMount(array, 0);
     }
-
-  } else { // normal fill with change detection and change event handling
-
-    for (let i = start, oldValue; i < end; i++) {
-      oldValue = array[i];
-      if (oldValue !== value) {
-        array[i] = value;
-        hasChanged = true;
-      }
-    }
-
   }
 
   if (hasChanged) {
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
   }
 
@@ -53,18 +40,31 @@ function intercepted_array_push(...rest) {
 
   if (rest.length > 0) {
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
 
-    for (let i = 0, value, subState; i < rest.length; i++) { // fragmented push calls to determine if added values are states that have to be mounted
+    for (let i = 0, value, subInternals; i < rest.length; i++) {
+
       value = rest[i];
-      array.push(value);
-      if (value && (subState = value[__CUE__])) { // if we push subStates into the array, mount the subStates
-        subState.instanceDidMount(array, i);
+
+      if (typeof value === 'object' && value !== null) {
+
+        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+
+        if (subInternals.mounted === false) {
+          array.push(subInternals.proxyState);
+          subInternals.instanceDidMount(array, array.length - 1);
+        }
+
+      } else {
+
+        array.push(value);
+
       }
+
     }
 
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
 
   }
@@ -77,32 +77,44 @@ function intercepted_array_unshift(...rest) {
 
   if (rest.length > 0) {
 
-    const instance = this[__CUE__];
-    const array = instance.plainState;
+    const internals = this[__CUE__];
+    const array = internals.plainState;
 
-    let i = rest.length, value, oldValue, subState;
-    while (--i >= 0) { // fragmented unshift calls to know if the value added into first index needs to be mounted
+    let i = rest.length, value, subInternals;
+    while (--i >= 0) {
+
       value = rest[i];
-      oldValue = array[0];
-      array.unshift(value);
-      if (value && (subState = value[__CUE__])) { // mount if value is subState
-        subState.instanceDidMount(array, 0);
+
+      if (typeof value === 'object' && value !== null) {
+
+        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+
+        if (subInternals.mounted === false) {
+          array.unshift(subInternals.proxyState);
+          subInternals.instanceDidMount(array, 0);
+        }
+
+      } else {
+
+        array.unshift(value);
+
       }
+
     }
 
-    instance.propertyDidChange();
+    internals.propertyDidChange();
     react();
 
   }
 
-  return this.length; // comply with default push return
+  return this.length; // comply with default unshift return
 
 }
 
 function intercepted_array_splice(start, deleteCount, ...items) {
 
-  const instance = this[__CUE__];
-  const array = instance.plainState;
+  const internals = this[__CUE__];
+  const array = internals.plainState;
 
   const len = array.length;
   const actualStart = start < 0 ? Math.max((len + start), 0) : Math.min(start, len);
@@ -121,7 +133,7 @@ function intercepted_array_splice(start, deleteCount, ...items) {
   // 1. delete elements from array, collected on "deleted", notify state of unmount if deleted elements are state objects. if we're deleting from an index that we will not be adding a replacement for, cue the property
   if (actualDeleteCount > 0) {
 
-    let i = actualStart + actualDeleteCount, value, oldValue, subState;
+    let i = actualStart + actualDeleteCount, oldValue, subState;
 
     while (--i >= actualStart) {
 
@@ -142,22 +154,31 @@ function intercepted_array_splice(start, deleteCount, ...items) {
   // 2. add elements to array, check if they have to be mounted and cue the property.
   if (insertCount > 0) {
 
-    for (let i = 0, value, arrayIndex, oldValue, subState; i < insertCount; i++) {
+    for (let i = 0, value, arrayIndex, subInternals; i < insertCount; i++) {
 
       value = items[i];
       arrayIndex = actualStart + i;
 
-      array.splice(arrayIndex, 0, value);
+      if (typeof value === 'object' && value !== null) {
 
-      if (value && (subState = value[__CUE__])) { // if we splice subStates into the array, mount the subStates
-        subState.instanceDidMount(array, arrayIndex);
+        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+
+        if (subInternals.mounted === false) {
+          array.splice(arrayIndex, 0, subInternals.proxyState);
+          subInternals.instanceDidMount(array, arrayIndex);
+        }
+
+      } else {
+
+        array.splice(arrayIndex, 0, value);
+
       }
 
     }
 
   }
 
-  instance.propertyDidChange();
+  internals.propertyDidChange();
   react();
 
   return deleted;
@@ -166,23 +187,23 @@ function intercepted_array_splice(start, deleteCount, ...items) {
 
 function intercepted_array_pop() {
 
-  const instance = this[__CUE__];
-  const array = instance.plainState;
+  const internals = this[__CUE__];
+  const array = internals.plainState;
 
   if (array.length === 0) {
     return undefined;
   }
 
   const last = array[array.length - 1];
-  const subState = last ? last[__CUE__] : undefined;
+  const subInternals = last ? last[__CUE__] : undefined;
 
-  if (subState) {
-    subState.instanceWillUnmount();
+  if (subInternals) {
+    subInternals.instanceWillUnmount();
   }
 
   delete array[array.length - 1];
 
-  instance.propertyDidChange();
+  internals.propertyDidChange();
   react();
 
   return last;
@@ -191,23 +212,23 @@ function intercepted_array_pop() {
 
 function intercepted_array_shift() {
 
-  const instance = this[__CUE__];
-  const array = instance.plainState;
+  const internals = this[__CUE__];
+  const array = internals.plainState;
 
   if (array.length === 0) {
     return undefined;
   }
 
   const last = array[0];
-  const subState = last ? last[__CUE__] : undefined;
+  const subInternals = last ? last[__CUE__] : undefined;
 
-  if (subState) {
-    subState.instanceWillUnmount();
+  if (subInternals) {
+    subInternals.instanceWillUnmount();
   }
 
   array.shift();
 
-  instance.propertyDidChange();
+  internals.propertyDidChange();
   react();
 
   return last;
@@ -216,8 +237,8 @@ function intercepted_array_shift() {
 
 function intercepted_array_copyWithin(target, start = 0, end = this.length) {
 
-  const instance = this[__CUE__];
-  const array = instance.plainState;
+  const internals = this[__CUE__];
+  const array = internals.plainState;
 
   const len = array.length;
   let to = target < 0 ? Math.max((len + target), 0) : Math.min(target, len);
@@ -254,7 +275,7 @@ function intercepted_array_copyWithin(target, start = 0, end = this.length) {
     count -= 1;
   }
 
-  instance.propertyDidChange();
+  internals.propertyDidChange();
   react();
 
   return array;
@@ -263,12 +284,18 @@ function intercepted_array_copyWithin(target, start = 0, end = this.length) {
 
 function intercepted_array_reverse() {
 
-  const instance = this[__CUE__];
-  const array = instance.plainState;
+  const internals = this[__CUE__];
+  const array = internals.plainState;
+
+  //TODO: what are the implications of this? if we're shuffling cue objects in an array we're rewriting their properties. This changes a number of things about them like: ownPropertyName, pathFromRoot
+  // Additionally, if a previously mounted cue state object is being attached to a new parent, we should also be able to conveniently re-wire the objects internals.
+  // unfortunately, this requires recursively re-writing all of the objects state-children as well. but I think we can do it because we only need to re-write some internal properties (paths!)
+  // some checks need to be performed here that disallow re-attaching objects if they consume properties from ancestors which would no longer be ancestors after the reattachment.
+  // BIG TODO.
 
   array.reverse();
 
-  instance.propertyDidChange();
+  internals.propertyDidChange();
   react();
 
   return array;
@@ -277,12 +304,12 @@ function intercepted_array_reverse() {
 
 function intercepted_array_sort(compareFunction) {
 
-  const instance = this[__CUE__];
-  const array = instance.plainState;
+  const internals = this[__CUE__];
+  const array = internals.plainState;
 
   array.sort(compareFunction);
 
-  instance.propertyDidChange();
+  internals.propertyDidChange();
   react();
 
   return array;

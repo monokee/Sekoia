@@ -10,6 +10,8 @@
  */
 function createState(data, module, type, props) {
 
+  console.log('%c createState from::::', 'background: paleGreen; color: darkGreen;', data);
+
   // 1. Attach Internals to "data" under private __CUE__ symbol.
   const internals = data[__CUE__] = new StateInternals(module, type);
 
@@ -25,11 +27,41 @@ function createState(data, module, type, props) {
   internals.proxyState = proxyState;
 
   // 4. When called from a StateFactory, pass initial props to Internals
-  if (arguments.length === 4) {
-    internals.initialProps = props;
+  if (props) internals.initialProps = props;
+
+  // 5. Recursively createState for all object children that are not yet states.
+  // TODO: don't mount sub-instances here. Do this in instanceDidMount, recursively for the children. only create state here.
+  if (isArray(data)) {
+
+    for (let i = 0, val; i < data.length; i++) {
+      val = data[i];
+      if (typeof val === 'object' && val !== null) {
+        val = val[__CUE__] || createState(val, module, STATE_TYPE_EXTENSION, null).internals;
+        if (val.mounted === false) {
+          data[i] = val.proxyState;
+          //val.instanceDidMount(data, i);
+        }
+      }
+    }
+
+  } else {
+
+    const keys = oKeys(data);
+    for (let i = 0, key, val; i < keys.length; i++) {
+      key = keys[i];
+      val = data[key];
+      if (typeof val === 'object' && val !== null) {
+        val = val[__CUE__] || createState(val, module, STATE_TYPE_EXTENSION, null).internals;
+        if (val.mounted === false) {
+          data[key] = val.proxyState;
+          //val.instanceDidMount(data, key);
+        }
+      }
+    }
+
   }
 
-  // 5. Return
+  // 6. Return
   return {
     plainState: data,
     proxyState: proxyState,

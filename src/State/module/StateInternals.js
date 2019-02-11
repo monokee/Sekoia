@@ -21,9 +21,14 @@ class StateInternals {
     this.imports = module.imports;
     this.mounted = false;
 
+    this.internalGetters = EMPTY_MAP;
+    this.internalSetters = EMPTY_MAP;
+
   }
 
   addChangeReaction(property, handler, scope, autorun = true) {
+
+    console.log('ADD CHANGE REACTION', property, this);
 
     if (!isFunction(handler)) {
       throw new TypeError(`Property change reaction for "${property}" is not a function...`);
@@ -99,13 +104,23 @@ class StateInternals {
 
   }
 
+  instanceDidChangePropertyName(ownPropertyName) {
+    this.ownPropertyName = ownPropertyName;
+    // TODO: rewrite pathFromRoot and propertyPathPrefix
+  }
+
   instanceDidMount(parent, ownPropertyName) {
 
-    // find the nearest parent that is based on a module and build the path to the property
-    let rootInternals = parent[__CUE__];
-    let rootPropertyName = ownPropertyName;
-    let pathFromRoot = [];
+    // This method is called when an instance has been attached to a parent node graph.
+    console.log(`%c [StateInternals](instanceDidMount) "${ownPropertyName}"`, 'background: gainsboro; color: black;');
 
+    this.parentInternals = parent[__CUE__];
+    let rootInternals = this.parentInternals;
+    this.ownPropertyName = ownPropertyName;
+    let rootPropertyName = this.ownPropertyName; //something
+
+    // Find the root internals (root !== parent. root is the closest module-based ancestor)
+    const pathFromRoot = [];
     while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE) {
       rootInternals = rootInternals.rootInternals;
       rootPropertyName = rootInternals.rootPropertyName;
@@ -133,31 +148,24 @@ class StateInternals {
       this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
       this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-      // 2. Inject Providers
       if (this.module.providersToInstall.size) {
         this.injectProviders();
       }
 
-      // 3. Create Derivatives from module blueprints
       if (this.module.derivativesToInstall.size) {
         this.installDerivatives();
       }
 
-      // 4. Initialize instance with ProxyState as "this" and pass initialProps we originally received from factory
-      this.module.initialize.call(this.proxyState, this.initialProps);
+      if (this.mounted === false && this.initialProps) { // only call "initialize" when an instance has not been mounted, never when it is being re-attached.
+        this.module.initialize.call(this.proxyState, this.initialProps);
+        delete this.initialProps;
+      }
 
-      // 5. We no longer need initialProps
-      delete this.initialProps;
 
-    } else if (this.type === STATE_TYPE_EXTENSION) {
+    } else if (this.type === STATE_TYPE_EXTENSION && isArray(this.plainState)) {
 
-      // Extensions don't have derived or provided properties. They don't have their own imports and
-      // they don't have actions. Only module-based state instances have these.
-
-      // extension only have getters when they are arrays (intercepted mutators)
-      this.internalGetters = isArray(this.plainState) ? ARRAY_MUTATOR_GETTERS : EMPTY_MAP;
-      // extensions don't have any internal setters
-      this.internalSetters = EMPTY_MAP;
+      // When a state extension is an array, we intercept array mutator methods on it.
+      this.internalGetters = ARRAY_MUTATOR_GETTERS;
 
     }
 
@@ -283,7 +291,7 @@ class StateInternals {
         root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
       }
 
-    } else if (this.type === STATE_TYPE_INSTANCE) { // react on self
+    } else { // react on self
 
       const observers = this.observersOf.get(prop);
       const derivatives = this.derivativesOf.get(prop);

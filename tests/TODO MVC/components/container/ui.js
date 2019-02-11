@@ -45,7 +45,13 @@ Cue.UI('Todo-Container', Component => ({
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      marginTop: '2.5em',
+
+      p: {
+        margin: 0
+      }
+
     }
 
   },
@@ -55,7 +61,7 @@ Cue.UI('Todo-Container', Component => ({
   },
 
   initialize(state) {
-
+    console.log('%c [Todo-Container](initialize)', 'background: lightcyan; color: dodgerblue;');
     this.state = state;
     this.createEditor = this.imports.editor;
     this.headline = this.select('.headline');

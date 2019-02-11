@@ -7,15 +7,16 @@ Cue.State('Todo-Container', Module => ({
   },
 
   imports: {
-    createEditor: Module.import('Todo-Editor')
+    Editor: Module.import('Todo-Editor')
   },
 
   initialize(props) {
 
-    this.title = props.title || this.title;
-    this.author = props.author || this.author;
+    console.log('%c [Todo-Container](initialize)', 'background: cornsilk; color: chocolate;');
 
-    this.editor = this.imports.createEditor(props.editor);
+    this.title = props.title;
+    this.author = props.author;
+    this.editor = this.imports.Editor(props.editor);
 
   }
 

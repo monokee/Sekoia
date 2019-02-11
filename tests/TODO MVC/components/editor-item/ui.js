@@ -8,6 +8,7 @@ Cue.UI('Todo-Item', Component => ({
   ),
 
   initialize(state) {
+    console.log('%c [Todo-Item](initialize)', 'background: lightcyan; color: dodgerblue;');
     this.state = state;
     this.checkBox = this.select('.checkbox');
     this.textField = this.select('.textField');

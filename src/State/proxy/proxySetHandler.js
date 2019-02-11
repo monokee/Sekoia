@@ -13,34 +13,38 @@ function proxySetHandler(target, prop, value) {
 
   const internals = target[__CUE__];
 
-  // Mount unmounted sub-state
-  const nestedInternals = value ? value[__CUE__] : undefined;
-  if (nestedInternals && nestedInternals.mounted === false) {
-    nestedInternals.instanceDidMount.call(nestedInternals, target, prop);
-  }
-
-  // Forward set requests
   if (internals.internalSetters.has(prop)) {
     internals.internalSetters.get(prop)(internals, value);
     return true;
   }
 
-  // Handle normal set requests
   if (value !== internals.valueCache.get(prop)) {
 
-    // mutate the target object
-    target[prop] = value;
+    if (typeof value === 'object' && value !== null) { // any object
 
-    // queue reactions
-    internals.propertyDidChange.call(internals, prop, value);
+      const subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
 
-    // update the cache
-    internals.valueCache.set(prop, value);
+      if (subInternals.mounted === false) {
 
-    // run through all reactions in the queue
-    react();
+        target[prop] = subInternals.proxyState; // attach the proxy
+        subInternals.instanceDidMount(target, prop); // mount
 
-    return true;
+        internals.propertyDidChange(prop, subInternals.proxyState);
+        internals.valueCache.set(prop, subInternals.proxyState);
+        react();
+        return true;
+
+      }
+
+    } else {
+
+      target[prop] = value;
+      internals.propertyDidChange(prop, value);
+      internals.valueCache.set(prop, value);
+      react();
+      return true;
+
+    }
 
   }
 
