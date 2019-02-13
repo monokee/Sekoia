@@ -7,18 +7,16 @@
  * @function cueImmediate
  * @external {Array} accumulatedDerivatives - Collects unique derivatives which were affected by source property mutation(s). Queueing of their subDerivatives is deferred.
  */
-function cueImmediate(prop, value, oldValue, observers, derivatives, stopPropagation) {
+function cueImmediate(prop, value, path, observers, derivatives, stopPropagation) {
 
   let i, reaction, derivative;
 
   if (observers) {
 
-    const o_O = {value: value, oldValue: oldValue};
-
     for (i = 0; i < observers.length; i++) {
       reaction = observers[i];
       if (MAIN_QUEUE.indexOf(reaction) === -1) {
-        MAIN_QUEUE.push(reaction, o_O);
+        MAIN_QUEUE.push(reaction, value, path);
       }
     }
 

@@ -1,8 +1,10 @@
 <component name="ProjectDictionaryState">
   <dictionary name="jonat">
     <words>
+      <w>checkmark</w>
       <w>clickables</w>
       <w>computeds</w>
+      <w>contenteditable</w>
       <w>gsap</w>
       <w>hndlr</w>
       <w>lerp</w>

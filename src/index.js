@@ -1,7 +1,7 @@
 
 /*
  *
- * 🍑 Cue - Reactive Data-Driven Web Apps
+ * 🧿 Cue - Reactive Data-Driven Web Apps
  *
  * @author Jonathan M. Ochmann for color.io
  * Copyright 2019 Patchflyer GmbH
@@ -18,15 +18,11 @@ const EMPTY_MAP = new Map();
 const oAssign = OBJ.assign;
 const oCreate = OBJ.create;
 const oDefineProperty = OBJ.defineProperty;
-const oDefineProperties = OBJ.defineProperties;
 const oGetPrototypeOf = OBJ.getPrototypeOf;
-const oSetPrototypeOf = OBJ.setPrototypeOf;
-const oGetOwnPropertyDescriptors = OBJ.getOwnPropertyDescriptors;
 const oProtoToString = OBJ.prototype.toString;
 
 // Utility methods
 const NOOP = ()=>{};
-const _construct = Reflect.construct;
 const oKeys = OBJ.keys;
 const isArray = ARR.isArray;
 const toArray = ARR.from;

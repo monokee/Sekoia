@@ -48,7 +48,8 @@ class CueComposite {
     // Create State Instance (this returns a proxy)
     const stateInstance = this.stateInstance = stateFactory(props);
     const stateInternals = this.stateInternals = stateInstance[__CUE__];
-    stateInternals.instanceDidMount.call(stateInternals, CUE_ROOT_STATE, stateModuleName);
+
+    stateInternals.instanceDidMount(CUE_ROOT_STATE, stateModuleName);
 
     // Create UI Element and append it to the target
     const uiElement = this.uiElement = uiFactory(stateInstance);

@@ -7,14 +7,9 @@ class StateInternals {
 
   constructor(module, type) {
 
-    // faster instanceof check
-    this[__IS_STATE_INTERNAL__] = true;
-
-    // STATE_TYPE_INSTANCE = 1 or STATE_TYPE_EXTENSION = 2
     this.type = type;
 
-    // value cache used for change detection
-    this.valueCache = new Map(); // 1D map [propertyName -> currentValue]
+    this.valueCache = new Map();
 
     // Pointer to underlying module (shared by all instances of module)
     this.module = module;
@@ -26,93 +21,49 @@ class StateInternals {
 
   }
 
-  addChangeReaction(property, handler, scope, autorun = true) {
-
-    console.log('ADD CHANGE REACTION', property, this);
-
-    if (!isFunction(handler)) {
-      throw new TypeError(`Property change reaction for "${property}" is not a function...`);
-    }
-
-    const boundHandler = handler.bind(scope);
-
-    if (this.observersOf.has(property)) {
-      this.observersOf.get(property).push(boundHandler);
-    } else {
-      this.observersOf.set(property, [ boundHandler ]);
-    }
-
-    if (this.derivedProperties.has(property)) {
-      const derivative = this.derivedProperties.get(property);
-      derivative.observers.push(boundHandler);
-      setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
-    }
-
-    if (autorun === true) {
-      const val = this.plainState[property];
-      boundHandler({value: val, path: property});
-    }
-
-    return boundHandler;
-
+  instanceWillUnmount() {
+    console.log('[todo: instanceWillUnmount]', this);
   }
 
-  removeChangeReaction(property, handler) {
+  cueConsumers(providerInstance, consumers, prop, value) {
 
-    if (this.observersOf.has(property)) {
+    // Find consumer instances and recurse into each branch
 
-      const reactions = this.observersOf.get(property);
-      const derivative = this.derivedProperties.get(property);
+    let key, childState;
+    for (key in this.plainState) {
 
-      if (handler === undefined) {
+      childState = this.plainState[key];
 
-        this.observersOf.delete(property);
+      if (childState && (childState = childState[__CUE__])) { // property is a child state instance
 
-        if (derivative) {
-          derivative.observers.splice(0, derivative.observers.length);
-          setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
-        }
-
-      } else if (isFunction(handler)) {
-
-        let i = reactions.indexOf(handler);
-
-        if (i > -1) {
-          reactions.splice(i, 1);
-        } else {
-          console.warn(`Can't remove the passed handler from reactions of "${property}" because it is not registered.`);
-        }
-
-        if (derivative) {
-
-          i = derivative.observers.indexOf(handler);
-
-          if (i > -1) {
-            derivative.observers.splice(i, 1);
-            setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
-          } else {
-            console.warn(`Can't remove the passed handler from observers of derived property "${property}" because it is not registered.`);
+        let provider;
+        for (provider of childState.providersOf.values()) {
+          if (provider.sourceInternals === providerInstance && provider.sourceProperty === prop) {
+            // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
+            childState.propertyDidChange.call(childState, provider.targetProperty, value); // continue recursion in this branch
           }
-
         }
+
+        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the provided prop is also provided from another upstream state)
+        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value);
 
       }
 
-    } else {
-      console.warn(`Can't unobserve property "${property}" because no reaction has been registered for it.`);
     }
 
   }
 
-  instanceDidChangePropertyName(ownPropertyName) {
-    this.ownPropertyName = ownPropertyName;
-    // TODO: rewrite pathFromRoot and propertyPathPrefix
+}
+
+class InstanceInternals extends StateInternals {
+
+  constructor(module, type) {
+    super(module, type);
   }
 
   instanceDidMount(parent, ownPropertyName) {
 
-    // This method is called when an instance has been attached to a parent node graph.
-    console.log(`%c [StateInternals](instanceDidMount) "${ownPropertyName}"`, 'background: gainsboro; color: black;');
+    // ------------------INLINE "SUPER" CALL----------------------
 
     this.parentInternals = parent[__CUE__];
     let rootInternals = this.parentInternals;
@@ -132,49 +83,52 @@ class StateInternals {
     this.pathFromRoot = pathFromRoot;
     this.propertyPathPrefix = pathFromRoot.length > 0 ? `${pathFromRoot.join('.')}.` : ''; // note the trailing dot
 
-    // only "smart" state instances based on their own module have top-level observers, derivatives and providers.
-    // all non-module-based state extensions (objects and arrays written into the state of a module) pull in smart data from their nearest module-based parent.
-    if (this.type === STATE_TYPE_INSTANCE) {
+    // -------------------------------------------------------------
 
-      this.name = this.module.name;
+    this.name = this.module.name;
 
-      this.internalGetters = this.module.internalGetters;
-      this.internalSetters = this.module.internalSetters;
+    this.internalGetters = this.module.internalGetters;
+    this.internalSetters = this.module.internalSetters;
+    this.consumersOf = this.module.consumersOf;
+    this.observersOf = new Map();       // 1D map [propertyName -> handler]
+    this.derivativesOf = new Map();     // 2D map [propertyName -> 1D array[...Derivatives]]
+    this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
+    this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-      this.consumersOf = this.module.consumersOf;
+    if (this.module.providersToInstall.size) {
+      this.injectProviders();
+    }
 
-      this.observersOf = new Map();       // 1D map [propertyName -> handler]
-      this.derivativesOf = new Map();     // 2D map [propertyName -> 1D array[...Derivatives]]
-      this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
-      this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
-
-      if (this.module.providersToInstall.size) {
-        this.injectProviders();
-      }
-
-      if (this.module.derivativesToInstall.size) {
-        this.installDerivatives();
-      }
-
-      if (this.mounted === false && this.initialProps) { // only call "initialize" when an instance has not been mounted, never when it is being re-attached.
-        this.module.initialize.call(this.proxyState, this.initialProps);
-        delete this.initialProps;
-      }
-
-
-    } else if (this.type === STATE_TYPE_EXTENSION && isArray(this.plainState)) {
-
-      // When a state extension is an array, we intercept array mutator methods on it.
-      this.internalGetters = ARRAY_MUTATOR_GETTERS;
-
+    if (this.module.derivativesToInstall.size) {
+      this.installDerivatives();
     }
 
     this.mounted = true;
+    this.module.initialize.call(this.proxyState, this.initialProps);
+    this.initialProps = undefined;
 
   }
 
-  instanceWillUnmount() {
-    console.log('[todo: instanceWillUnmount]', this);
+  propertyDidChange(prop, value) {
+
+    const observers = this.observersOf.get(prop);
+    const derivatives = this.derivativesOf.get(prop);
+
+    if (observers || derivatives) {
+      if (isAccumulating) {
+        cueImmediate(prop, value, prop, observers, derivatives, false);
+      } else {
+        cueAll(prop, value, prop, observers, derivatives, false);
+      }
+    }
+
+    const consumers = this.consumersOf.get(prop);
+
+    // 2. if the changed property has consumers, find them and recurse
+    if (consumers) {
+      this.cueConsumers(this, consumers, prop, value, prop);
+    }
+
   }
 
   injectProviders() {
@@ -262,83 +216,143 @@ class StateInternals {
 
   }
 
-  propertyDidChange(prop, value) {
+  addChangeReaction(property, handler, scope, autorun = true) {
 
-    // if im an extensionState and one of my properties has changed, i will forward the change to my nearest module parent which will receive a change event for a property that i am attached to. a path will be available in the event handler.
-    // if im an instanceState, i will only notify my immediate property observers.
+    if (!isFunction(handler)) {
+      throw new TypeError(`Property change reaction for "${property}" is not a function...`);
+    }
 
-    if (this.type === STATE_TYPE_EXTENSION) { // forward all changes to the nearest root parent
+    const boundHandler = handler.bind(scope);
 
-      const root = this.rootInternals;
-      const rootProp = this.rootPropertyName;
-      const rootVal = root.plainState[rootProp];
-      const path = this.propertyPathPrefix + prop;
+    if (this.observersOf.has(property)) {
+      this.observersOf.get(property).push(boundHandler);
+    } else {
+      this.observersOf.set(property, [ boundHandler ]);
+    }
 
-      // 1. recurse over direct dependencies
-      const observers = root.observersOf.get(rootProp);
-      const derivatives = root.derivativesOf.get(rootProp);
-      if (observers || derivatives) {
-        if (isAccumulating) {
-          cueImmediate(rootProp, rootVal, path, observers, derivatives, false);
-        } else {
-          cueAll(rootProp, rootVal, path, observers, derivatives, false);
+    if (this.derivedProperties.has(property)) {
+      const derivative = this.derivedProperties.get(property);
+      derivative.observers.push(boundHandler);
+      setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
+    }
+
+    if (autorun === true) {
+      const val = this.proxyState[property];
+      boundHandler(val, property);
+    }
+
+    return boundHandler;
+
+  }
+
+  removeChangeReaction(property, handler) {
+
+    if (this.observersOf.has(property)) {
+
+      const reactions = this.observersOf.get(property);
+      const derivative = this.derivedProperties.get(property);
+
+      if (handler === undefined) {
+
+        this.observersOf.delete(property);
+
+        if (derivative) {
+          derivative.observers.splice(0, derivative.observers.length);
+          setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
         }
-      }
 
-      // 2. Notify consumers of the property
-      const consumers = root.consumersOf.get(rootProp);
-      if (consumers) {
-        root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
-      }
+      } else if (isFunction(handler)) {
 
-    } else { // react on self
+        let i = reactions.indexOf(handler);
 
-      const observers = this.observersOf.get(prop);
-      const derivatives = this.derivativesOf.get(prop);
-
-      if (observers || derivatives) {
-        if (isAccumulating) {
-          cueImmediate(prop, value, prop, observers, derivatives, false);
+        if (i > -1) {
+          reactions.splice(i, 1);
         } else {
-          cueAll(prop, value, prop, observers, derivatives, false);
+          console.warn(`Can't remove the passed handler from reactions of "${property}" because it is not registered.`);
         }
+
+        if (derivative) {
+
+          i = derivative.observers.indexOf(handler);
+
+          if (i > -1) {
+            derivative.observers.splice(i, 1);
+            setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
+          } else {
+            console.warn(`Can't remove the passed handler from observers of derived property "${property}" because it is not registered.`);
+          }
+
+        }
+
       }
 
-      const consumers = this.consumersOf.get(prop);
-
-      // 2. if the changed property has consumers, find them and recurse
-      if (consumers) {
-        this.cueConsumers(this, consumers, prop, value, prop);
-      }
-
+    } else {
+      console.warn(`Can't unobserve property "${property}" because no reaction has been registered for it.`);
     }
 
   }
 
-  cueConsumers(providerInstance, consumers, prop, value) {
+}
 
-    // Find consumer instances and recurse into each branch
+class ExtensionInternals extends StateInternals {
 
-    let key, childState;
-    for (key in this.plainState) {
+  constructor(module, type) {
+    super(module, type);
+  }
 
-      childState = this.plainState[key];
+  instanceDidMount(parent, ownPropertyName) {
 
-      if (childState && (childState = childState[__CUE__])) { // property is a child state instance
+    // ------------------INLINE "SUPER" CALL----------------------
 
-        let provider;
-        for (provider of childState.providersOf.values()) {
-          if (provider.sourceInstance === providerInstance && provider.sourceProperty === prop) {
-            // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
-            childState.propertyDidChange.call(childState, provider.targetProperty, value); // continue recursion in this branch
-          }
-        }
+    this.parentInternals = parent[__CUE__];
+    let rootInternals = this.parentInternals;
+    this.ownPropertyName = ownPropertyName;
+    let rootPropertyName = this.ownPropertyName; //something
 
-        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the provided prop is also provided from another upstream state)
-        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value);
+    // Find the root internals (root !== parent. root is the closest module-based ancestor)
+    const pathFromRoot = [];
+    while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE) {
+      rootInternals = rootInternals.rootInternals;
+      rootPropertyName = rootInternals.rootPropertyName;
+      pathFromRoot.unshift(rootPropertyName);
+    }
 
+    this.rootInternals = rootInternals;
+    this.rootPropertyName = rootPropertyName;
+    this.pathFromRoot = pathFromRoot;
+    this.propertyPathPrefix = pathFromRoot.length > 0 ? `${pathFromRoot.join('.')}.` : ''; // note the trailing dot
+
+    // -------------------------------------------------------------
+
+    this.internalGetters = ARRAY_MUTATOR_GETTERS;
+    this.mounted = true;
+
+  }
+
+  propertyDidChange(prop) {
+
+    // propagate changes to the root instance.
+
+    const root = this.rootInternals;
+    const rootProp = this.rootPropertyName;
+    const rootVal = root.plainState[rootProp];
+    const path = this.propertyPathPrefix + prop;
+
+    // 1. recurse over direct dependencies
+    const observers = root.observersOf.get(rootProp);
+    const derivatives = root.derivativesOf.get(rootProp);
+    if (observers || derivatives) {
+      if (isAccumulating) {
+        cueImmediate(rootProp, rootVal, path, observers, derivatives, false);
+      } else {
+        cueAll(rootProp, rootVal, path, observers, derivatives, false);
       }
+    }
 
+    // 2. Notify consumers of the property
+    const consumers = root.consumersOf.get(rootProp);
+    if (consumers) {
+      root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
     }
 
   }

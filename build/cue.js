@@ -2,7 +2,7 @@
 
   /*
    *
-   * 🍑 Cue - Reactive Data-Driven Web Apps
+   * 🧿 Cue - Reactive Data-Driven Web Apps
    *
    * @author Jonathan M. Ochmann for color.io
    * Copyright 2019 Patchflyer GmbH
@@ -19,15 +19,11 @@
   const oAssign = OBJ.assign;
   const oCreate = OBJ.create;
   const oDefineProperty = OBJ.defineProperty;
-  const oDefineProperties = OBJ.defineProperties;
   const oGetPrototypeOf = OBJ.getPrototypeOf;
-  const oSetPrototypeOf = OBJ.setPrototypeOf;
-  const oGetOwnPropertyDescriptors = OBJ.getOwnPropertyDescriptors;
   const oProtoToString = OBJ.prototype.toString;
 
   // Utility methods
   const NOOP = () => {};
-  const _construct = Reflect.construct;
   const oKeys = OBJ.keys;
   const isArray = ARR.isArray;
   const toArray = ARR.from;
@@ -155,9 +151,6 @@
   // Internals of State Modules for internally passing module data around: name -> object
   const CUE_STATE_INTERNALS = new Map();
 
-  // Root State Store
-  const CUE_ROOT_STATE = {};
-
   // State Flags
   let isReacting = false; // is a reaction currently in process?
   let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
@@ -177,13 +170,31 @@
   const TRAVERSE_UP = 1;
 
   // Meta Keys used for closure scope lookup && safely extending foreign objects
-  const __CUE__ = Symbol('Cue State Internals');
-  const __IS_STATE_INTERNAL__ = Symbol('Instance of StateInternals');
+  const __CUE__ = Symbol('🧿 Cue Internals');
 
   const STATE_TYPE_INSTANCE = 1;
   const STATE_TYPE_EXTENSION = 2;
 
-  const ARRAY_MUTATOR_NAMES = new Set(['fill', 'push', 'unshift', 'splice', 'pop', 'shift', 'copyWithin', 'reverse', 'sort']);
+  // Root State Store
+  const CUE_ROOT_STATE = {};
+  oDefineProperty(CUE_ROOT_STATE, __CUE__, {
+    value: {
+      name: '::ROOT::',
+      module: {
+        name: '::ROOT::'
+      },
+      type: STATE_TYPE_INSTANCE,
+      plainState: CUE_ROOT_STATE,
+      proxyState: CUE_ROOT_STATE,
+      observersOf: EMPTY_MAP,
+      derivativesOf: EMPTY_MAP,
+      consumersOf: EMPTY_MAP,
+      providersToInstall: EMPTY_MAP,
+      derivativesToInstall: EMPTY_MAP,
+      internalGetters: EMPTY_MAP,
+      internalSetters: EMPTY_MAP
+    }
+  });
 
   /**
    * Reverse engineered array mutator methods that allow for fine-grained change detection and mutation interception.
@@ -199,24 +210,23 @@
     const internals = this[__CUE__];
     const array = internals.plainState;
 
-    let hasChanged = false;
-
     if (typeof value === 'object' && value !== null) {
       value = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
     }
 
-    for (let i = start, oldValue; i < end; i++) {
+    for (let i = start, oldValue, subInternals; i < end; i++) {
       oldValue = array[i];
       if (oldValue !== value) {
         array[i] = value;
-        hasChanged = true;
+        if (value && (subInternals = value[__CUE__]) && subInternals.mounted === false) {
+          subInternals.instanceDidMount(array, i);
+          createAndMountSubStates(subInternals);
+        }
+        internals.propertyDidChange(i);
       }
     }
 
-    if (hasChanged) {
-      internals.propertyDidChange();
-      react();
-    }
+    react();
 
     return this;
 
@@ -235,12 +245,11 @@
 
         if (typeof value === 'object' && value !== null) {
 
-          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
-          if (subInternals.mounted === false) {
-            array.push(subInternals.proxyState);
-            subInternals.instanceDidMount(array, array.length - 1);
-          }
+          array.push(subInternals.proxyState);
+          subInternals.instanceDidMount(array, array.length - 1);
+          createAndMountSubStates(subInternals);
 
         } else {
 
@@ -248,9 +257,10 @@
 
         }
 
+        internals.propertyDidChange(array.length - 1);
+
       }
 
-      internals.propertyDidChange();
       react();
 
     }
@@ -274,11 +284,12 @@
 
         if (typeof value === 'object' && value !== null) {
 
-          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
           if (subInternals.mounted === false) {
             array.unshift(subInternals.proxyState);
             subInternals.instanceDidMount(array, 0);
+            createAndMountSubStates(subInternals);
           }
 
         } else {
@@ -287,9 +298,10 @@
 
         }
 
+        internals.propertyDidChange(0);
+
       }
 
-      internals.propertyDidChange();
       react();
 
     }
@@ -315,7 +327,8 @@
       actualDeleteCount = Math.min(Math.max(deleteCount, 0), len - actualStart);
     }
 
-    const deleted = [];
+    const deleted = [],
+      notified = [];
 
     // 1. delete elements from array, collected on "deleted", notify state of unmount if deleted elements are state objects. if we're deleting from an index that we will not be adding a replacement for, cue the property
     if (actualDeleteCount > 0) {
@@ -332,7 +345,9 @@
         }
 
         array.splice(i, 1);
+        internals.propertyDidChange(i);
 
+        notified.push(i);
         deleted.push(oldValue);
 
       }
@@ -349,11 +364,12 @@
 
         if (typeof value === 'object' && value !== null) {
 
-          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+          subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
           if (subInternals.mounted === false) {
             array.splice(arrayIndex, 0, subInternals.proxyState);
             subInternals.instanceDidMount(array, arrayIndex);
+            createAndMountSubStates(subInternals);
           }
 
         } else {
@@ -362,11 +378,14 @@
 
         }
 
+        if (notified.indexOf(arrayIndex) === -1) {
+          internals.propertyDidChange(arrayIndex);
+        }
+
       }
 
     }
 
-    internals.propertyDidChange();
     react();
 
     return deleted;
@@ -391,7 +410,7 @@
 
     delete array[array.length - 1];
 
-    internals.propertyDidChange();
+    internals.propertyDidChange(array.length);
     react();
 
     return last;
@@ -416,7 +435,7 @@
 
     array.shift();
 
-    internals.propertyDidChange();
+    internals.propertyDidChange(0);
     react();
 
     return last;
@@ -451,19 +470,20 @@
           throw new Error(`You can't create copies of Cue State Instances via Array.prototype.copyWithin.`);
         }
         array[to] = array[from];
+        internals.propertyDidChange(to);
       } else {
         value = array[to];
         if (value && (subState = value[__CUE__])) {
           subState.instanceWillUnmount();
         }
         delete array[to];
+        internals.propertyDidChange(to);
       }
       from += direction;
       to += direction;
       count -= 1;
     }
 
-    internals.propertyDidChange();
     react();
 
     return array;
@@ -475,15 +495,12 @@
     const internals = this[__CUE__];
     const array = internals.plainState;
 
-    //TODO: what are the implications of this? if we're shuffling cue objects in an array we're rewriting their properties. This changes a number of things about them like: ownPropertyName, pathFromRoot
-    // Additionally, if a previously mounted cue state object is being attached to a new parent, we should also be able to conveniently re-wire the objects internals.
-    // unfortunately, this requires recursively re-writing all of the objects state-children as well. but I think we can do it because we only need to re-write some internal properties (paths!)
-    // some checks need to be performed here that disallow re-attaching objects if they consume properties from ancestors which would no longer be ancestors after the reattachment.
-    // BIG TODO.
-
     array.reverse();
 
-    internals.propertyDidChange();
+    for (let i = 0; i < array.length; i++) {
+      internals.propertyDidChange(i);
+    }
+
     react();
 
     return array;
@@ -494,10 +511,16 @@
 
     const internals = this[__CUE__];
     const array = internals.plainState;
+    const before = array.slice();
 
     array.sort(compareFunction);
 
-    internals.propertyDidChange();
+    for (let i = 0; i < array.length; i++) {
+      if (array[i] !== before[i]) {
+        internals.propertyDidChange(i);
+      }
+    }
+
     react();
 
     return array;
@@ -688,7 +711,7 @@
   /**
    * One-level (shallow), ordered equality check.
    * Works for primitives, plain objects and arrays.
-   * Other object types are strictly compared.
+   * Other object types are not supported.
    * @function areShallowEqual
    * @param     {*}       a - Compare this to:
    * @param     {*}       b - this...
@@ -696,28 +719,31 @@
    * */
   function areShallowEqual(a, b) {
 
-    if (a === b) return true;
+    if (isArray(a)) return !isArray(b) || a.length !== b.length ? false : areArraysShallowEqual(a, b);
 
-    if (a && b && typeof a === 'object' && typeof b === 'object') {
+    if (typeof a === 'object') return typeof b !== 'object' || (a === null || b === null) && a !== b ? false : arePlainObjectsShallowEqual(a, b);
 
-      // Plain Arrays
-      const arrayA = isArray(a);
-      const arrayB = isArray(b);
+    return a === b;
 
-      if (arrayA !== arrayB) return false;
-      if (arrayA && arrayB) return areArraysShallowEqual(a, b);
+  }
 
-      // Plain Objects
-      const objA = a.constructor === OBJ;
-      const objB = b.constructor === OBJ;
+  /**
+   * One-level (shallow), ordered equality check for arrays.
+   * Specifically optimized for "areShallowEqual" which pre-compares array length!
+   * @function areArraysShallowEqual
+   * @param   {Array}  a - The array that is compared to:
+   * @param   {Array}  b - this other array.
+   * @returns {boolean}  - True if a and b are shallow equal, else false.
+   * */
+  function areArraysShallowEqual(a, b) {
 
-      if (objA !== objB) return false;
-      if (objA && objB) return arePlainObjectsShallowEqual(a, b);
-
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) {
+        return false;
+      }
     }
 
-    // Maps, Sets, Date, RegExp etc strictly compared
-    return a !== a && b !== b;
+    return true;
 
   }
 
@@ -740,29 +766,6 @@
     for (let i = 0, k; i < keysA.length; i++) {
       k = keysA[i];
       if (keysB.indexOf(k) === -1 || a[k] !== b[k]) {
-        return false;
-      }
-    }
-
-    return true;
-
-  }
-
-  /**
-   * One-level (shallow), ordered equality check for arrays.
-   * @function areArraysShallowEqual
-   * @param   {Array}  a - The array that is compared to:
-   * @param   {Array}  b - this other array.
-   * @returns {boolean}  - True if a and b are shallow equal, else false.
-   * */
-  function areArraysShallowEqual(a, b) {
-
-    if (a.length !== b.length) {
-      return false;
-    }
-
-    for (let i = 0; i < a.length; i++) {
-      if (a[i] !== b[i]) {
         return false;
       }
     }
@@ -944,12 +947,24 @@
         // recompute
         this.intermediate = this.computation.call(null, this.valueCache);
 
-        // compare to previous value
+        // shallow compare to previous value
         if (areShallowEqual(this._value, this.intermediate)) {
+
           this.hasChanged = false;
+
         } else {
-          this._value = this.intermediate;
+
+          // shallow cache computation result
+          if (isArray(this.intermediate)) {
+            this._value = this.intermediate.slice();
+          } else if (typeof this.intermediate === 'object' && this.intermediate !== null) {
+            this._value = oAssign({}, this.intermediate);
+          } else {
+            this._value = this.intermediate;
+          }
+
           this.hasChanged = true;
+
         }
 
         // computation is up to date (until it gets invalidated by changing a dependency again...)
@@ -1267,7 +1282,7 @@
       prop === 'imports' ?
       internals.imports :
       internals.internalGetters.has(prop) ?
-      internals.internalGetters.get(prop) :
+      internals.internalGetters.get(prop)(internals) :
       target[prop];
 
   }
@@ -1295,19 +1310,20 @@
 
       if (typeof value === 'object' && value !== null) { // any object
 
-        const subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+        const subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
-        if (subInternals.mounted === false) {
-
+        if (subInternals.mounted === false) { // something that is being set should not be mounted...
           target[prop] = subInternals.proxyState; // attach the proxy
-          subInternals.instanceDidMount(target, prop); // mount
-
-          internals.propertyDidChange(prop, subInternals.proxyState);
-          internals.valueCache.set(prop, subInternals.proxyState);
-          react();
-          return true;
-
+          subInternals.instanceDidMount(target, prop); // mount the value to the target object
+          createAndMountSubStates(subInternals); // mount any children of value recursively to their parents.
+        } else {
+          console.warn(`Can't re-mount previously mounted property "${prop}" to instance of "${internals.module.name}". This feature is not yet available.`);
         }
+
+        internals.propertyDidChange(prop, subInternals.proxyState);
+        internals.valueCache.set(prop, subInternals.proxyState);
+        react();
+        return true;
 
       } else {
 
@@ -1371,16 +1387,11 @@
 
     if (observers) {
 
-      const o_O = {
-        value,
-        path
-      };
-
-      // add pairs of unique [reactionHandler, observationObject] to queue
+      // add pairs of unique [reactionHandler, changedValue, changedPropertyPath] to queue
       for (i = 0; i < observers.length; i++) {
         item = observers[i];
-        if (MAIN_QUEUE.indexOf(item) === -1) {
-          MAIN_QUEUE.push(item, o_O);
+        if (MAIN_QUEUE.indexOf(item) === -1) { // TODO: under which circumstances can there be duplicates here?
+          MAIN_QUEUE.push(item, value, path);
         }
       }
 
@@ -1419,21 +1430,16 @@
    * @function cueImmediate
    * @external {Array} accumulatedDerivatives - Collects unique derivatives which were affected by source property mutation(s). Queueing of their subDerivatives is deferred.
    */
-  function cueImmediate(prop, value, oldValue, observers, derivatives, stopPropagation) {
+  function cueImmediate(prop, value, path, observers, derivatives, stopPropagation) {
 
     let i, reaction, derivative;
 
     if (observers) {
 
-      const o_O = {
-        value: value,
-        oldValue: oldValue
-      };
-
       for (i = 0; i < observers.length; i++) {
         reaction = observers[i];
         if (MAIN_QUEUE.indexOf(reaction) === -1) {
-          MAIN_QUEUE.push(reaction, o_O);
+          MAIN_QUEUE.push(reaction, value, path);
         }
       }
 
@@ -1460,12 +1466,11 @@
    */
   function cueAccumulated() {
 
-    for (let i = 0, derivative, previous, result; i < accumulatedDerivatives.length; i++) {
+    for (let i = 0, derivative, result; i < accumulatedDerivatives.length; i++) {
       derivative = accumulatedDerivatives[i];
-      previous = derivative._value; // internal oldValue
       result = derivative.value; // calls "getter" -> recomputes value
       if (derivative.hasChanged) {
-        cueAll(derivative.ownPropertyName, result, previous, derivative.observers, derivative.subDerivatives, derivative.stopPropagation);
+        cueAll(derivative.ownPropertyName, result, derivative.ownPropertyName, derivative.observers, derivative.subDerivatives, derivative.stopPropagation);
       }
     }
 
@@ -1482,10 +1487,15 @@
   function react() {
 
     if (MAIN_QUEUE.length && !isAccumulating) {
-      isReacting = true;
-      for (let i = 0; i < MAIN_QUEUE.length; i += 2) MAIN_QUEUE[i](MAIN_QUEUE[i + 1]);
+
+      // Queue contains tuples of (handler, value, path) -> call i[0](i[1],[i2]) ie handler(value, path)
+      for (let i = 0; i < MAIN_QUEUE.length; i += 3) {
+        MAIN_QUEUE[i](MAIN_QUEUE[i + 1], MAIN_QUEUE[i + 2]);
+      }
+
+      // Empty the queue.
       MAIN_QUEUE.splice(0, MAIN_QUEUE.length);
-      isReacting = false;
+
     }
 
   }
@@ -1613,7 +1623,13 @@
       } else if (isFunction(val)) {
 
         if (!module.internalGetters.has(prop)) {
-          module.internalGetters.set(prop, val);
+
+          //module.internalGetters.set(prop, function() {
+          //  return val;
+          //});
+
+          module.internalGetters.set(prop, () => val);
+
         } else {
           throw new Error(`Module method name "${prop}" clashes with a property from "props" or with a default Cue property ("get" and "set" are reserved properties). Make sure that props and method names are distinct.`);
         }
@@ -1634,14 +1650,9 @@
 
     constructor(module, type) {
 
-      // faster instanceof check
-      this[__IS_STATE_INTERNAL__] = true;
-
-      // STATE_TYPE_INSTANCE = 1 or STATE_TYPE_EXTENSION = 2
       this.type = type;
 
-      // value cache used for change detection
-      this.valueCache = new Map(); // 1D map [propertyName -> currentValue]
+      this.valueCache = new Map();
 
       // Pointer to underlying module (shared by all instances of module)
       this.module = module;
@@ -1653,96 +1664,49 @@
 
     }
 
-    addChangeReaction(property, handler, scope, autorun = true) {
-
-      console.log('ADD CHANGE REACTION', property, this);
-
-      if (!isFunction(handler)) {
-        throw new TypeError(`Property change reaction for "${property}" is not a function...`);
-      }
-
-      const boundHandler = handler.bind(scope);
-
-      if (this.observersOf.has(property)) {
-        this.observersOf.get(property).push(boundHandler);
-      } else {
-        this.observersOf.set(property, [boundHandler]);
-      }
-
-      if (this.derivedProperties.has(property)) {
-        const derivative = this.derivedProperties.get(property);
-        derivative.observers.push(boundHandler);
-        setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
-      }
-
-      if (autorun === true) {
-        const val = this.plainState[property];
-        boundHandler({
-          value: val,
-          path: property
-        });
-      }
-
-      return boundHandler;
-
+    instanceWillUnmount() {
+      console.log('[todo: instanceWillUnmount]', this);
     }
 
-    removeChangeReaction(property, handler) {
+    cueConsumers(providerInstance, consumers, prop, value) {
 
-      if (this.observersOf.has(property)) {
+      // Find consumer instances and recurse into each branch
 
-        const reactions = this.observersOf.get(property);
-        const derivative = this.derivedProperties.get(property);
+      let key, childState;
+      for (key in this.plainState) {
 
-        if (handler === undefined) {
+        childState = this.plainState[key];
 
-          this.observersOf.delete(property);
+        if (childState && (childState = childState[__CUE__])) { // property is a child state instance
 
-          if (derivative) {
-            derivative.observers.splice(0, derivative.observers.length);
-            setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
-          }
-
-        } else if (isFunction(handler)) {
-
-          let i = reactions.indexOf(handler);
-
-          if (i > -1) {
-            reactions.splice(i, 1);
-          } else {
-            console.warn(`Can't remove the passed handler from reactions of "${property}" because it is not registered.`);
-          }
-
-          if (derivative) {
-
-            i = derivative.observers.indexOf(handler);
-
-            if (i > -1) {
-              derivative.observers.splice(i, 1);
-              setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
-            } else {
-              console.warn(`Can't remove the passed handler from observers of derived property "${property}" because it is not registered.`);
+          let provider;
+          for (provider of childState.providersOf.values()) {
+            if (provider.sourceInternals === providerInstance && provider.sourceProperty === prop) {
+              // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
+              childState.propertyDidChange.call(childState, provider.targetProperty, value); // continue recursion in this branch
             }
-
           }
+
+          // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the provided prop is also provided from another upstream state)
+          childState.cueConsumers.call(childState, providerInstance, consumers, prop, value);
 
         }
 
-      } else {
-        console.warn(`Can't unobserve property "${property}" because no reaction has been registered for it.`);
       }
 
     }
 
-    instanceDidChangePropertyName(ownPropertyName) {
-      this.ownPropertyName = ownPropertyName;
-      // TODO: rewrite pathFromRoot and propertyPathPrefix
+  }
+
+  class InstanceInternals extends StateInternals {
+
+    constructor(module, type) {
+      super(module, type);
     }
 
     instanceDidMount(parent, ownPropertyName) {
 
-      // This method is called when an instance has been attached to a parent node graph.
-      console.log(`%c [StateInternals](instanceDidMount) "${ownPropertyName}"`, 'background: gainsboro; color: black;');
+      // ------------------INLINE "SUPER" CALL----------------------
 
       this.parentInternals = parent[__CUE__];
       let rootInternals = this.parentInternals;
@@ -1762,48 +1726,52 @@
       this.pathFromRoot = pathFromRoot;
       this.propertyPathPrefix = pathFromRoot.length > 0 ? `${pathFromRoot.join('.')}.` : ''; // note the trailing dot
 
-      // only "smart" state instances based on their own module have top-level observers, derivatives and providers.
-      // all non-module-based state extensions (objects and arrays written into the state of a module) pull in smart data from their nearest module-based parent.
-      if (this.type === STATE_TYPE_INSTANCE) {
+      // -------------------------------------------------------------
 
-        this.name = this.module.name;
+      this.name = this.module.name;
 
-        this.internalGetters = this.module.internalGetters;
-        this.internalSetters = this.module.internalSetters;
+      this.internalGetters = this.module.internalGetters;
+      this.internalSetters = this.module.internalSetters;
+      this.consumersOf = this.module.consumersOf;
+      this.observersOf = new Map(); // 1D map [propertyName -> handler]
+      this.derivativesOf = new Map(); // 2D map [propertyName -> 1D array[...Derivatives]]
+      this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
+      this.providersOf = new Map(); // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-        this.consumersOf = this.module.consumersOf;
+      if (this.module.providersToInstall.size) {
+        this.injectProviders();
+      }
 
-        this.observersOf = new Map(); // 1D map [propertyName -> handler]
-        this.derivativesOf = new Map(); // 2D map [propertyName -> 1D array[...Derivatives]]
-        this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
-        this.providersOf = new Map(); // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
-
-        if (this.module.providersToInstall.size) {
-          this.injectProviders();
-        }
-
-        if (this.module.derivativesToInstall.size) {
-          this.installDerivatives();
-        }
-
-        if (this.mounted === false && this.initialProps) { // only call "initialize" when an instance has not been mounted, never when it is being re-attached.
-          this.module.initialize.call(this.proxyState, this.initialProps);
-          delete this.initialProps;
-        }
-
-      } else if (this.type === STATE_TYPE_EXTENSION && isArray(this.plainState)) {
-
-        // When a state extension is an array, we intercept array mutator methods on it.
-        this.internalGetters = ARRAY_MUTATOR_GETTERS;
-
+      if (this.module.derivativesToInstall.size) {
+        this.installDerivatives();
       }
 
       this.mounted = true;
+      this.module.initialize.call(this.proxyState, this.initialProps);
+      this.initialProps = undefined;
 
     }
 
-    instanceWillUnmount() {
-      console.log('[todo: instanceWillUnmount]', this);
+    propertyDidChange(prop, value) {
+
+      const observers = this.observersOf.get(prop);
+      const derivatives = this.derivativesOf.get(prop);
+
+      if (observers || derivatives) {
+        if (isAccumulating) {
+          cueImmediate(prop, value, prop, observers, derivatives, false);
+        } else {
+          cueAll(prop, value, prop, observers, derivatives, false);
+        }
+      }
+
+      const consumers = this.consumersOf.get(prop);
+
+      // 2. if the changed property has consumers, find them and recurse
+      if (consumers) {
+        this.cueConsumers(this, consumers, prop, value, prop);
+      }
+
     }
 
     injectProviders() {
@@ -1896,83 +1864,143 @@
 
     }
 
-    propertyDidChange(prop, value) {
+    addChangeReaction(property, handler, scope, autorun = true) {
 
-      // if im an extensionState and one of my properties has changed, i will forward the change to my nearest module parent which will receive a change event for a property that i am attached to. a path will be available in the event handler.
-      // if im an instanceState, i will only notify my immediate property observers.
+      if (!isFunction(handler)) {
+        throw new TypeError(`Property change reaction for "${property}" is not a function...`);
+      }
 
-      if (this.type === STATE_TYPE_EXTENSION) { // forward all changes to the nearest root parent
+      const boundHandler = handler.bind(scope);
 
-        const root = this.rootInternals;
-        const rootProp = this.rootPropertyName;
-        const rootVal = root.plainState[rootProp];
-        const path = this.propertyPathPrefix + prop;
+      if (this.observersOf.has(property)) {
+        this.observersOf.get(property).push(boundHandler);
+      } else {
+        this.observersOf.set(property, [boundHandler]);
+      }
 
-        // 1. recurse over direct dependencies
-        const observers = root.observersOf.get(rootProp);
-        const derivatives = root.derivativesOf.get(rootProp);
-        if (observers || derivatives) {
-          if (isAccumulating) {
-            cueImmediate(rootProp, rootVal, path, observers, derivatives, false);
-          } else {
-            cueAll(rootProp, rootVal, path, observers, derivatives, false);
+      if (this.derivedProperties.has(property)) {
+        const derivative = this.derivedProperties.get(property);
+        derivative.observers.push(boundHandler);
+        setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
+      }
+
+      if (autorun === true) {
+        const val = this.proxyState[property];
+        boundHandler(val, property);
+      }
+
+      return boundHandler;
+
+    }
+
+    removeChangeReaction(property, handler) {
+
+      if (this.observersOf.has(property)) {
+
+        const reactions = this.observersOf.get(property);
+        const derivative = this.derivedProperties.get(property);
+
+        if (handler === undefined) {
+
+          this.observersOf.delete(property);
+
+          if (derivative) {
+            derivative.observers.splice(0, derivative.observers.length);
+            setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
           }
-        }
 
-        // 2. Notify consumers of the property
-        const consumers = root.consumersOf.get(rootProp);
-        if (consumers) {
-          root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
-        }
+        } else if (isFunction(handler)) {
 
-      } else { // react on self
+          let i = reactions.indexOf(handler);
 
-        const observers = this.observersOf.get(prop);
-        const derivatives = this.derivativesOf.get(prop);
-
-        if (observers || derivatives) {
-          if (isAccumulating) {
-            cueImmediate(prop, value, prop, observers, derivatives, false);
+          if (i > -1) {
+            reactions.splice(i, 1);
           } else {
-            cueAll(prop, value, prop, observers, derivatives, false);
+            console.warn(`Can't remove the passed handler from reactions of "${property}" because it is not registered.`);
           }
+
+          if (derivative) {
+
+            i = derivative.observers.indexOf(handler);
+
+            if (i > -1) {
+              derivative.observers.splice(i, 1);
+              setEndOfPropagationInBranchOf(derivative, TRAVERSE_UP);
+            } else {
+              console.warn(`Can't remove the passed handler from observers of derived property "${property}" because it is not registered.`);
+            }
+
+          }
+
         }
 
-        const consumers = this.consumersOf.get(prop);
-
-        // 2. if the changed property has consumers, find them and recurse
-        if (consumers) {
-          this.cueConsumers(this, consumers, prop, value, prop);
-        }
-
+      } else {
+        console.warn(`Can't unobserve property "${property}" because no reaction has been registered for it.`);
       }
 
     }
 
-    cueConsumers(providerInstance, consumers, prop, value) {
+  }
 
-      // Find consumer instances and recurse into each branch
+  class ExtensionInternals extends StateInternals {
 
-      let key, childState;
-      for (key in this.plainState) {
+    constructor(module, type) {
+      super(module, type);
+    }
 
-        childState = this.plainState[key];
+    instanceDidMount(parent, ownPropertyName) {
 
-        if (childState && (childState = childState[__CUE__])) { // property is a child state instance
+      // ------------------INLINE "SUPER" CALL----------------------
 
-          let provider;
-          for (provider of childState.providersOf.values()) {
-            if (provider.sourceInstance === providerInstance && provider.sourceProperty === prop) {
-              // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
-              childState.propertyDidChange.call(childState, provider.targetProperty, value); // continue recursion in this branch
-            }
-          }
+      this.parentInternals = parent[__CUE__];
+      let rootInternals = this.parentInternals;
+      this.ownPropertyName = ownPropertyName;
+      let rootPropertyName = this.ownPropertyName; //something
 
-          // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the provided prop is also provided from another upstream state)
-          childState.cueConsumers.call(childState, providerInstance, consumers, prop, value);
+      // Find the root internals (root !== parent. root is the closest module-based ancestor)
+      const pathFromRoot = [];
+      while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE) {
+        rootInternals = rootInternals.rootInternals;
+        rootPropertyName = rootInternals.rootPropertyName;
+        pathFromRoot.unshift(rootPropertyName);
+      }
 
+      this.rootInternals = rootInternals;
+      this.rootPropertyName = rootPropertyName;
+      this.pathFromRoot = pathFromRoot;
+      this.propertyPathPrefix = pathFromRoot.length > 0 ? `${pathFromRoot.join('.')}.` : ''; // note the trailing dot
+
+      // -------------------------------------------------------------
+
+      this.internalGetters = ARRAY_MUTATOR_GETTERS;
+      this.mounted = true;
+
+    }
+
+    propertyDidChange(prop) {
+
+      // propagate changes to the root instance.
+
+      const root = this.rootInternals;
+      const rootProp = this.rootPropertyName;
+      const rootVal = root.plainState[rootProp];
+      const path = this.propertyPathPrefix + prop;
+
+      // 1. recurse over direct dependencies
+      const observers = root.observersOf.get(rootProp);
+      const derivatives = root.derivativesOf.get(rootProp);
+      if (observers || derivatives) {
+        if (isAccumulating) {
+          cueImmediate(rootProp, rootVal, path, observers, derivatives, false);
+        } else {
+          cueAll(rootProp, rootVal, path, observers, derivatives, false);
         }
+      }
 
+      // 2. Notify consumers of the property
+      const consumers = root.consumersOf.get(rootProp);
+      if (consumers) {
+        root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
       }
 
     }
@@ -1990,10 +2018,8 @@
    */
   function createState(data, module, type, props) {
 
-    console.log('%c createState from::::', 'background: paleGreen; color: darkGreen;', data);
-
     // 1. Attach Internals to "data" under private __CUE__ symbol.
-    const internals = data[__CUE__] = new StateInternals(module, type);
+    const internals = data[__CUE__] = type === STATE_TYPE_INSTANCE ? new InstanceInternals(module, type) : new ExtensionInternals(module, type);
 
     // 2. Wrap "data" into a reactive proxy
     const proxyState = new Proxy(data, {
@@ -2009,43 +2035,58 @@
     // 4. When called from a StateFactory, pass initial props to Internals
     if (props) internals.initialProps = props;
 
-    // 5. Recursively createState for all object children that are not yet states.
-    // TODO: don't mount sub-instances here. Do this in instanceDidMount, recursively for the children. only create state here.
-    if (isArray(data)) {
+    // 5. Return
+    return internals;
 
-      for (let i = 0, val; i < data.length; i++) {
-        val = data[i];
+  }
+
+  function createAndMountSubStates(internals) {
+
+    if (isArray(internals.plainState)) {
+
+      for (let i = 0, val; i < internals.plainState.length; i++) {
+
+        val = internals.plainState[i];
+
         if (typeof val === 'object' && val !== null) {
-          val = val[__CUE__] || createState(val, module, STATE_TYPE_EXTENSION, null).internals;
+
+          val = val[__CUE__] || createState(val, internals.module, STATE_TYPE_EXTENSION, null);
+
           if (val.mounted === false) {
-            data[i] = val.proxyState;
-            //val.instanceDidMount(data, i);
+            internals.plainState[i] = val.proxyState;
+            val.instanceDidMount(internals.plainState, i);
           }
+
+          createAndMountSubStates(val);
+
         }
+
       }
 
     } else {
 
-      const keys = oKeys(data);
+      const keys = oKeys(internals.plainState);
+
       for (let i = 0, key, val; i < keys.length; i++) {
+
         key = keys[i];
-        val = data[key];
+        val = internals.plainState[key];
+
         if (typeof val === 'object' && val !== null) {
-          val = val[__CUE__] || createState(val, module, STATE_TYPE_EXTENSION, null).internals;
+
+          val = val[__CUE__] || createState(val, internals.module, STATE_TYPE_EXTENSION, null);
+
           if (val.mounted === false) {
-            data[key] = val.proxyState;
-            //val.instanceDidMount(data, key);
+            internals.plainState[key] = val.proxyState;
+            val.instanceDidMount(internals.plainState, key);
           }
+
+          createAndMountSubStates(val);
+
         }
+
       }
 
-    }
-
-    // 6. Return
-    return {
-      plainState: data,
-      proxyState: proxyState,
-      internals: internals
     }
 
   }
@@ -2176,45 +2217,107 @@
     }
   }
 
+  /**
+   * Little CSS in JS Utility which scopes the passed styles object to the template element.
+   * The rules for this are:
+   * - Every template element is assigned a globally unique class name ".cue-uid"
+   * - This is required to scope nested elements uniquely to the template container.
+   * - All styles that are being specified in the styles object are assumed to target either tag names, classes or ids.
+   * - If a template element contains an element with the tag name that matches a specified top-level style, the tag name takes precedence over class names.
+   * - Top-level (ie not nested) tag names are scoped to the component by creating CSS rules in the form of ".cue-uid tag {...}"
+   * - Top-level class names are scoped to the component in the form of ".cue-uid__className {...}". Note the underline. We do this to avoid overly complex selectors.
+   * - CSS Rules can be written in nested SCSS style syntax including nested chaining by inserting "&" before the property name ie "&:hover", "&.active" etc...
+   * @param   {object}      styles    - The styles object. Must be a plain object of strings and nested objects containing style rules.
+   * @param   {HTMLElement} template  - The template html element. This is the element that is used for cloning instances.
+   * @returns {Map}                   - A Map object which contains mapping from original class names to scoped class names (or an empty map)
+   */
   function scopeStylesToComponent(styles, template) {
 
-    const map = new Map();
-    if (!styles) return map;
+    const classMap = new Map();
 
-    let className, classRules, classRule, pseudoRuleIndex, pseudoRuleStyle, uniqueClassName, ruleIndex, ruleStyle;
+    if (!styles) return classMap;
 
-    for (className in styles) {
+    const scope = `cue-${CUE_UI_STYLESHEET.cssRules.length.toString(36)}`;
 
-      uniqueClassName = createUID(className);
+    for (const key in styles) {
+      insertStyleRule(prepareSelectorName(key, scope, template, classMap), styles[key]);
+    }
 
-      ruleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName} {}`, CUE_UI_STYLESHEET.cssRules.length);
-      ruleStyle = CUE_UI_STYLESHEET.cssRules[ruleIndex].style;
+    template.classList.add(scope);
 
-      classRules = styles[className];
+    classMap.forEach((scopedClassName, originalClassName) => {
+      replaceClassNameInElement(originalClassName, scopedClassName, template);
+    });
 
-      for (classRule in classRules) {
-        if (isObjectLike(classRules[classRule])) { // nested selectors with basic sass functionality.
-          if (classRule[0] === '&') { // chain onto the selector
-            pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName}${classRule.substring(1)} {}`, CUE_UI_STYLESHEET.cssRules.length);
-          } else { // nest the selector (space separation)
-            pseudoRuleIndex = CUE_UI_STYLESHEET.insertRule(`.${uniqueClassName} ${classRule} {}`, CUE_UI_STYLESHEET.cssRules.length);
-          }
-          pseudoRuleStyle = CUE_UI_STYLESHEET.cssRules[pseudoRuleIndex].style;
-          oAssign(pseudoRuleStyle, classRules[classRule]);
-          delete classRules[classRule];
-        }
+    return classMap;
+
+  }
+
+  function getScopedSelectorName(element, scope, selector, classMap) {
+    if (element.getElementsByTagName(selector).length) {
+      return `.${scope} ${selector}`;
+    } else if (selector[0] === '#') {
+      return selector;
+    } else {
+      selector = selector.replace('.', '');
+      return `.${classMap.set(selector, `${selector}__${scope}`).get(selector)}`;
+    }
+  }
+
+  function prepareSelectorName(key, scope, template, classMap) {
+
+    if (key.indexOf(',') > -1) {
+
+      const selectors = key.split(',');
+      const scopedSelectors = [];
+
+      for (let i = 0; i < selectors.length; i++) {
+        scopedSelectors.push(getScopedSelectorName(template, scope, selectors[i], classMap));
       }
 
-      oAssign(ruleStyle, classRules);
-      map.set(className, uniqueClassName);
+      return scopedSelectors.join(', ');
 
-      if (template) {
-        replaceClassNameInElement(className, uniqueClassName, template);
+    } else {
+
+      return getScopedSelectorName(template, scope, key, classMap);
+    }
+
+  }
+
+  function insertStyleRule(selectorName, styleProperties) {
+
+    let prop;
+
+    let variables = ''; // variables have to be in the rule at insertion time or they wont work.
+    for (prop in styleProperties) {
+
+      if (prop.indexOf('--', 0) === 0) {
+        variables += `${prop}: ${styleProperties[prop]}; `;
+        delete styleProperties[prop];
       }
 
     }
 
-    return map;
+    const ruleIndex = CUE_UI_STYLESHEET.insertRule(`${selectorName} { ${variables} } `, CUE_UI_STYLESHEET.cssRules.length);
+    const styleRule = CUE_UI_STYLESHEET.cssRules[ruleIndex].style;
+
+    for (prop in styleProperties) {
+
+      if (styleProperties[prop].constructor === OBJ) {
+
+        if (prop[0] === '&') {
+          insertStyleRule(`${selectorName}${prop.substring(1)}`, styleProperties[prop]);
+        } else {
+          insertStyleRule(`${selectorName} ${prop}`, styleProperties[prop]);
+        }
+
+      } else {
+
+        styleRule[prop] = styleProperties[prop];
+
+      }
+
+    }
 
   }
 
@@ -3300,7 +3403,8 @@
       // Create State Instance (this returns a proxy)
       const stateInstance = this.stateInstance = stateFactory(props);
       const stateInternals = this.stateInternals = stateInstance[__CUE__];
-      stateInternals.instanceDidMount.call(stateInternals, CUE_ROOT_STATE, stateModuleName);
+
+      stateInternals.instanceDidMount(CUE_ROOT_STATE, stateModuleName);
 
       // Create UI Element and append it to the target
       const uiElement = this.uiElement = uiFactory(stateInstance);

@@ -22,19 +22,20 @@ function proxySetHandler(target, prop, value) {
 
     if (typeof value === 'object' && value !== null) { // any object
 
-      const subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+      const subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
-      if (subInternals.mounted === false) {
-
+      if (subInternals.mounted === false) { // something that is being set should not be mounted...
         target[prop] = subInternals.proxyState; // attach the proxy
-        subInternals.instanceDidMount(target, prop); // mount
-
-        internals.propertyDidChange(prop, subInternals.proxyState);
-        internals.valueCache.set(prop, subInternals.proxyState);
-        react();
-        return true;
-
+        subInternals.instanceDidMount(target, prop); // mount the value to the target object
+        createAndMountSubStates(subInternals); // mount any children of value recursively to their parents.
+      } else {
+        console.warn(`Can't re-mount previously mounted property "${prop}" to instance of "${internals.module.name}". This feature is not yet available.`);
       }
+
+      internals.propertyDidChange(prop, subInternals.proxyState);
+      internals.valueCache.set(prop, subInternals.proxyState);
+      react();
+      return true;
 
     } else {
 

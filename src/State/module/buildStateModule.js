@@ -123,7 +123,13 @@ function buildStateModule(module, moduleInitializer) {
     } else if (isFunction(val)) {
 
       if (!module.internalGetters.has(prop)) {
-        module.internalGetters.set(prop, val);
+
+        //module.internalGetters.set(prop, function() {
+        //  return val;
+        //});
+
+        module.internalGetters.set(prop, () => val);
+
       } else {
         throw new Error(`Module method name "${prop}" clashes with a property from "props" or with a default Cue property ("get" and "set" are reserved properties). Make sure that props and method names are distinct.`);
       }

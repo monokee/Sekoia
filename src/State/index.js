@@ -18,9 +18,6 @@ const CUE_STATE_MODULES = new Map();
 // Internals of State Modules for internally passing module data around: name -> object
 const CUE_STATE_INTERNALS = new Map();
 
-// Root State Store
-const CUE_ROOT_STATE = {};
-
 // State Flags
 let isReacting = false; // is a reaction currently in process?
 let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
@@ -40,10 +37,26 @@ const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
 
 // Meta Keys used for closure scope lookup && safely extending foreign objects
-const __CUE__ = Symbol('Cue State Internals');
-const __IS_STATE_INTERNAL__ = Symbol('Instance of StateInternals');
+const __CUE__ = Symbol('🧿 Cue Internals');
 
 const STATE_TYPE_INSTANCE = 1;
 const STATE_TYPE_EXTENSION = 2;
 
-const ARRAY_MUTATOR_NAMES = new Set(['fill','push','unshift','splice','pop','shift','copyWithin','reverse','sort']);
+// Root State Store
+const CUE_ROOT_STATE = {};
+oDefineProperty(CUE_ROOT_STATE, __CUE__, {
+  value: {
+    name: '::ROOT::',
+    module: {name: '::ROOT::'},
+    type: STATE_TYPE_INSTANCE,
+    plainState: CUE_ROOT_STATE,
+    proxyState: CUE_ROOT_STATE,
+    observersOf: EMPTY_MAP,
+    derivativesOf: EMPTY_MAP,
+    consumersOf: EMPTY_MAP,
+    providersToInstall: EMPTY_MAP,
+    derivativesToInstall: EMPTY_MAP,
+    internalGetters: EMPTY_MAP,
+    internalSetters: EMPTY_MAP
+  }
+});

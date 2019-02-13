@@ -3,7 +3,18 @@ Cue.State('Todo-Container', Module => ({
   props: {
     title: 'Cue TODO MVC',
     author: 'monokee',
-    editor: null
+    time: new Date().toString(),
+    greetAuthor({time, author}) {
+      if (time < '12000') {
+        return `Good Morning, ${author}!`;
+      } else {
+        return `Good Afternood, ${author}!`;
+      }
+    },
+    fullText({greetAuthor}) {
+
+    },
+    editor: {}
   },
 
   imports: {
@@ -11,13 +22,9 @@ Cue.State('Todo-Container', Module => ({
   },
 
   initialize(props) {
-
-    console.log('%c [Todo-Container](initialize)', 'background: cornsilk; color: chocolate;');
-
     this.title = props.title;
     this.author = props.author;
     this.editor = this.imports.Editor(props.editor);
-
   }
 
 }));

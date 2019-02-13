@@ -43,12 +43,24 @@ class Derivative {
       // recompute
       this.intermediate = this.computation.call(null, this.valueCache);
 
-      // compare to previous value
+      // shallow compare to previous value
       if (areShallowEqual(this._value, this.intermediate)) {
+
         this.hasChanged = false;
+
       } else {
-        this._value = this.intermediate;
+
+        // shallow cache computation result
+        if (isArray(this.intermediate)) {
+          this._value = this.intermediate.slice();
+        } else if (typeof this.intermediate === 'object' && this.intermediate !== null) {
+          this._value = oAssign({}, this.intermediate);
+        } else {
+          this._value = this.intermediate;
+        }
+
         this.hasChanged = true;
+
       }
 
       // computation is up to date (until it gets invalidated by changing a dependency again...)

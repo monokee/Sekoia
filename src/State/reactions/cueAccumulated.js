@@ -8,12 +8,11 @@
  */
 function cueAccumulated() {
 
-  for (let i = 0, derivative, previous, result; i < accumulatedDerivatives.length; i++) {
+  for (let i = 0, derivative, result; i < accumulatedDerivatives.length; i++) {
     derivative = accumulatedDerivatives[i];
-    previous = derivative._value; // internal oldValue
     result = derivative.value; // calls "getter" -> recomputes value
     if (derivative.hasChanged) {
-      cueAll(derivative.ownPropertyName, result, previous, derivative.observers, derivative.subDerivatives, derivative.stopPropagation);
+      cueAll(derivative.ownPropertyName, result, derivative.ownPropertyName, derivative.observers, derivative.subDerivatives, derivative.stopPropagation);
     }
   }
 

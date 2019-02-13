@@ -17,13 +17,11 @@ function cueAll(prop, value, path, observers, derivatives, stopPropagation) {
 
   if (observers) {
 
-    const o_O = {value, path};
-
-    // add pairs of unique [reactionHandler, observationObject] to queue
+    // add pairs of unique [reactionHandler, changedValue, changedPropertyPath] to queue
     for (i = 0; i < observers.length; i++) {
       item = observers[i];
-      if (MAIN_QUEUE.indexOf(item) === -1) {
-        MAIN_QUEUE.push(item, o_O);
+      if (MAIN_QUEUE.indexOf(item) === -1) { // TODO: under which circumstances can there be duplicates here?
+        MAIN_QUEUE.push(item, value, path);
       }
     }
 

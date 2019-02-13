@@ -26,6 +26,7 @@ Cue.UI('Todo-Container', Component => ({
       fontFamily     : 'Roboto, sans-serif',
       color          : 'rgb(232,235,238)',
       backgroundColor: 'rgb(22,25,28)',
+      userSelect: 'none'
     },
 
     title: {
@@ -35,8 +36,8 @@ Cue.UI('Todo-Container', Component => ({
       textAlign: 'center'
     },
 
-    editor: {
-      width        : '500px',
+    editorContainer: {
+      width        : '650px',
       maxWidth     : '95%',
       boxShadow    : 'none'
     },
@@ -57,27 +58,24 @@ Cue.UI('Todo-Container', Component => ({
   },
 
   imports: {
-    editor: Component.import('Todo-Editor')
+    Editor: Component.import('Todo-Editor')
   },
 
   initialize(state) {
-    console.log('%c [Todo-Container](initialize)', 'background: lightcyan; color: dodgerblue;');
     this.state = state;
-    this.createEditor = this.imports.editor;
     this.headline = this.select('.headline');
     this.editorContainer = this.select('.editorContainer');
-
   },
 
   renderState: {
 
-    title(o) {
-      this.headline.textContent = o.value;
+    title(text) {
+      this.headline.textContent = text;
     },
 
-    editor(o) {
+    editor(data) {
       this.editorContainer.appendChild(
-        this.createEditor(o.value)
+        this.imports.Editor(data)
       );
     }
 

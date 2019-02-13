@@ -17,7 +17,7 @@ function proxyGetHandler(target, prop) {
     : prop === 'imports'
       ? internals.imports
       : internals.internalGetters.has(prop)
-        ? internals.internalGetters.get(prop)
+        ? internals.internalGetters.get(prop)(internals)
         : target[prop];
 
 }

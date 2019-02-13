@@ -13,24 +13,23 @@ function intercepted_array_fill(value, start = 0, end = this.length) {
   const internals = this[__CUE__];
   const array = internals.plainState;
 
-  let hasChanged = false;
-
   if (typeof value === 'object' && value !== null) {
     value = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
   }
 
-  for (let i = start, oldValue; i < end; i++) {
+  for (let i = start, oldValue, subInternals; i < end; i++) {
     oldValue = array[i];
     if (oldValue !== value) {
       array[i] = value;
-      hasChanged = true;
+      if (value && (subInternals = value[__CUE__]) && subInternals.mounted === false) {
+        subInternals.instanceDidMount(array, i);
+        createAndMountSubStates(subInternals);
+      }
+      internals.propertyDidChange(i);
     }
   }
 
-  if (hasChanged) {
-    internals.propertyDidChange();
-    react();
-  }
+  react();
 
   return this;
 
@@ -49,12 +48,11 @@ function intercepted_array_push(...rest) {
 
       if (typeof value === 'object' && value !== null) {
 
-        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
-        if (subInternals.mounted === false) {
-          array.push(subInternals.proxyState);
-          subInternals.instanceDidMount(array, array.length - 1);
-        }
+        array.push(subInternals.proxyState);
+        subInternals.instanceDidMount(array, array.length - 1);
+        createAndMountSubStates(subInternals);
 
       } else {
 
@@ -62,9 +60,10 @@ function intercepted_array_push(...rest) {
 
       }
 
+      internals.propertyDidChange(array.length - 1);
+
     }
 
-    internals.propertyDidChange();
     react();
 
   }
@@ -87,11 +86,12 @@ function intercepted_array_unshift(...rest) {
 
       if (typeof value === 'object' && value !== null) {
 
-        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
         if (subInternals.mounted === false) {
           array.unshift(subInternals.proxyState);
           subInternals.instanceDidMount(array, 0);
+          createAndMountSubStates(subInternals);
         }
 
       } else {
@@ -100,9 +100,10 @@ function intercepted_array_unshift(...rest) {
 
       }
 
+      internals.propertyDidChange(0);
+
     }
 
-    internals.propertyDidChange();
     react();
 
   }
@@ -128,7 +129,7 @@ function intercepted_array_splice(start, deleteCount, ...items) {
     actualDeleteCount = Math.min(Math.max(deleteCount, 0), len - actualStart);
   }
 
-  const deleted = [];
+  const deleted = [], notified = [];
 
   // 1. delete elements from array, collected on "deleted", notify state of unmount if deleted elements are state objects. if we're deleting from an index that we will not be adding a replacement for, cue the property
   if (actualDeleteCount > 0) {
@@ -144,7 +145,9 @@ function intercepted_array_splice(start, deleteCount, ...items) {
       }
 
       array.splice(i, 1);
+      internals.propertyDidChange(i);
 
+      notified.push(i);
       deleted.push(oldValue);
 
     }
@@ -161,11 +164,12 @@ function intercepted_array_splice(start, deleteCount, ...items) {
 
       if (typeof value === 'object' && value !== null) {
 
-        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null).internals;
+        subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
         if (subInternals.mounted === false) {
           array.splice(arrayIndex, 0, subInternals.proxyState);
           subInternals.instanceDidMount(array, arrayIndex);
+          createAndMountSubStates(subInternals);
         }
 
       } else {
@@ -174,11 +178,14 @@ function intercepted_array_splice(start, deleteCount, ...items) {
 
       }
 
+      if (notified.indexOf(arrayIndex) === -1) {
+        internals.propertyDidChange(arrayIndex);
+      }
+
     }
 
   }
 
-  internals.propertyDidChange();
   react();
 
   return deleted;
@@ -203,7 +210,7 @@ function intercepted_array_pop() {
 
   delete array[array.length - 1];
 
-  internals.propertyDidChange();
+  internals.propertyDidChange(array.length);
   react();
 
   return last;
@@ -228,7 +235,7 @@ function intercepted_array_shift() {
 
   array.shift();
 
-  internals.propertyDidChange();
+  internals.propertyDidChange(0);
   react();
 
   return last;
@@ -263,19 +270,20 @@ function intercepted_array_copyWithin(target, start = 0, end = this.length) {
         throw new Error(`You can't create copies of Cue State Instances via Array.prototype.copyWithin.`);
       }
       array[to] = array[from];
+      internals.propertyDidChange(to);
     } else {
       value = array[to];
       if (value && (subState = value[__CUE__])) {
         subState.instanceWillUnmount();
       }
       delete array[to];
+      internals.propertyDidChange(to);
     }
     from += direction;
     to += direction;
     count -= 1;
   }
 
-  internals.propertyDidChange();
   react();
 
   return array;
@@ -287,15 +295,12 @@ function intercepted_array_reverse() {
   const internals = this[__CUE__];
   const array = internals.plainState;
 
-  //TODO: what are the implications of this? if we're shuffling cue objects in an array we're rewriting their properties. This changes a number of things about them like: ownPropertyName, pathFromRoot
-  // Additionally, if a previously mounted cue state object is being attached to a new parent, we should also be able to conveniently re-wire the objects internals.
-  // unfortunately, this requires recursively re-writing all of the objects state-children as well. but I think we can do it because we only need to re-write some internal properties (paths!)
-  // some checks need to be performed here that disallow re-attaching objects if they consume properties from ancestors which would no longer be ancestors after the reattachment.
-  // BIG TODO.
-
   array.reverse();
 
-  internals.propertyDidChange();
+  for (let i = 0; i < array.length; i++) {
+    internals.propertyDidChange(i);
+  }
+
   react();
 
   return array;
@@ -306,10 +311,16 @@ function intercepted_array_sort(compareFunction) {
 
   const internals = this[__CUE__];
   const array = internals.plainState;
+  const before = array.slice();
 
   array.sort(compareFunction);
 
-  internals.propertyDidChange();
+  for (let i = 0; i < array.length; i++) {
+    if (array[i] !== before[i]) {
+      internals.propertyDidChange(i);
+    }
+  }
+
   react();
 
   return array;

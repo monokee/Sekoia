@@ -18,6 +18,14 @@ Cue.UI('Todo-Editor', Component => ({
 
   styles: {
 
+    a: {
+      backgroundColor: 'blue'
+    },
+
+    b: {
+      backgroundColor: 'yellow'
+    },
+
     editor: {
       position: 'relative',
       width: '100%',
@@ -29,43 +37,59 @@ Cue.UI('Todo-Editor', Component => ({
     todoInput: {
       width: '100%',
       height: '54px',
+      boxSizing: 'border-box',
+      borderRadius: '3px',
+      padding: '0 0.5em',
+      outline: 0,
+      border: 'none',
       '&:focus': {
         border: 'none',
-        outline: 'none'
+        outline: 0
       }
     },
 
     todoList: {
       borderTop: '1px solid rgb(62,65,68)',
-      borderBottom: '1px solid rgb(62,65,68)',
+      marginBottom: '1em',
       display: 'flex',
       flexDirection: 'column'
     },
 
     footer: {
       display: 'flex',
-      alignItems: 'space-around',
-      justifyContent: 'center'
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      padding: '1em 0',
+      borderTop: '1px solid rgb(62,65,68)',
+    },
+
+    itemCount: {
+      borderBottom: '1px solid transparent'
     },
 
     filterButtons: {
-      display: 'flex'
+      display: 'flex',
+      margin: '0 0.5em'
     },
 
     filterButton: {
       margin: '0 0.5em',
       cursor: 'pointer',
+      borderBottom: '1px solid transparent',
       opacity: 0.9,
       transition: 'opacity 150ms',
       '&:hover': {
         opacity: 0.75
       },
       '&.active': {
-        opacity: 1
+        opacity: 1,
+        color: '#fff',
+        borderBottom: '1px solid rgb(0,115,255)'
       }
     },
 
     clearButton: {
+      borderBottom: '1px solid transparent',
       opacity: 0,
       transition: 'opacity 150ms',
       '&.visible': {
@@ -83,7 +107,12 @@ Cue.UI('Todo-Editor', Component => ({
   },
 
   initialize(state) {
-    console.log('%c [Todo-Editor](initialize)', 'background: lightcyan; color: dodgerblue;');
+
+    if (state.type === 'a') {
+      this.addClass('a')
+    } else {
+      this.addClass('b')
+    }
 
     this.state = state;
 
@@ -104,10 +133,15 @@ Cue.UI('Todo-Editor', Component => ({
 
     keydown: {
       '.todoInput'(e) {
-        if (e.which === 13) {
-          this.state.addTodo(this.input.value);
+        if (e.which === 13 && this.input.value) {
+          this.state.addTodo({
+            isComplete: false,
+            text: this.input.value
+          });
+          this.input.value = '';
         }
       }
+
     },
 
     click: {
@@ -120,25 +154,23 @@ Cue.UI('Todo-Editor', Component => ({
 
   renderState: {
 
-    filter(o) {
+    filter(type) {
       for (const button in this.filterButtons) {
-        if (button !== o.value) {
+        if (button !== type) {
           this.removeClass(this.filterButtons[button], 'active');
         } else {
-          this.removeClass(this.filterButtons[button], 'active');
+          this.addClass(this.filterButtons[button], 'active');
         }
       }
     },
 
-    activeCount(o) {
-      this.itemCount.textContent = `${o.value} ${o.value === 1 ? 'item' : 'items'} left`;
+    activeCount(number) {
+      this.itemCount.textContent = `${number} ${number === 1 ? 'item' : 'items'} left`;
     },
 
-    todos(o) {
+    visibleTodos(todoArray) {
 
-      // o.value is not a proxy here. however, its children are. how?
-
-      if(o.value.length === 0) {
+      if(todoArray.length === 0) {
         this.addClass(this.footer, 'hidden');
       } else {
         this.removeClass(this.footer, 'hidden');
@@ -146,19 +178,9 @@ Cue.UI('Todo-Editor', Component => ({
 
       this.list.textContent = '';
 
-      o.value.forEach(item => {
+      todoArray.forEach(item => {
         this.list.appendChild(this.imports.createItem(item));
       });
-
-      /*
-      this.setChildren(this.list, {
-        from: this.todoState,
-        to: o.value,
-        create: this.imports.createItem
-      });
-
-      this.todoState = o.value;
-      */
 
     }
 
