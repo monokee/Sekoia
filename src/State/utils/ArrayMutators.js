@@ -25,10 +25,10 @@ function intercepted_array_fill(value, start = 0, end = this.length) {
         subInternals.instanceDidMount(array, i);
         createAndMountSubStates(subInternals);
       }
-      internals.propertyDidChange(i);
     }
   }
 
+  internals.propertyDidChange();
   react();
 
   return this;
@@ -60,10 +60,9 @@ function intercepted_array_push(...rest) {
 
       }
 
-      internals.propertyDidChange(array.length - 1);
-
     }
 
+    internals.propertyDidChange();
     react();
 
   }
@@ -100,10 +99,9 @@ function intercepted_array_unshift(...rest) {
 
       }
 
-      internals.propertyDidChange(0);
-
     }
 
+    internals.propertyDidChange();
     react();
 
   }
@@ -129,7 +127,7 @@ function intercepted_array_splice(start, deleteCount, ...items) {
     actualDeleteCount = Math.min(Math.max(deleteCount, 0), len - actualStart);
   }
 
-  const deleted = [], notified = [];
+  const deleted = [];
 
   // 1. delete elements from array, collected on "deleted", notify state of unmount if deleted elements are state objects. if we're deleting from an index that we will not be adding a replacement for, cue the property
   if (actualDeleteCount > 0) {
@@ -145,9 +143,7 @@ function intercepted_array_splice(start, deleteCount, ...items) {
       }
 
       array.splice(i, 1);
-      internals.propertyDidChange(i);
 
-      notified.push(i);
       deleted.push(oldValue);
 
     }
@@ -178,14 +174,11 @@ function intercepted_array_splice(start, deleteCount, ...items) {
 
       }
 
-      if (notified.indexOf(arrayIndex) === -1) {
-        internals.propertyDidChange(arrayIndex);
-      }
-
     }
 
   }
 
+  internals.propertyDidChange();
   react();
 
   return deleted;
@@ -210,7 +203,7 @@ function intercepted_array_pop() {
 
   delete array[array.length - 1];
 
-  internals.propertyDidChange(array.length);
+  internals.propertyDidChange();
   react();
 
   return last;
@@ -235,7 +228,7 @@ function intercepted_array_shift() {
 
   array.shift();
 
-  internals.propertyDidChange(0);
+  internals.propertyDidChange();
   react();
 
   return last;
@@ -270,20 +263,20 @@ function intercepted_array_copyWithin(target, start = 0, end = this.length) {
         throw new Error(`You can't create copies of Cue State Instances via Array.prototype.copyWithin.`);
       }
       array[to] = array[from];
-      internals.propertyDidChange(to);
+
     } else {
       value = array[to];
       if (value && (subState = value[__CUE__])) {
         subState.instanceWillUnmount();
       }
       delete array[to];
-      internals.propertyDidChange(to);
     }
     from += direction;
     to += direction;
     count -= 1;
   }
 
+  internals.propertyDidChange();
   react();
 
   return array;
@@ -297,10 +290,7 @@ function intercepted_array_reverse() {
 
   array.reverse();
 
-  for (let i = 0; i < array.length; i++) {
-    internals.propertyDidChange(i);
-  }
-
+  internals.propertyDidChange();
   react();
 
   return array;
@@ -311,16 +301,10 @@ function intercepted_array_sort(compareFunction) {
 
   const internals = this[__CUE__];
   const array = internals.plainState;
-  const before = array.slice();
 
   array.sort(compareFunction);
 
-  for (let i = 0; i < array.length; i++) {
-    if (array[i] !== before[i]) {
-      internals.propertyDidChange(i);
-    }
-  }
-
+  internals.propertyDidChange();
   react();
 
   return array;

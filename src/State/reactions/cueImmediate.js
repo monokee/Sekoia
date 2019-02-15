@@ -25,7 +25,7 @@ function cueImmediate(prop, value, path, observers, derivatives, stopPropagation
   if (derivatives && stopPropagation === false) {
     for (i = 0; i < derivatives.length; i++) {
       derivative = derivatives[i];
-      derivative.updateProperty(prop, value);
+      derivative.needsUpdate = true;
       if (accumulatedDerivatives.indexOf(derivative) === -1) {
         accumulatedDerivatives.push(derivative);
       }

@@ -11,17 +11,20 @@ Cue.UI('Todo-Item', {
             <div class="text" contenteditable="false"></div>
             <div class="date"></div>
         </div>
-        <div class="editIcon"></div>
+        <div class="editButton">edit</div>
      </div>`
   ),
 
   styles: {
 
     item: {
+      position: 'relative',
+      width: '100%',
       display: 'flex',
       flexDirection: 'row',
       justifyContent: 'space-between',
-      padding: '0.75em 0.5em',
+      alignItems: 'center',
+      padding: '1em',
       margin: '1em 0 0',
       background: 'rgba(128,135,142,0.1)',
       opacity: 0.9,
@@ -29,7 +32,11 @@ Cue.UI('Todo-Item', {
       cursor: 'default',
       transition: 'background 150ms, opacity 150ms',
       '&:hover': {
-        opacity: 8
+        opacity: 8,
+
+        '.editButton': {
+          opacity: 1
+        }
       },
       '&:nth-child(odd)': {
         background: 'rgba(128,135,142,0.05)'
@@ -37,19 +44,81 @@ Cue.UI('Todo-Item', {
       '&.editing': {
         opacity: 1
       },
-      '&.completed': {
-        opacity: 0.5
+
+      '.textField': {
+        position: 'relative',
+        padding: '0, 1em',
+        textAlign: 'center',
+
+        div: {
+          transition: 'opacity 150ms'
+        },
+
+        '.text': {
+          position: 'relative',
+          height: '100%'
+        },
+
+        '.text::after': {
+          position: 'absolute',
+          content: '',
+          display: 'block',
+          width: '120%',
+          height: '2px',
+          left: '-10%',
+          top: '50%',
+          backgroundColor: 'rgb(0,115,255)',
+          transformOrigin: 'left',
+          transform: 'scaleX(0)',
+          transition: 'transform 250ms ease-in-out'
+        }
+
       },
-      '&.completed:hover': {
-        opacity: 0.4
+
+      '.date': {
+        fontSize: '0.7em',
+        opacity: 0.65
+      },
+
+      '.editButton': {
+        fontSize: '0.7em',
+        textDecoration: 'underline',
+        opacity: 0.25,
+        transition: 'opacity 150ms',
+        cursor: 'pointer',
+        '&:hover': {
+          opacity: 0.8
+        },
+        '&.disabled': {
+          pointerEvents: 'none'
+        }
+      },
+
+      '&.complete': {
+
+        '.editButton': {
+          userSelect: 'none'
+        },
+
+        '.textField div': {
+          opacity: 0.5
+        },
+
+        '.text::after': {
+          transform: 'scaleX(1)'
+        },
+
       }
+
     },
 
     checkbox: {
       position: 'relative',
       display: 'inline-block',
-      height: '24px',
-      lineHeight: '24px',
+      width: 'var(--iconSize)',
+      height: 'var(--iconSize)',
+      lineHeight: 'var(--iconSize)',
+      cursor: 'pointer',
       opacity: 0.75,
       transition: 'opacity 150ms',
       '--iconSize': '24px',
@@ -58,8 +127,19 @@ Cue.UI('Todo-Item', {
       '&:hover': {
         opacity: 1
       },
+
       '&.checked': {
-        opacity: 1
+        opacity: 1,
+
+        '.bullet': {
+          border: '12px solid rgb(0, 115, 255)'
+        },
+
+        '.tick': {
+          opacity: 1,
+          transform: 'scale(0.55)'
+        }
+
       },
 
       '.bullet': {
@@ -71,30 +151,23 @@ Cue.UI('Todo-Item', {
         transition: 'border 150ms',
         boxSizing: 'border-box'
       },
-      '&.checked .bullet': {
-        border: '12px solid rgb(0,115,255)'
-      },
 
       '.tick': {
         position: 'absolute',
         width: 'var(--iconSize)',
         height: 'var(--iconSize)',
         borderRadius: '50%',
-        background: `rgb(0, 115, 255), url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 512 512\'%3e%3cpath fill=\'white\' d=\'M362.6 192.9L345 174.8c-.7-.8-1.8-1.2-2.8-1.2-1.1 0-2.1.4-2.8 1.2l-122 122.9-44.4-44.4c-.8-.8-1.8-1.2-2.8-1.2-1 0-2 .4-2.8 1.2l-17.8 17.8c-1.6 1.6-1.6 4.1 0 5.7l56 56c3.6 3.6 8 5.7 11.7 5.7 5.3 0 9.9-3.9 11.6-5.5h.1l133.7-134.4c1.4-1.7 1.4-4.2-.1-5.7z\'/%3e%3c/svg%3e") no-repeat center`,
+        background: '#fff',
         opacity: 0,
         transform: 'scale(0.33)',
         transition: 'opacity 150ms, transform 150ms'
-      },
-      '&.checked .tick': {
-        opacity: 1,
-        transform: 'scale(1)'
       },
 
       '.label': {
         marginLeft: '24px',
         paddingLeft: '12px'
       }
-    }
+    },
 
   },
 
@@ -104,6 +177,29 @@ Cue.UI('Todo-Item', {
     this.textField = this.select('.textField');
     this.text = this.select('.text');
     this.date = this.select('.date');
+    this.editButton = this.select('.editButton');
+
+    this.goIntoEditMode = () => {
+      this.isEditing = true;
+      this.text.setAttribute('contenteditable', 'true');
+      this.editButton.textContent = 'ok';
+      this.addClass(this.textField, 'editing');
+      const range = document.createRange();
+      range.selectNodeContents(this.text);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    };
+
+    this.leaveEditMode = () => {
+      this.text.setAttribute('contenteditable', 'false');
+      this.editButton.textContent = 'edit';
+      this.removeClass(this.textField, 'editing');
+      this.state.text = this.text.textContent;
+      window.getSelection().removeAllRanges();
+      setTimeout(() => this.isEditing = false, 100);
+    };
+
   },
 
   bindEvents: {
@@ -111,37 +207,29 @@ Cue.UI('Todo-Item', {
     click: {
       '.checkbox'() {
         this.state.isComplete = !this.state.isComplete;
-      }
-    },
-
-    dblclick: {
-      '.textField'() {
-        if (this.textField.getAttribute('contenteditable') === 'false') {
-          this.textField.setAttribute('contenteditable', 'true');
-          const range = document.createRange();
-          range.selectNodeContents(this.textField);
-          const selection = window.getSelection();
-          selection.removeAllRanges();
-          selection.addRange(range);
+      },
+      '.editButton'() {
+        if (!this.isEditing) {
+          this.goIntoEditMode();
+        } else {
+          this.leaveEditMode();
         }
       }
     },
 
     focusout: {
       '.textField'() {
-        this.textField.setAttribute('contenteditable', 'false');
-        this.state.text = this.textField.textContent;
-        window.getSelection().removeAllRanges();
+        if (this.isEditing) {
+          this.leaveEditMode();
+        }
       }
     },
 
     keydown: {
       '.textField'(e) {
-        if (this.textField.getAttribute('contenteditable') === 'true' && e.which === 13) {
+        if (this.isEditing && e.which === 13) {
           e.preventDefault();
-          this.textField.setAttribute('contenteditable', 'false');
-          this.state.text = this.textField.textContent;
-          window.getSelection().removeAllRanges();
+          this.leaveEditMode();
         }
       }
     }
@@ -151,17 +239,23 @@ Cue.UI('Todo-Item', {
   renderState: {
 
     isComplete(flag) {
-      if (flag) {
-        this.element.dataset.complete = 'true';
+      if (flag === true) {
+        this.addClass('complete');
         this.addClass(this.checkBox, 'checked');
+        this.addClass(this.editButton, 'disabled');
+        this.element.dataset.complete = 'true';
       } else {
-        this.element.dataset.complete = 'false';
-        this.removeClass(this.checkBox, 'checked');
+       this.removeClass('complete');
+       this.removeClass(this.checkBox, 'checked');
+       this.removeClass(this.editButton, 'disabled');
+       this.element.dataset.complete = 'false';
       }
+
     },
 
     text(content) {
       this.text.textContent = content;
+      this.date.textContent = new Date().toLocaleDateString('en-us', { weekday: 'short', year: '2-digit', month: 'short', day: 'numeric' });
     }
 
   }

@@ -11,7 +11,7 @@
 function createState(data, module, type, props) {
 
   // 1. Attach Internals to "data" under private __CUE__ symbol.
-  const internals = data[__CUE__] = type === STATE_TYPE_INSTANCE ? new InstanceInternals(module, type) : new ExtensionInternals(module, type);
+  const internals = data[__CUE__] = type === STATE_TYPE_MODULE ? new InstanceInternals(module, type) : new ExtensionInternals(module, type);
 
   // 2. Wrap "data" into a reactive proxy
   const proxyState = new Proxy(data, {

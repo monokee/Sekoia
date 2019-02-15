@@ -70,17 +70,20 @@ function insertStyleRule(selectorName, styleProperties) {
 
   let prop;
 
-  let variables = ''; // variables have to be in the rule at insertion time or they wont work.
+  let specialProps = ''; // variables have to be in the rule at insertion time or they wont work.
   for (prop in styleProperties) {
 
-    if (prop.indexOf('--', 0) === 0) {
-      variables += `${prop}: ${styleProperties[prop]}; `;
+    if (prop.indexOf('--', 0) === 0) { // custom properties
+      specialProps += `${prop}: ${styleProperties[prop]}; `;
+      delete styleProperties[prop];
+    } else if (prop === 'content') { // pseudo content attribute needs special escape (TODO: so does inline base64!)
+      specialProps += `${prop}: "${styleProperties[prop]}"; `;
       delete styleProperties[prop];
     }
 
   }
 
-  const ruleIndex = CUE_UI_STYLESHEET.insertRule(`${selectorName} { ${variables} } `, CUE_UI_STYLESHEET.cssRules.length);
+  const ruleIndex = CUE_UI_STYLESHEET.insertRule(`${selectorName} { ${specialProps} } `, CUE_UI_STYLESHEET.cssRules.length);
   const styleRule = CUE_UI_STYLESHEET.cssRules[ruleIndex].style;
 
   for (prop in styleProperties) {

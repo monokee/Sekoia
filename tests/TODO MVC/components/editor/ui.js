@@ -22,10 +22,6 @@ Cue.UI('Todo-Editor', Component => ({
       backgroundColor: 'blue'
     },
 
-    b: {
-      backgroundColor: 'yellow'
-    },
-
     editor: {
       position: 'relative',
       width: '100%',

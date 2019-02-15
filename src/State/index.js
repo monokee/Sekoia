@@ -19,10 +19,13 @@ const CUE_STATE_MODULES = new Map();
 const CUE_STATE_INTERNALS = new Map();
 
 // State Flags
-let isReacting = false; // is a reaction currently in process?
 let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
 const accumulatedDerivatives = []; // derivatives which are accumulated during batch operations (emptied after each batch!)
-// Reaction Queue
+const QUEUED_OBSERVERS = new Set(); // collect queued observers to avoid duplication in an update batch. cleared after each run
+const QUEUED_DERIVATIVES = new Set(); // same as above
+const QUEUED_DERIVATIVE_INSTANCES = new Set();
+
+// Reaction Queue (cleared after each run)
 const MAIN_QUEUE = [];
 
 // Global derivative installer payload
@@ -37,9 +40,10 @@ const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
 
 // Meta Keys used for closure scope lookup && safely extending foreign objects
-const __CUE__ = Symbol('🧿 Cue Internals');
+const __CUE__ = Symbol('🧿');
 
-const STATE_TYPE_INSTANCE = 1;
+const STATE_TYPE_ROOT = -1;
+const STATE_TYPE_MODULE = 1;
 const STATE_TYPE_EXTENSION = 2;
 
 // Root State Store
@@ -47,8 +51,7 @@ const CUE_ROOT_STATE = {};
 oDefineProperty(CUE_ROOT_STATE, __CUE__, {
   value: {
     name: '::ROOT::',
-    module: {name: '::ROOT::'},
-    type: STATE_TYPE_INSTANCE,
+    type: STATE_TYPE_ROOT,
     plainState: CUE_ROOT_STATE,
     proxyState: CUE_ROOT_STATE,
     observersOf: EMPTY_MAP,
@@ -57,6 +60,7 @@ oDefineProperty(CUE_ROOT_STATE, __CUE__, {
     providersToInstall: EMPTY_MAP,
     derivativesToInstall: EMPTY_MAP,
     internalGetters: EMPTY_MAP,
-    internalSetters: EMPTY_MAP
+    internalSetters: EMPTY_MAP,
+    propertyDidChange: NOOP
   }
 });

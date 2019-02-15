@@ -1,4 +1,4 @@
-Cue.State('Todo-Item', Module => ({
+Cue.State('Todo-Item', {
 
   props: {
     text: '',
@@ -10,4 +10,4 @@ Cue.State('Todo-Item', Module => ({
     this.isComplete = props.isComplete;
   }
 
-}));
+});

@@ -21,36 +21,49 @@ class StateInternals {
 
   }
 
-  instanceWillUnmount() {
-    console.log('[todo: instanceWillUnmount]', this);
-  }
+  bubble() {
 
-  cueConsumers(providerInstance, consumers, prop, value) {
+    // 1. Bubble the change through immediate module relationships
+    let directParent = this.directParent;
+    let ownProp = this.ownPropertyName;
+    let ownValue = this.proxyState;
 
-    // Find consumer instances and recurse into each branch
+    while (directParent.type === STATE_TYPE_MODULE) {
 
-    let key, childState;
-    for (key in this.plainState) {
+      directParent.cueObservers.call(directParent, ownProp, ownValue);
+      directParent.cueDerivatives.call(directParent, ownProp, false);
 
-      childState = this.plainState[key];
+      if (directParent.consumersOf.has(ownProp)) {
+        directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
+      }
 
-      if (childState && (childState = childState[__CUE__])) { // property is a child state instance
+      ownProp = directParent.ownPropertyName;
+      ownValue = directParent.proxyState;
+      directParent = directParent.directParent;
 
-        let provider;
-        for (provider of childState.providersOf.values()) {
-          if (provider.sourceInternals === providerInstance && provider.sourceProperty === prop) {
-            // this will branch off into its own search from a new root for a new property in case the provided property is passed down at multiple levels in the state tree...
-            childState.propertyDidChange.call(childState, provider.targetProperty, value); // continue recursion in this branch
-          }
-        }
+    }
 
-        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the provided prop is also provided from another upstream state)
-        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value);
+    // 2. If the immediate module chain did not reach all
+    // the way to the root because it was interrupted by extension states,
+    // we still bubble up but only for computations. these can reach deep into objects and thus
+    // have to be reevaluated all the way through the affected branch to the root.
+    if (directParent.type !== STATE_TYPE_ROOT) {
 
+      let nextModuleParent = directParent.closestModuleParent;
+      let branchPropertyName = directParent.branchPropertyName;
+
+      while (nextModuleParent && nextModuleParent.type !== STATE_TYPE_ROOT) {
+        nextModuleParent.cueDerivatives.call(nextModuleParent, branchPropertyName, false);
+        branchPropertyName = nextModuleParent.branchPropertyName;
+        nextModuleParent = nextModuleParent.closestModuleParent;
       }
 
     }
 
+  }
+
+  instanceWillUnmount() {
+    console.log('[todo: instanceWillUnmount]', this);
   }
 
 }
@@ -65,31 +78,26 @@ class InstanceInternals extends StateInternals {
 
     // ------------------INLINE "SUPER" CALL----------------------
 
-    this.parentInternals = parent[__CUE__];
-    let rootInternals = this.parentInternals;
+    this.directParent = parent[__CUE__];
     this.ownPropertyName = ownPropertyName;
-    let rootPropertyName = this.ownPropertyName; //something
 
-    // Find the root internals (root !== parent. root is the closest module-based ancestor)
-    const pathFromRoot = [];
-    while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE) {
-      rootInternals = rootInternals.rootInternals;
-      rootPropertyName = rootInternals.rootPropertyName;
-      pathFromRoot.unshift(rootPropertyName);
+    let closestModuleParent = this.directParent;
+    let branchPropertyName = ownPropertyName;
+    while (closestModuleParent && closestModuleParent.type !== STATE_TYPE_MODULE) {
+      branchPropertyName = closestModuleParent.ownPropertyName;
+      closestModuleParent = closestModuleParent.closestModuleParent;
     }
 
-    this.rootInternals = rootInternals;
-    this.rootPropertyName = rootPropertyName;
-    this.pathFromRoot = pathFromRoot;
-    this.propertyPathPrefix = pathFromRoot.length > 0 ? `${pathFromRoot.join('.')}.` : ''; // note the trailing dot
+    this.closestModuleParent = closestModuleParent; // the next upstream state object that is based on a module (can be the immediate parent!)
+    this.branchPropertyName = branchPropertyName; // the property name of the enclosing object on the closest module parent
 
     // -------------------------------------------------------------
 
     this.name = this.module.name;
-
     this.internalGetters = this.module.internalGetters;
     this.internalSetters = this.module.internalSetters;
     this.consumersOf = this.module.consumersOf;
+
     this.observersOf = new Map();       // 1D map [propertyName -> handler]
     this.derivativesOf = new Map();     // 2D map [propertyName -> 1D array[...Derivatives]]
     this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
@@ -111,6 +119,125 @@ class InstanceInternals extends StateInternals {
 
   propertyDidChange(prop, value) {
 
+    console.log('%c propertyDidChange ', 'background-color: hotpink; color: white;', prop);
+
+    this.cueObservers(prop, value);
+    this.cueDerivatives(prop, false);
+
+    if (this.consumersOf.has(prop)) {
+      this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
+    }
+
+    this.bubble();
+
+    QUEUED_OBSERVERS.clear();
+    QUEUED_DERIVATIVES.clear();
+    QUEUED_DERIVATIVE_INSTANCES.clear();
+
+  }
+
+  cueObservers(prop, value) {
+
+    const observers = this.observersOf.get(prop);
+
+    if (observers && !QUEUED_OBSERVERS.has(observers)) {
+
+      QUEUED_OBSERVERS.add(observers);
+
+      for (let i = 0; i < observers.length; i++) {
+        MAIN_QUEUE.push(observers[i], value, prop);
+      }
+
+    }
+
+  }
+
+  cueDerivatives(prop, stopPropagation) {
+
+    if (stopPropagation === false) {
+
+      const derivatives = this.derivativesOf.get(prop);
+
+      if (derivatives && !QUEUED_DERIVATIVES.has(derivatives)) {
+
+        QUEUED_DERIVATIVES.add(derivatives);
+
+        let hasChanged = false;
+
+        for (let i = 0, derivative, result; i < derivatives.length; i++) {
+
+          derivative = derivatives[i];
+
+          if (QUEUED_DERIVATIVE_INSTANCES.has(derivative)) continue;
+
+          QUEUED_DERIVATIVE_INSTANCES.add(derivative);
+
+          derivative.needsUpdate = true;
+          console.log('recompute', derivative.ownPropertyName, 'because derivatives is not yet on the stack!', derivative);
+          result = derivative.value; // call getter, recompute
+
+          if (derivative.hasChanged === true) {
+            this.cueObservers(derivative.ownPropertyName, result);
+            this.cueDerivatives(derivative.ownPropertyName, derivative.stopPropagation);
+            hasChanged = true;
+          }
+
+        }
+
+        if (hasChanged === true) {
+          this.bubble(); // if any derivative has changed its value, bubble
+        }
+
+      }
+
+    }
+
+  }
+
+  cueConsumers(providerInstance, consumers, prop, value) {
+
+    // Find consumer instances and recurse into each branch
+
+    let key, childState;
+    for (key in this.plainState) {
+
+      childState = this.plainState[key];
+
+      if (childState && (childState = childState[__CUE__])) { // property is a child state instance
+
+        let provider;
+        for (provider of childState.providersOf.values()) {
+
+          if (provider.sourceInternals === providerInstance && provider.sourceProperty === prop) {
+
+            childState.cueObservers.call(childState, provider.targetProperty, value);
+            childState.cueDerivatives.call(childState, provider.targetProperty, false);
+
+            // if the childState is providing the property further to its children, this will branch off into its own search from a new root for a new property name...
+            if (childState.consumersOf.has(provider.targetProperty)) {
+              childState.cueConsumers.call(childState, childState, childState.consumersOf.get(provider.targetProperty), provider.targetProperty, value);
+            }
+
+          }
+
+        }
+
+        // even if we did find a match above we have to recurse, potentially creating a parallel search route (if the provided prop is also provided from another upstream state)
+        childState.cueConsumers.call(childState, providerInstance, consumers, prop, value);
+
+      }
+
+    }
+
+  }
+
+  propertyDidChange1(prop, value) {
+
+    // called when an immediate child of the module has changed.
+    // 1. Cue observers and derivatives of the property recursively.
+    // 2. Cue consumers of the property recursively.
+    // 3. Cue derivatives of the branchPropertyName on the closestModuleParent.
+
     const observers = this.observersOf.get(prop);
     const derivatives = this.derivativesOf.get(prop);
 
@@ -129,6 +256,18 @@ class InstanceInternals extends StateInternals {
       this.cueConsumers(this, consumers, prop, value, prop);
     }
 
+    /* TODO: Deep change observation (@see editor/state/todo array)
+
+    // 3. Bubble the change to n root parents recursively where n is defined in constant BUBBLE_ROOT_LEVELS
+    if (BUBBLE_ROOT_LEVELS === ++bubbleCount) {
+      console.log('Bubble up to:', this.parentPropertyNameOnRoot, this.rootInternals.name);
+      this.rootInternals.propertyDidChange.call(this.rootInternals, this.parentPropertyNameOnRoot, this.rootInternals[this.parentPropertyNameOnRoot]);
+    } else {
+      bubbleCount = 0;
+    }
+
+    */
+
   }
 
   injectProviders() {
@@ -145,21 +284,21 @@ class InstanceInternals extends StateInternals {
         targetProperty = description.targetProperty; // the top-level property name on this instance that is consuming from the parent
 
         // Traverse through the parent hierarchy until we find the first parent that has been created from a module that matches the name of the providerModule
-        let rootInternals = this.rootInternals;
+        let providingParent = this.closestModuleParent;
 
-        while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE && rootInternals.name !== sourceModule) {
-          rootInternals = rootInternals.rootInternals;
+        while (providingParent && providingParent.name !== sourceModule) {
+          providingParent = providingParent.closestModuleParent;
         }
 
-        if (rootInternals) { // found a parent instance that matches the consuming child module name
+        if (providingParent) { // found a parent instance that matches the consuming child module name
 
           // now we have to check if the found state instance is the actual source of the provided property or if it is also consuming it from another parent state.
-          rootProvider = rootInternals.providersOf.get(sourceProperty);
+          rootProvider = providingParent.providersOf.get(sourceProperty);
 
           if (rootProvider) { // the provider is a middleman that receives the data from another parent.
             rootProvider = getRootProvider(rootProvider);
           } else {
-            rootProvider = {sourceInternals: rootInternals, sourceProperty, targetModule, targetProperty};
+            rootProvider = {sourceInternals: providingParent, sourceProperty, targetModule, targetProperty};
           }
 
           // -> inject the rootProvider. We now have direct access to the data source on a parent, no matter how many levels of indirection the data has taken to arrive here.
@@ -182,12 +321,12 @@ class InstanceInternals extends StateInternals {
   installDerivatives() {
 
     let vDerivative, i, derivative, sourceProperty, dependencies, superDerivative;
-    for (vDerivative of this.module.derivativesToInstall.values()) {
+    for (vDerivative of this.module.derivativesToInstall.values()) { // topologically sorted installers.
 
       // 3.0 Create Derivative instance
       derivative = new Derivative(vDerivative.ownPropertyName, vDerivative.computation, vDerivative.sourceProperties);
 
-      // 3.1 Install instance as derivedProp
+      // 3.1 Install instance as derivedProp (inserted in topologically sorted order!)
       this.derivedProperties.set(vDerivative.ownPropertyName, derivative);
 
       // 3.2 Add derivative as derivativeOf of its sourceProperties (dependencyGraph)
@@ -209,8 +348,8 @@ class InstanceInternals extends StateInternals {
         superDerivative.subDerivatives.push(derivative);
       }
 
-      // 3.4 Fill internal cache of Derivative with proxy. (traps will get values from other resolved derivatives and provided props)
-      derivative.fillCache(this.proxyState);
+      // 3.4 Assign the proxy state as the source of the derivative so that computations can pull out internal getters
+      derivative.source = this.proxyState;
 
     }
 
@@ -304,23 +443,18 @@ class ExtensionInternals extends StateInternals {
 
     // ------------------INLINE "SUPER" CALL----------------------
 
-    this.parentInternals = parent[__CUE__];
-    let rootInternals = this.parentInternals;
+    this.directParent = parent[__CUE__];
     this.ownPropertyName = ownPropertyName;
-    let rootPropertyName = this.ownPropertyName; //something
 
-    // Find the root internals (root !== parent. root is the closest module-based ancestor)
-    const pathFromRoot = [];
-    while (rootInternals && rootInternals.type !== STATE_TYPE_INSTANCE) {
-      rootInternals = rootInternals.rootInternals;
-      rootPropertyName = rootInternals.rootPropertyName;
-      pathFromRoot.unshift(rootPropertyName);
+    let closestModuleParent = this.directParent;
+    let branchPropertyName = ownPropertyName;
+    while (closestModuleParent && closestModuleParent.type !== STATE_TYPE_MODULE) {
+      branchPropertyName = closestModuleParent.ownPropertyName;
+      closestModuleParent = closestModuleParent.closestModuleParent;
     }
 
-    this.rootInternals = rootInternals;
-    this.rootPropertyName = rootPropertyName;
-    this.pathFromRoot = pathFromRoot;
-    this.propertyPathPrefix = pathFromRoot.length > 0 ? `${pathFromRoot.join('.')}.` : ''; // note the trailing dot
+    this.closestModuleParent = closestModuleParent; // the next upstream state object that is based on a module (can be the immediate parent!)
+    this.branchPropertyName = branchPropertyName; // the property name of the enclosing object on the closest module parent
 
     // -------------------------------------------------------------
 
@@ -329,31 +463,13 @@ class ExtensionInternals extends StateInternals {
 
   }
 
-  propertyDidChange(prop) {
+  propertyDidChange() {
 
-    // propagate changes to the root instance.
+    this.bubble();
 
-    const root = this.rootInternals;
-    const rootProp = this.rootPropertyName;
-    const rootVal = root.plainState[rootProp];
-    const path = this.propertyPathPrefix + prop;
-
-    // 1. recurse over direct dependencies
-    const observers = root.observersOf.get(rootProp);
-    const derivatives = root.derivativesOf.get(rootProp);
-    if (observers || derivatives) {
-      if (isAccumulating) {
-        cueImmediate(rootProp, rootVal, path, observers, derivatives, false);
-      } else {
-        cueAll(rootProp, rootVal, path, observers, derivatives, false);
-      }
-    }
-
-    // 2. Notify consumers of the property
-    const consumers = root.consumersOf.get(rootProp);
-    if (consumers) {
-      root.cueConsumers.call(root, root, consumers, rootProp, rootVal, path);
-    }
+    QUEUED_OBSERVERS.clear();
+    QUEUED_DERIVATIVES.clear();
+    QUEUED_DERIVATIVE_INSTANCES.clear();
 
   }
 

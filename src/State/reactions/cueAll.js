@@ -13,7 +13,7 @@
  */
 function cueAll(prop, value, path, observers, derivatives, stopPropagation) {
 
-  let i, l, item;
+  let i, l, item, hasChanged = false;
 
   if (observers) {
 
@@ -29,10 +29,8 @@ function cueAll(prop, value, path, observers, derivatives, stopPropagation) {
 
   if (derivatives && (l = derivatives.length) && stopPropagation === false) {
 
-    // update internal cache of derivatives
-    for (i = 0; i < l; i++) {
-      derivatives[i].updateProperty(prop, value);
-    }
+    // flag derivatives to update
+    for (i = 0; i < l; i++) derivatives[i].needsUpdate = true;
 
     // recompute value and recurse
     let result;
@@ -43,11 +41,14 @@ function cueAll(prop, value, path, observers, derivatives, stopPropagation) {
       result = item.value; // calls "getter" -> recomputes _value
 
       if (item.hasChanged) { // has value changed after recomputation -> recurse
+        hasChanged = true;
         cueAll(item.ownPropertyName, result, item.ownPropertyName, item.observers, item.subDerivatives, item.stopPropagation);
       }
 
     }
 
   }
+
+  return hasChanged;
 
 }

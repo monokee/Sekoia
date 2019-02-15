@@ -14,6 +14,10 @@ Cue.UI('Todo-Container', Component => ({
 
   styles: {
 
+    '*': {
+      boxSizing: 'border-box'
+    },
+
     container: {
       position       : 'relative',
       width          : '100vw',
@@ -26,7 +30,7 @@ Cue.UI('Todo-Container', Component => ({
       fontFamily     : 'Roboto, sans-serif',
       color          : 'rgb(232,235,238)',
       backgroundColor: 'rgb(22,25,28)',
-      userSelect: 'none'
+      userSelect     : 'none'
     },
 
     title: {
@@ -37,17 +41,17 @@ Cue.UI('Todo-Container', Component => ({
     },
 
     editorContainer: {
-      width        : '650px',
-      maxWidth     : '95%',
-      boxShadow    : 'none'
+      width    : '650px',
+      maxWidth : '95%',
+      boxShadow: 'none'
     },
 
     footer: {
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
+      display       : 'flex',
+      flexDirection : 'column',
+      alignItems    : 'center',
       justifyContent: 'center',
-      marginTop: '2.5em',
+      marginTop     : '2.5em',
 
       p: {
         margin: 0
@@ -65,18 +69,13 @@ Cue.UI('Todo-Container', Component => ({
     this.state = state;
     this.headline = this.select('.headline');
     this.editorContainer = this.select('.editorContainer');
+    this.editorContainer.appendChild(this.imports.Editor(state.editor));
   },
 
   renderState: {
 
     title(text) {
       this.headline.textContent = text;
-    },
-
-    editor(data) {
-      this.editorContainer.appendChild(
-        this.imports.Editor(data)
-      );
     }
 
   }
