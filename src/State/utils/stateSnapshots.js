@@ -35,9 +35,7 @@ function applyState(props) {
     props = JSON.parse(props);
   }
 
-  isAccumulating = true;
   patchState(internals.rootInternals.proxyState, internals.rootPropertyName, props);
-  isAccumulating = false;
 
   cueAccumulated();
   react();

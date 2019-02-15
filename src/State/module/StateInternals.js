@@ -68,7 +68,7 @@ class StateInternals {
 
 }
 
-class InstanceInternals extends StateInternals {
+class StateModuleInternals extends StateInternals {
 
   constructor(module, type) {
     super(module, type);
@@ -112,14 +112,16 @@ class InstanceInternals extends StateInternals {
     }
 
     this.mounted = true;
+
+    isInitializing = true;
     this.module.initialize.call(this.proxyState, this.initialProps);
+    isInitializing = false;
+
     this.initialProps = undefined;
 
   }
 
   propertyDidChange(prop, value) {
-
-    console.log('%c propertyDidChange ', 'background-color: hotpink; color: white;', prop);
 
     this.cueObservers(prop, value);
     this.cueDerivatives(prop, false);
@@ -130,6 +132,7 @@ class InstanceInternals extends StateInternals {
 
     this.bubble();
 
+    // TODO: this is too soon and too naive. batch ops are far more intricately wired
     QUEUED_OBSERVERS.clear();
     QUEUED_DERIVATIVES.clear();
     QUEUED_DERIVATIVE_INSTANCES.clear();
@@ -168,18 +171,20 @@ class InstanceInternals extends StateInternals {
 
           derivative = derivatives[i];
 
-          if (QUEUED_DERIVATIVE_INSTANCES.has(derivative)) continue;
+          if (!QUEUED_DERIVATIVE_INSTANCES.has(derivative)) {
 
-          QUEUED_DERIVATIVE_INSTANCES.add(derivative);
+            QUEUED_DERIVATIVE_INSTANCES.add(derivative);
 
-          derivative.needsUpdate = true;
-          console.log('recompute', derivative.ownPropertyName, 'because derivatives is not yet on the stack!', derivative);
-          result = derivative.value; // call getter, recompute
+            derivative.needsUpdate = true;
 
-          if (derivative.hasChanged === true) {
-            this.cueObservers(derivative.ownPropertyName, result);
-            this.cueDerivatives(derivative.ownPropertyName, derivative.stopPropagation);
-            hasChanged = true;
+            result = derivative.value; // call getter, recompute
+
+            if (derivative.hasChanged === true) {
+              this.cueObservers(derivative.ownPropertyName, result);
+              this.cueDerivatives(derivative.ownPropertyName, derivative.stopPropagation);
+              hasChanged = true;
+            }
+
           }
 
         }
@@ -228,45 +233,6 @@ class InstanceInternals extends StateInternals {
       }
 
     }
-
-  }
-
-  propertyDidChange1(prop, value) {
-
-    // called when an immediate child of the module has changed.
-    // 1. Cue observers and derivatives of the property recursively.
-    // 2. Cue consumers of the property recursively.
-    // 3. Cue derivatives of the branchPropertyName on the closestModuleParent.
-
-    const observers = this.observersOf.get(prop);
-    const derivatives = this.derivativesOf.get(prop);
-
-    if (observers || derivatives) {
-      if (isAccumulating) {
-        cueImmediate(prop, value, prop, observers, derivatives, false);
-      } else {
-        cueAll(prop, value, prop, observers, derivatives, false);
-      }
-    }
-
-    const consumers = this.consumersOf.get(prop);
-
-    // 2. if the changed property has consumers, find them and recurse
-    if (consumers) {
-      this.cueConsumers(this, consumers, prop, value, prop);
-    }
-
-    /* TODO: Deep change observation (@see editor/state/todo array)
-
-    // 3. Bubble the change to n root parents recursively where n is defined in constant BUBBLE_ROOT_LEVELS
-    if (BUBBLE_ROOT_LEVELS === ++bubbleCount) {
-      console.log('Bubble up to:', this.parentPropertyNameOnRoot, this.rootInternals.name);
-      this.rootInternals.propertyDidChange.call(this.rootInternals, this.parentPropertyNameOnRoot, this.rootInternals[this.parentPropertyNameOnRoot]);
-    } else {
-      bubbleCount = 0;
-    }
-
-    */
 
   }
 
@@ -326,7 +292,7 @@ class InstanceInternals extends StateInternals {
       // 3.0 Create Derivative instance
       derivative = new Derivative(vDerivative.ownPropertyName, vDerivative.computation, vDerivative.sourceProperties);
 
-      // 3.1 Install instance as derivedProp (inserted in topologically sorted order!)
+      // 3.1 Install instance as derivedProp
       this.derivedProperties.set(vDerivative.ownPropertyName, derivative);
 
       // 3.2 Add derivative as derivativeOf of its sourceProperties (dependencyGraph)
@@ -433,7 +399,7 @@ class InstanceInternals extends StateInternals {
 
 }
 
-class ExtensionInternals extends StateInternals {
+class StateExtensionInternals extends StateInternals {
 
   constructor(module, type) {
     super(module, type);

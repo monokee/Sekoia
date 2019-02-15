@@ -43,9 +43,6 @@ const FILES = {
     `${MODULES.state}/proxy/proxySetHandler.js`,
     `${MODULES.state}/proxy/proxyDeleteHandler.js`,
 
-    `${MODULES.state}/reactions/cueAll.js`,
-    `${MODULES.state}/reactions/cueImmediate.js`,
-    `${MODULES.state}/reactions/cueAccumulated.js`,
     `${MODULES.state}/reactions/react.js`,
 
     `${MODULES.state}/module/buildStateModule.js`,

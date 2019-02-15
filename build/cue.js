@@ -152,13 +152,12 @@
   const CUE_STATE_INTERNALS = new Map();
 
   // State Flags
-  let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
-  const accumulatedDerivatives = []; // derivatives which are accumulated during batch operations (emptied after each batch!)
   const QUEUED_OBSERVERS = new Set(); // collect queued observers to avoid duplication in an update batch. cleared after each run
   const QUEUED_DERIVATIVES = new Set(); // same as above
   const QUEUED_DERIVATIVE_INSTANCES = new Set();
 
   // Reaction Queue (cleared after each run)
+  let isInitializing = false;
   const MAIN_QUEUE = [];
 
   // Global derivative installer payload
@@ -569,7 +568,7 @@
 
   }
 
-  function areStatesEqual(a, b) {
+  function areDeepEqual(a, b) {
 
     if (isArray(a)) return !isArray(b) || a.length !== b.length ? false : areArraysDeepEqual(a, b);
 
@@ -582,7 +581,7 @@
   function areArraysDeepEqual(a, b) {
 
     for (let i = 0; i < a.length; i++) {
-      if (!areStatesEqual(a[i], b[i])) {
+      if (!areDeepEqual(a[i], b[i])) {
         return false;
       }
     }
@@ -600,7 +599,7 @@
 
     for (let i = 0, k; i < keysA.length; i++) {
       k = keysA[i];
-      if (keysB.indexOf(k) === -1 || !areStatesEqual(a[k], b[keysB[i]])) {
+      if (keysB.indexOf(k) === -1 || !areDeepEqual(a[k], b[keysB[i]])) {
         return false;
       }
     }
@@ -835,9 +834,7 @@
       props = JSON.parse(props);
     }
 
-    isAccumulating = true;
     patchState(internals.rootInternals.proxyState, internals.rootPropertyName, props);
-    isAccumulating = false;
 
     cueAccumulated();
     react();
@@ -966,7 +963,7 @@
 
       if (this.needsUpdate) {
         this.intermediate = this.computation.call(null, this.source);
-        if (areStatesEqual(this._value, this.intermediate)) {
+        if (areDeepEqual(this._value, this.intermediate)) {
           this.hasChanged = false;
         } else {
           this._value = this.intermediate;
@@ -979,19 +976,6 @@
 
     }
 
-    /**
-     * Pull in all dependency values from source. Used at instantiation time to fill cache with initial values
-     * @param {object} source - The source state object from which values should be pulled into the internal cache.
-     */
-    fillCache(source) {
-      this.valueCache = source;
-      this.needsUpdate = true;
-    }
-
-    /**
-     * Dispose this derivative by nullifying its strong pointers and removing itself from its computation branch.
-     * @param {boolean} root - required for recursive calls to self. see inline comments below
-     */
     dispose(root = true) {
 
       let i;
@@ -1354,124 +1338,13 @@
   }
 
   /**
-   * Queues all reactions, derivatives and their subDerivative branch in a single recursive function.
-   * This function is used for queueing dependencies whenever we are not in a batch-op situation (like actions) and we don't want to
-   * defer dependency traversal until after a batch op has finished.
-   * @function cueAll
-   * @param {string}  prop            - The property which has been mutated.
-   * @param {*}       value           - The result of the mutation.
-   * @param {string}  path            - The path of the property relative to the nearest model-based instance.
-   * @param {Array}   observers       - Reaction handlers observing the property.
-   * @param {Array}   derivatives     - Derivatives that are being derived from the property.
-   * @param {boolean} stopPropagation - Whether or not a derivative has been flagged to be the last observed derivative in its dependency branch. Used for recursion.
-   */
-  function cueAll(prop, value, path, observers, derivatives, stopPropagation) {
-
-    let i, l, item, hasChanged = false;
-
-    if (observers) {
-
-      // add pairs of unique [reactionHandler, changedValue, changedPropertyPath] to queue
-      for (i = 0; i < observers.length; i++) {
-        item = observers[i];
-        if (MAIN_QUEUE.indexOf(item) === -1) { // TODO: under which circumstances can there be duplicates here?
-          MAIN_QUEUE.push(item, value, path);
-        }
-      }
-
-    }
-
-    if (derivatives && (l = derivatives.length) && stopPropagation === false) {
-
-      // flag derivatives to update
-      for (i = 0; i < l; i++) derivatives[i].needsUpdate = true;
-
-      // recompute value and recurse
-      let result;
-
-      for (i = 0; i < l; i++) {
-
-        item = derivatives[i];
-        result = item.value; // calls "getter" -> recomputes _value
-
-        if (item.hasChanged) { // has value changed after recomputation -> recurse
-          hasChanged = true;
-          cueAll(item.ownPropertyName, result, item.ownPropertyName, item.observers, item.subDerivatives, item.stopPropagation);
-        }
-
-      }
-
-    }
-
-    return hasChanged;
-
-  }
-
-  /**
-   * Called when state is mutated in a batch operation. Queues only the immediate reactions and derivatives of a mutated source property.
-   * Explicitly collects the immediate derivatives of the mutated source properties on "accumulatedDerivatives" Array
-   * so that the queueing of their subDerivatives (their dependency branch) can be deferred until the batch operation has finished.
-   * Batch Op is detected -> Mutations call cueImmediate -> batch op finishes -> cueAccumulated is called -> react() is called.
-   * @function cueImmediate
-   * @external {Array} accumulatedDerivatives - Collects unique derivatives which were affected by source property mutation(s). Queueing of their subDerivatives is deferred.
-   */
-  function cueImmediate(prop, value, path, observers, derivatives, stopPropagation) {
-
-    let i, reaction, derivative;
-
-    if (observers) {
-
-      for (i = 0; i < observers.length; i++) {
-        reaction = observers[i];
-        if (MAIN_QUEUE.indexOf(reaction) === -1) {
-          MAIN_QUEUE.push(reaction, value, path);
-        }
-      }
-
-    }
-
-    if (derivatives && stopPropagation === false) {
-      for (i = 0; i < derivatives.length; i++) {
-        derivative = derivatives[i];
-        derivative.needsUpdate = true;
-        if (accumulatedDerivatives.indexOf(derivative) === -1) {
-          accumulatedDerivatives.push(derivative);
-        }
-      }
-    }
-
-  }
-
-  /**
-   * Queues the subDerivatives of derivatives which have accumulated during a batch operation.
-   * This method is called after a batch operation has finished and is an optimization that prevents unnecessary re-computations
-   * of the dependency branch when there is a chance that one or many source properties are changed multiple times during a batch op (like actions).
-   * @function cueAccumulated
-   * @external {Array} accumulatedDerivatives - Contains unique derivatives which were affected by source property mutation(s). Their subDerivatives have not yet been queued.
-   */
-  function cueAccumulated() {
-
-    for (let i = 0, derivative, result; i < accumulatedDerivatives.length; i++) {
-      derivative = accumulatedDerivatives[i];
-      result = derivative.value; // calls "getter" -> recomputes value
-      if (derivative.hasChanged) {
-        cueAll(derivative.ownPropertyName, result, derivative.ownPropertyName, derivative.observers, derivative.subDerivatives, derivative.stopPropagation);
-      }
-    }
-
-    // Empty accumulatedDerivatives
-    accumulatedDerivatives.splice(0, accumulatedDerivatives.length);
-
-  }
-
-  /**
    * Runs through the Main Queue to execute each collected reaction with each collected observation payload as the first and only argument.
    * Main Queue is emptied after each call to react.
    * @function react
    */
   function react() {
 
-    if (MAIN_QUEUE.length && !isAccumulating) {
+    if (MAIN_QUEUE.length) {
 
       // Queue contains tuples of (handler, value, path) -> call i[0](i[1],[i2]) ie handler(value, path)
       for (let i = 0; i < MAIN_QUEUE.length; i += 3) {
@@ -1696,7 +1569,7 @@
 
   }
 
-  class InstanceInternals extends StateInternals {
+  class StateModuleInternals extends StateInternals {
 
     constructor(module, type) {
       super(module, type);
@@ -1740,14 +1613,16 @@
       }
 
       this.mounted = true;
+
+      isInitializing = true;
       this.module.initialize.call(this.proxyState, this.initialProps);
+      isInitializing = false;
+
       this.initialProps = undefined;
 
     }
 
     propertyDidChange(prop, value) {
-
-      console.log('%c propertyDidChange ', 'background-color: hotpink; color: white;', prop);
 
       this.cueObservers(prop, value);
       this.cueDerivatives(prop, false);
@@ -1796,18 +1671,20 @@
 
             derivative = derivatives[i];
 
-            if (QUEUED_DERIVATIVE_INSTANCES.has(derivative)) continue;
+            if (!QUEUED_DERIVATIVE_INSTANCES.has(derivative)) {
 
-            QUEUED_DERIVATIVE_INSTANCES.add(derivative);
+              QUEUED_DERIVATIVE_INSTANCES.add(derivative);
 
-            derivative.needsUpdate = true;
-            console.log('recompute', derivative.ownPropertyName, 'because derivatives is not yet on the stack!', derivative);
-            result = derivative.value; // call getter, recompute
+              derivative.needsUpdate = true;
 
-            if (derivative.hasChanged === true) {
-              this.cueObservers(derivative.ownPropertyName, result);
-              this.cueDerivatives(derivative.ownPropertyName, derivative.stopPropagation);
-              hasChanged = true;
+              result = derivative.value; // call getter, recompute
+
+              if (derivative.hasChanged === true) {
+                this.cueObservers(derivative.ownPropertyName, result);
+                this.cueDerivatives(derivative.ownPropertyName, derivative.stopPropagation);
+                hasChanged = true;
+              }
+
             }
 
           }
@@ -1856,45 +1733,6 @@
         }
 
       }
-
-    }
-
-    propertyDidChange1(prop, value) {
-
-      // called when an immediate child of the module has changed.
-      // 1. Cue observers and derivatives of the property recursively.
-      // 2. Cue consumers of the property recursively.
-      // 3. Cue derivatives of the branchPropertyName on the closestModuleParent.
-
-      const observers = this.observersOf.get(prop);
-      const derivatives = this.derivativesOf.get(prop);
-
-      if (observers || derivatives) {
-        if (isAccumulating) {
-          cueImmediate(prop, value, prop, observers, derivatives, false);
-        } else {
-          cueAll(prop, value, prop, observers, derivatives, false);
-        }
-      }
-
-      const consumers = this.consumersOf.get(prop);
-
-      // 2. if the changed property has consumers, find them and recurse
-      if (consumers) {
-        this.cueConsumers(this, consumers, prop, value, prop);
-      }
-
-      /* TODO: Deep change observation (@see editor/state/todo array)
-
-      // 3. Bubble the change to n root parents recursively where n is defined in constant BUBBLE_ROOT_LEVELS
-      if (BUBBLE_ROOT_LEVELS === ++bubbleCount) {
-        console.log('Bubble up to:', this.parentPropertyNameOnRoot, this.rootInternals.name);
-        this.rootInternals.propertyDidChange.call(this.rootInternals, this.parentPropertyNameOnRoot, this.rootInternals[this.parentPropertyNameOnRoot]);
-      } else {
-        bubbleCount = 0;
-      }
-
-      */
 
     }
 
@@ -1959,7 +1797,7 @@
         // 3.0 Create Derivative instance
         derivative = new Derivative(vDerivative.ownPropertyName, vDerivative.computation, vDerivative.sourceProperties);
 
-        // 3.1 Install instance as derivedProp (inserted in topologically sorted order!)
+        // 3.1 Install instance as derivedProp
         this.derivedProperties.set(vDerivative.ownPropertyName, derivative);
 
         // 3.2 Add derivative as derivativeOf of its sourceProperties (dependencyGraph)
@@ -2066,7 +1904,7 @@
 
   }
 
-  class ExtensionInternals extends StateInternals {
+  class StateExtensionInternals extends StateInternals {
 
     constructor(module, type) {
       super(module, type);
@@ -2120,7 +1958,7 @@
   function createState(data, module, type, props) {
 
     // 1. Attach Internals to "data" under private __CUE__ symbol.
-    const internals = data[__CUE__] = type === STATE_TYPE_MODULE ? new InstanceInternals(module, type) : new ExtensionInternals(module, type);
+    const internals = data[__CUE__] = type === STATE_TYPE_MODULE ? new StateModuleInternals(module, type) : new StateExtensionInternals(module, type);
 
     // 2. Wrap "data" into a reactive proxy
     const proxyState = new Proxy(data, {

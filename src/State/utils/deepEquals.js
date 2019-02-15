@@ -1,5 +1,5 @@
 
-function areStatesEqual(a, b) {
+function areDeepEqual(a, b) {
 
   if (isArray(a)) return !isArray(b) || a.length !== b.length ? false : areArraysDeepEqual(a, b);
 
@@ -12,7 +12,7 @@ function areStatesEqual(a, b) {
 function areArraysDeepEqual(a, b) {
 
   for (let i = 0; i < a.length; i++) {
-    if (!areStatesEqual(a[i], b[i])) {
+    if (!areDeepEqual(a[i], b[i])) {
       return false;
     }
   }
@@ -30,7 +30,7 @@ function arePlainObjectsDeepEqual(a, b) {
 
   for (let i = 0, k; i < keysA.length; i++) {
     k = keysA[i];
-    if (keysB.indexOf(k) === -1 || !areStatesEqual(a[k], b[keysB[i]])) {
+    if (keysB.indexOf(k) === -1 || !areDeepEqual(a[k], b[keysB[i]])) {
       return false;
     }
   }

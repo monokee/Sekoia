@@ -19,13 +19,12 @@ const CUE_STATE_MODULES = new Map();
 const CUE_STATE_INTERNALS = new Map();
 
 // State Flags
-let isAccumulating = false; // are we accumulating observers and derivatives because a change is part of a multi-property-change action?
-const accumulatedDerivatives = []; // derivatives which are accumulated during batch operations (emptied after each batch!)
 const QUEUED_OBSERVERS = new Set(); // collect queued observers to avoid duplication in an update batch. cleared after each run
 const QUEUED_DERIVATIVES = new Set(); // same as above
 const QUEUED_DERIVATIVE_INSTANCES = new Set();
 
 // Reaction Queue (cleared after each run)
+let isInitializing = false;
 const MAIN_QUEUE = [];
 
 // Global derivative installer payload

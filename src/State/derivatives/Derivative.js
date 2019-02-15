@@ -37,7 +37,7 @@ class Derivative {
 
     if (this.needsUpdate) {
       this.intermediate = this.computation.call(null, this.source);
-      if (areStatesEqual(this._value, this.intermediate)) {
+      if (areDeepEqual(this._value, this.intermediate)) {
         this.hasChanged = false;
       } else {
         this._value = this.intermediate;
@@ -50,19 +50,6 @@ class Derivative {
 
   }
 
-  /**
-   * Pull in all dependency values from source. Used at instantiation time to fill cache with initial values
-   * @param {object} source - The source state object from which values should be pulled into the internal cache.
-   */
-  fillCache(source) {
-    this.valueCache = source;
-    this.needsUpdate = true;
-  }
-
-  /**
-   * Dispose this derivative by nullifying its strong pointers and removing itself from its computation branch.
-   * @param {boolean} root - required for recursive calls to self. see inline comments below
-   */
   dispose(root = true) {
 
     let i;

@@ -6,7 +6,7 @@
  */
 function react() {
 
-  if (MAIN_QUEUE.length && !isAccumulating) {
+  if (MAIN_QUEUE.length) {
 
     // Queue contains tuples of (handler, value, path) -> call i[0](i[1],[i2]) ie handler(value, path)
     for (let i = 0; i < MAIN_QUEUE.length; i += 3) {
