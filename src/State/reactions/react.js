@@ -18,4 +18,10 @@ function react() {
 
   }
 
+  if (--accumulationDepth === 0) {
+    console.log('%cCLEAR ACCUMULATIONS','background: red;color:white;');
+    ACCUMULATED_INSTANCES.splice(0, ACCUMULATED_INSTANCES.length);
+    QUEUED_DERIVATIVE_INSTANCES.splice(0, QUEUED_DERIVATIVE_INSTANCES.length);
+  }
+
 }

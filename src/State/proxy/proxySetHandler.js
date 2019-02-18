@@ -20,6 +20,8 @@ function proxySetHandler(target, prop, value) {
 
   if (value !== internals.valueCache.get(prop)) {
 
+    accumulationDepth++;
+
     if (typeof value === 'object' && value !== null) { // any object
 
       const subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);

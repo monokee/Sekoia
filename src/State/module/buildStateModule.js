@@ -124,10 +124,7 @@ function buildStateModule(module, moduleInitializer) {
 
       if (!module.internalGetters.has(prop)) {
 
-        //module.internalGetters.set(prop, function() {
-        //  return val;
-        //});
-
+        // create a bound-action which accumulates and releases
         module.internalGetters.set(prop, () => val);
 
       } else {

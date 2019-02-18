@@ -18,13 +18,12 @@ const CUE_STATE_MODULES = new Map();
 // Internals of State Modules for internally passing module data around: name -> object
 const CUE_STATE_INTERNALS = new Map();
 
-// State Flags
-const QUEUED_OBSERVERS = new Set(); // collect queued observers to avoid duplication in an update batch. cleared after each run
-const QUEUED_DERIVATIVES = new Set(); // same as above
-const QUEUED_DERIVATIVE_INSTANCES = new Set();
+// Accumulation Stacks used for property tracking during mutation calls
+const QUEUED_DERIVATIVE_INSTANCES = [];
+const ACCUMULATED_INSTANCES = [];
+let accumulationDepth = 0;
 
 // Reaction Queue (cleared after each run)
-let isInitializing = false;
 const MAIN_QUEUE = [];
 
 // Global derivative installer payload

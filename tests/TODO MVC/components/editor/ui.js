@@ -166,6 +166,8 @@ Cue.UI('Todo-Editor', Component => ({
 
     visibleTodos(todoArray) {
 
+      console.log('re-render: visibleTodos');
+
       if(todoArray.length === 0) {
         this.addClass(this.footer, 'hidden');
       } else {

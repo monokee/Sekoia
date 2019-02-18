@@ -1,4 +1,3 @@
-
 /**
  * Attaches itself to a reactive state instance under private [__CUE__] symbol.
  * Properties and methods are required for reactivity engine embedded into every Cue State Instance
@@ -23,18 +22,29 @@ class StateInternals {
 
   bubble() {
 
+    // 1. bubble changes [d, o, s] through immediate module relationships (moduleChild -> moduleParent)
+    // 2. bubble cueDerivatives through all ancestor modules to the root.
+
     // 1. Bubble the change through immediate module relationships
     let directParent = this.directParent;
     let ownProp = this.ownPropertyName;
     let ownValue = this.proxyState;
 
-    while (directParent.type === STATE_TYPE_MODULE) {
+    let topLevelPropertyUpdated = true;
 
-      directParent.cueObservers.call(directParent, ownProp, ownValue);
-      directParent.cueDerivatives.call(directParent, ownProp, false);
+    // (only bubble top-level property changes as they are considered inherent modifications to objects (ie break on noChange)
+    while (topLevelPropertyUpdated && directParent.type === STATE_TYPE_MODULE) {
 
-      if (directParent.consumersOf.has(ownProp)) {
-        directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
+      if (ACCUMULATED_INSTANCES.indexOf(directParent) === -1) {
+        ACCUMULATED_INSTANCES.push(directParent);
+
+        directParent.cueObservers.call(directParent, ownProp, ownValue);
+        topLevelPropertyUpdated = directParent.cueDerivatives.call(directParent, ownProp);
+
+        if (directParent.consumersOf.has(ownProp)) {
+          directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
+        }
+
       }
 
       ownProp = directParent.ownPropertyName;
@@ -47,15 +57,22 @@ class StateInternals {
     // the way to the root because it was interrupted by extension states,
     // we still bubble up but only for computations. these can reach deep into objects and thus
     // have to be reevaluated all the way through the affected branch to the root.
+    // we explicitly don't care about top-level changes here because of infinite computation depth.
     if (directParent.type !== STATE_TYPE_ROOT) {
 
       let nextModuleParent = directParent.closestModuleParent;
       let branchPropertyName = directParent.branchPropertyName;
 
       while (nextModuleParent && nextModuleParent.type !== STATE_TYPE_ROOT) {
-        nextModuleParent.cueDerivatives.call(nextModuleParent, branchPropertyName, false);
+
+        if (ACCUMULATED_INSTANCES.indexOf(nextModuleParent) === -1) {
+          ACCUMULATED_INSTANCES.push(nextModuleParent);
+          nextModuleParent.cueDerivatives.call(nextModuleParent, branchPropertyName);
+        }
+
         branchPropertyName = nextModuleParent.branchPropertyName;
         nextModuleParent = nextModuleParent.closestModuleParent;
+
       }
 
     }
@@ -113,9 +130,7 @@ class StateModuleInternals extends StateInternals {
 
     this.mounted = true;
 
-    isInitializing = true;
     this.module.initialize.call(this.proxyState, this.initialProps);
-    isInitializing = false;
 
     this.initialProps = undefined;
 
@@ -123,29 +138,29 @@ class StateModuleInternals extends StateInternals {
 
   propertyDidChange(prop, value) {
 
-    this.cueObservers(prop, value);
-    this.cueDerivatives(prop, false);
+    if (ACCUMULATED_INSTANCES.indexOf(this) === -1) {
 
-    if (this.consumersOf.has(prop)) {
-      this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
+      ACCUMULATED_INSTANCES.push(this);
+
+      // add own dependencies to cue.
+      this.cueObservers(prop, value);
+      this.cueDerivatives(prop);
+
+      if (this.consumersOf.has(prop)) {
+        this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
+      }
+
+      this.bubble();
+
     }
-
-    this.bubble();
-
-    // TODO: this is too soon and too naive. batch ops are far more intricately wired
-    QUEUED_OBSERVERS.clear();
-    QUEUED_DERIVATIVES.clear();
-    QUEUED_DERIVATIVE_INSTANCES.clear();
 
   }
 
   cueObservers(prop, value) {
 
-    const observers = this.observersOf.get(prop);
+    if (this.observersOf.has(prop)) {
 
-    if (observers && !QUEUED_OBSERVERS.has(observers)) {
-
-      QUEUED_OBSERVERS.add(observers);
+      const observers = this.observersOf.get(prop);
 
       for (let i = 0; i < observers.length; i++) {
         MAIN_QUEUE.push(observers[i], value, prop);
@@ -155,45 +170,43 @@ class StateModuleInternals extends StateInternals {
 
   }
 
-  cueDerivatives(prop, stopPropagation) {
+  cueDerivatives(prop) {
 
-    if (stopPropagation === false) {
+    if (this.derivativesOf.has(prop)) {
 
       const derivatives = this.derivativesOf.get(prop);
+      const subDerivatives = [];
 
-      if (derivatives && !QUEUED_DERIVATIVES.has(derivatives)) {
+      let hasChanged = false, i, derivative, result;
 
-        QUEUED_DERIVATIVES.add(derivatives);
+      for (i = 0; i < derivatives.length; i++) {
 
-        let hasChanged = false;
+        derivative = derivatives[i];
 
-        for (let i = 0, derivative, result; i < derivatives.length; i++) {
+        if (QUEUED_DERIVATIVE_INSTANCES.indexOf(derivative) === -1) {
 
-          derivative = derivatives[i];
+          QUEUED_DERIVATIVE_INSTANCES.push(derivative);
 
-          if (!QUEUED_DERIVATIVE_INSTANCES.has(derivative)) {
+          derivative.needsUpdate = true;
 
-            QUEUED_DERIVATIVE_INSTANCES.add(derivative);
+          result = derivative.value; // call getter, recompute
 
-            derivative.needsUpdate = true;
-
-            result = derivative.value; // call getter, recompute
-
-            if (derivative.hasChanged === true) {
-              this.cueObservers(derivative.ownPropertyName, result);
-              this.cueDerivatives(derivative.ownPropertyName, derivative.stopPropagation);
-              hasChanged = true;
-            }
-
+          if (derivative.hasChanged === true && subDerivatives.indexOf(derivative) === -1) {
+            subDerivatives.push(derivative);
+            this.cueObservers(derivative.ownPropertyName, result);
+            hasChanged = true;
           }
 
         }
 
-        if (hasChanged === true) {
-          this.bubble(); // if any derivative has changed its value, bubble
-        }
-
       }
+
+      for (i = 0; i < subDerivatives.length; i++) {
+        derivative = subDerivatives[i];
+        this.cueDerivatives(derivative.ownPropertyName);
+      }
+
+      return hasChanged; // if any derivative has changed its value, bubble
 
     }
 
@@ -216,7 +229,7 @@ class StateModuleInternals extends StateInternals {
           if (provider.sourceInternals === providerInstance && provider.sourceProperty === prop) {
 
             childState.cueObservers.call(childState, provider.targetProperty, value);
-            childState.cueDerivatives.call(childState, provider.targetProperty, false);
+            childState.cueDerivatives.call(childState, provider.targetProperty);
 
             // if the childState is providing the property further to its children, this will branch off into its own search from a new root for a new property name...
             if (childState.consumersOf.has(provider.targetProperty)) {
@@ -264,7 +277,7 @@ class StateModuleInternals extends StateInternals {
           if (rootProvider) { // the provider is a middleman that receives the data from another parent.
             rootProvider = getRootProvider(rootProvider);
           } else {
-            rootProvider = {sourceInternals: providingParent, sourceProperty, targetModule, targetProperty};
+            rootProvider = { sourceInternals: providingParent, sourceProperty, targetModule, targetProperty };
           }
 
           // -> inject the rootProvider. We now have direct access to the data source on a parent, no matter how many levels of indirection the data has taken to arrive here.
@@ -286,24 +299,26 @@ class StateModuleInternals extends StateInternals {
 
   installDerivatives() {
 
-    let vDerivative, i, derivative, sourceProperty, dependencies, superDerivative;
+    let vDerivative, i, derivative, sourceProperty, superDerivative;
     for (vDerivative of this.module.derivativesToInstall.values()) { // topologically sorted installers.
 
       // 3.0 Create Derivative instance
       derivative = new Derivative(vDerivative.ownPropertyName, vDerivative.computation, vDerivative.sourceProperties);
 
       // 3.1 Install instance as derivedProp
-      this.derivedProperties.set(vDerivative.ownPropertyName, derivative);
+      this.derivedProperties.set(vDerivative.ownPropertyName, derivative); // maintains topological insertion order
 
-      // 3.2 Add derivative as derivativeOf of its sourceProperties (dependencyGraph)
+      // 3.2 Add derivative as derivativeOf of its sourceProperties
       for (i = 0; i < vDerivative.sourceProperties.length; i++) {
+
         sourceProperty = vDerivative.sourceProperties[i];
-        dependencies = this.derivativesOf.get(sourceProperty);
-        if (dependencies) {
-          dependencies.push(derivative);
+
+        if (this.derivativesOf.has(sourceProperty)) {
+          this.derivativesOf.get(sourceProperty).push(derivative);
         } else {
-          this.derivativesOf.set(sourceProperty, [ derivative ]);
+          this.derivativesOf.set(sourceProperty, [derivative]);
         }
+
       }
 
       // 3.3 Enhance Derivative for self-aware traversal
@@ -332,7 +347,7 @@ class StateModuleInternals extends StateInternals {
     if (this.observersOf.has(property)) {
       this.observersOf.get(property).push(boundHandler);
     } else {
-      this.observersOf.set(property, [ boundHandler ]);
+      this.observersOf.set(property, [boundHandler]);
     }
 
     if (this.derivedProperties.has(property)) {
@@ -431,11 +446,9 @@ class StateExtensionInternals extends StateInternals {
 
   propertyDidChange() {
 
+    // 1. extension states have no observers, derivatives or consumers of their own
+    // 2. regular bubble logic will apply
     this.bubble();
-
-    QUEUED_OBSERVERS.clear();
-    QUEUED_DERIVATIVES.clear();
-    QUEUED_DERIVATIVE_INSTANCES.clear();
 
   }
 
