@@ -870,9 +870,8 @@
       props = JSON.parse(props);
     }
 
-    patchState(internals.rootInternals.proxyState, internals.rootPropertyName, props);
+    patchState(internals.closestModuleParent.proxyState, internals.branchPropertyName, props);
 
-    cueAccumulated();
     react();
 
   }
@@ -998,14 +997,28 @@
     get value() {
 
       if (this.needsUpdate) {
+
         this.intermediate = this.computation.call(null, this.source);
-        if (areDeepEqual(this._value, this.intermediate)) {
+
+        if (areShallowEqual(this._value, this.intermediate)) { // shallow compare objects
+
           this.hasChanged = false;
+
         } else {
-          this._value = this.intermediate;
+
+          this._value = isArray(this.intermediate) // shallow clone objects in cache
+            ?
+            this.intermediate.slice() :
+            typeof this.intermediate === 'object' && this.intermediate !== null ?
+            oAssign({}, this.intermediate) :
+            this.intermediate;
+
           this.hasChanged = true;
+
         }
+
         this.needsUpdate = false;
+
       }
 
       return this._value;
@@ -1112,7 +1125,6 @@
         }
 
         if (!target.has(sourceProperty)) {
-          console.log(`Adding ordered Derivative "${derivative.ownPropertyName}". Visited:`, JSON.stringify(this.visited));
           target.set(sourceProperty, derivative);
         }
 
@@ -1378,31 +1390,37 @@
 
   }
 
+  const REACTION_BUFFER_TIME = 1000 / 60;
+  let REACTION_BUFFER = null;
+
   /**
-   * Runs through the Main Queue to execute each collected reaction with each collected observation payload as the first and only argument.
+   * Runs through the Main Queue to execute each collected reaction with each collected property value as the first and only argument.
+   * Calls to react() are automatically buffered and internal flush() is only called ~16.7ms after the last call to react().
+   * This accumulates reactions during batch operations with many successive calls to react() and flushes them in one go when the call
+   * rate is decreased. Because reactions likely trigger rendering, this attempts to defer and separate rendering from internal value updating and change propagation.
    * Main Queue is emptied after each call to react.
-   * @function react
+   * Since react is the last function called after a property has changed (with each change increasing the accumulation depth), we decrease the depth by one for
+   * each call to react and empty the accumulation arrays when accumulationDepth === 0 ie: we've "stepped out of" the initial change and all of it's derived changes throughout the state tree.
+   * Note that this is done synchronously and outside of buffering.
    */
   function react() {
 
-    if (MAIN_QUEUE.length) {
+    clearTimeout(REACTION_BUFFER);
 
-      // Queue contains tuples of (handler, value, path) -> call i[0](i[1],[i2]) ie handler(value, path)
-      for (let i = 0; i < MAIN_QUEUE.length; i += 3) {
-        MAIN_QUEUE[i](MAIN_QUEUE[i + 1], MAIN_QUEUE[i + 2]);
-      }
-
-      // Empty the queue.
-      MAIN_QUEUE.splice(0, MAIN_QUEUE.length);
-
-    }
+    REACTION_BUFFER = setTimeout(flushReactionBuffer, REACTION_BUFFER_TIME);
 
     if (--accumulationDepth === 0) {
-      console.log('%cCLEAR ACCUMULATIONS', 'background: red;color:white;');
-      ACCUMULATED_INSTANCES.splice(0, ACCUMULATED_INSTANCES.length);
-      QUEUED_DERIVATIVE_INSTANCES.splice(0, QUEUED_DERIVATIVE_INSTANCES.length);
+      while (ACCUMULATED_INSTANCES.length) ACCUMULATED_INSTANCES.pop();
+      while (QUEUED_DERIVATIVE_INSTANCES.length) QUEUED_DERIVATIVE_INSTANCES.pop();
     }
 
+  }
+
+  function flushReactionBuffer() {
+    // Queue contains tuples of (handler, value) -> call i[0](i[1]) ie handler(value)
+    for (let i = 0; i < MAIN_QUEUE.length; i += 2) MAIN_QUEUE[i](MAIN_QUEUE[i + 1]);
+    while (MAIN_QUEUE.length) MAIN_QUEUE.pop(); // flush
+    REACTION_BUFFER = null;
   }
 
   /**
@@ -1586,8 +1604,6 @@
           directParent.cueObservers.call(directParent, ownProp, ownValue);
           topLevelPropertyUpdated = directParent.cueDerivatives.call(directParent, ownProp);
 
-          console.log('topLevelPropertyUpdated', ownProp, topLevelPropertyUpdated);
-
           if (directParent.consumersOf.has(ownProp)) {
             directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
           }
@@ -1627,7 +1643,7 @@
     }
 
     instanceWillUnmount() {
-      console.log('[todo: instanceWillUnmount]', this);
+      //console.log('[todo: instanceWillUnmount]', this);
     }
 
   }
@@ -1710,7 +1726,7 @@
         const observers = this.observersOf.get(prop);
 
         for (let i = 0; i < observers.length; i++) {
-          MAIN_QUEUE.push(observers[i], value, prop);
+          MAIN_QUEUE.push(observers[i], value);
         }
 
       }
@@ -1754,7 +1770,7 @@
           this.cueDerivatives(derivative.ownPropertyName);
         }
 
-        return hasChanged; // if any derivative has changed its value, bubble
+        return hasChanged; // we return this that bubbling can stop if no top-level property changed.
 
       }
 
@@ -2202,20 +2218,115 @@
 
   });
 
+  const HTML5_TAGNAMES = new Set([
+  'abbr',
+  'address',
+  'area',
+  'article',
+  'aside',
+  'audio',
+  'b',
+  'bdi',
+  'bdo',
+  'blockquote',
+  'body',
+  'br',
+  'button',
+  'canvas',
+  'caption',
+  'cite',
+  'code',
+  'col',
+  'colgroup',
+  'command',
+  'datalist',
+  'dd',
+  'del',
+  'details',
+  'dfn',
+  'div',
+  'dl',
+  'dt',
+  'em',
+  'embed',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'header',
+  'hr',
+  'html',
+  'i',
+  'iframe',
+  'img',
+  'input',
+  'ins',
+  'kbd',
+  'keygen',
+  'label',
+  'legend',
+  'li',
+  'main',
+  'map',
+  'mark',
+  'menu',
+  'meter',
+  'nav',
+  'object',
+  'ol',
+  'optgroup',
+  'option',
+  'output',
+  'p',
+  'param',
+  'pre',
+  'progress',
+  'q',
+  'rp',
+  'rt',
+  'ruby',
+  's',
+  'samp',
+  'section',
+  'select',
+  'small',
+  'source',
+  'span',
+  'strong',
+  'sub',
+  'summary',
+  'sup',
+  'table',
+  'tbody',
+  'td',
+  'textarea',
+  'tfoot',
+  'th',
+  'thead',
+  'time',
+  'tr',
+  'track',
+  'u',
+  'ul',
+  'var',
+  'video',
+  'wbr'
+]);
+
   // Library stylesheet that components can write scoped classes to
-  const CUE_UI_STYLESHEET = (() => {
+  const CUE_UI_STYLESHEET = wrap(() => {
     const stylesheet = document.createElement('style');
     stylesheet.id = 'CUE-STYLES';
     document.head.appendChild(stylesheet);
     return stylesheet.sheet;
-  })();
-
-  function replaceClassNameInElement(a, b, element) {
-    element.classList.replace(a, b);
-    for (let i = 0; i < element.children.length; i++) {
-      replaceClassNameInElement(a, b, element.children[i]);
-    }
-  }
+  });
 
   /**
    * Little CSS in JS Utility which scopes the passed styles object to the template element.
@@ -2308,10 +2419,26 @@
 
       if (styleProperties[prop].constructor === OBJ) {
 
-        if (prop[0] === '&') {
-          insertStyleRule(`${selectorName}${prop.substring(1)}`, styleProperties[prop]);
+        if (prop.indexOf(',') > -1) {
+
+          const selectors = prop.split(',');
+
+          for (let i = 0; i < selectors.length; i++) {
+            if (selectors[i][0] === '&') {
+              insertStyleRule(`${selectorName}${selectors[i].substring(1)}`, styleProperties[prop]);
+            } else {
+              insertStyleRule(`${selectorName} ${selectors[i]}`, styleProperties[prop]);
+            }
+          }
+
         } else {
-          insertStyleRule(`${selectorName} ${prop}`, styleProperties[prop]);
+
+          if (prop[0] === '&') {
+            insertStyleRule(`${selectorName}${prop.substring(1)}`, styleProperties[prop]);
+          } else {
+            insertStyleRule(`${selectorName} ${prop}`, styleProperties[prop]);
+          }
+
         }
 
       } else {
@@ -2324,34 +2451,51 @@
 
   }
 
-  function scopeKeyframesToComponent(keyframes) {
+  function replaceClassNameInElement(a, b, element) {
+    element.classList.replace(a, b);
+    for (let i = 0; i < element.children.length; i++) {
+      replaceClassNameInElement(a, b, element.children[i]);
+    }
+  }
 
-    const map = new Map();
-    if (!keyframes) return map;
+  function translateEventSelectorsToScope(events, scopedStyles) {
 
-    let name, uniqueName, framesIndex, framesSheet, frames, percent, index, style;
+    let eventName, x, selector;
 
-    for (name in keyframes) {
+    for (eventName in events) {
 
-      uniqueName = createUID(name);
+      x = events[eventName];
 
-      framesIndex = CUE_UI_STYLESHEET.insertRule(`@keyframes ${uniqueName} {}`, CUE_UI_STYLESHEET.cssRules.length);
-      framesSheet = CUE_UI_STYLESHEET.cssRules[framesIndex];
+      if (isObjectLike(x)) { // event type has sub-selectors
 
-      frames = keyframes[name];
+        for (selector in x) {
 
-      for (percent in frames) {
-        framesSheet.appendRule(`${percent}% {}`);
-        index = framesSheet.cssRules.length - 1;
-        style = framesSheet.cssRules[index].style;
-        oAssign(style, frames[percent]);
+          let normalizedSelector = selector;
+          let subString, scopedSelector;
+
+          // if selector doesnt start with (. # [ * ) and is not html5 tag name, assume omitted leading dot.
+          if (selector[0] !== '.' && selector[0] !== '#' && selector[0] !== '[' && selector[0] !== '*' && !HTML5_TAGNAMES.has(selector)) {
+            normalizedSelector = '.' + selector;
+          }
+
+          if (scopedStyles.has(normalizedSelector)) {
+            scopedSelector = '.' + scopedStyles.get(normalizedSelector);
+          } else if (scopedStyles.has((subString = normalizedSelector.substring(1)))) {
+            scopedSelector = '.' + scopedStyles.get(subString);
+          } else {
+            scopedSelector = normalizedSelector;
+          }
+
+          // overwrite in-place
+          if (scopedSelector !== selector) {
+            x[scopedSelector] = x[selector];
+            delete x[selector];
+          }
+
+        }
       }
 
-      map.set(name, uniqueName);
-
     }
-
-    return map;
 
   }
 
@@ -2395,9 +2539,9 @@
     let prevEnd = currentArray.length - 1,
       newEnd = newArray.length - 1;
     let a, b;
-    let prevStartNode = parent.firstChild,
+    let prevStartNode = parentElement.firstChild,
       newStartNode = prevStartNode;
-    let prevEndNode = parent.lastChild,
+    let prevEndNode = parentElement.lastChild,
       newEndNode = prevEndNode;
     let afterNode;
 
@@ -2463,7 +2607,7 @@
         updateFn(prevEndNode, b);
 
         _node = prevEndNode.previousSibling;
-        parent.insertBefore(prevEndNode, newStartNode);
+        parentElement.insertBefore(prevEndNode, newStartNode);
         newEndNode = prevEndNode = _node;
 
         newStart++;
@@ -2489,7 +2633,7 @@
         updateFn(prevStartNode, b);
 
         _node = prevStartNode.nextSibling;
-        parent.insertBefore(prevStartNode, afterNode);
+        parentElement.insertBefore(prevStartNode, afterNode);
         afterNode = newEndNode = prevStartNode;
         prevStartNode = _node;
 
@@ -2513,10 +2657,10 @@
         let next;
         while (prevStart <= prevEnd) {
           if (prevEnd === 0) {
-            parent.removeChild(prevEndNode);
+            parentElement.removeChild(prevEndNode);
           } else {
             next = prevEndNode.previousSibling;
-            parent.removeChild(prevEndNode);
+            parentElement.removeChild(prevEndNode);
             prevEndNode = next;
           }
           prevEnd--;
@@ -2531,8 +2675,8 @@
         while (newStart <= newEnd) {
           afterNode
             ?
-            parent.insertBefore(createFn(newArray[newStart]), afterNode) :
-            parent.appendChild(createFn(newArray[newStart]));
+            parentElement.insertBefore(createFn(newArray[newStart]), afterNode) :
+            parentElement.appendChild(createFn(newArray[newStart]));
           newStart++
         }
       }
@@ -2570,10 +2714,10 @@
     // Full Replace
     if (reusable === 0) {
 
-      parent.textContent = '';
+      parentElement.textContent = '';
 
       for (i = newStart; i <= newEnd; i++) {
-        parent.appendChild(createFn(newArray[i]));
+        parentElement.appendChild(createFn(newArray[i]));
       }
 
       return;
@@ -2593,7 +2737,7 @@
     }
 
     for (i = 0; i < toRemove.length; i++) {
-      parent.removeChild(nodes[toRemove[i]]);
+      parentElement.removeChild(nodes[toRemove[i]]);
     }
 
     let snakeIndex = snake.length - 1,
@@ -2615,7 +2759,7 @@
           updateFn(tempNode, newArray[i]);
         }
 
-        parent.insertBefore(tempNode, afterNode);
+        parentElement.insertBefore(tempNode, afterNode);
         afterNode = tempNode;
 
       }
@@ -2654,7 +2798,7 @@
 
         while (hi - lo > 1) {
 
-          mid = FLOOR((lo + hi) / 2);
+          mid = Math.floor((lo + hi) / 2);
 
           if (seq[mid] > n) {
             hi = mid;
@@ -2698,16 +2842,7 @@
     let prop, boundHandler;
 
     for (prop in reactions) {
-
       boundHandler = stateInternals.addChangeReaction.call(stateInternals, prop, reactions[prop], component, component.autorun);
-
-      // TODO: not sure what we need this for
-      if (component.reactions.has(prop)) {
-        component.reactions.get(prop).push(boundHandler);
-      } else {
-        component.reactions.set(prop, [boundHandler]);
-      }
-
     }
 
   }
@@ -2743,7 +2878,13 @@
     if (isFunction(handlerOrDelegate)) {
       eventStack.push(handlerOrDelegate);
     } else if (isObjectLike(handlerOrDelegate)) {
-      for (const selector in handlerOrDelegate) eventStack.push(e => e.target.closest(selector) && handlerOrDelegate[selector].call(scope, e));
+      for (const selector in handlerOrDelegate) {
+        eventStack.push(e => {
+          if (e.target.closest(selector)) {
+            handlerOrDelegate[selector].call(scope, e);
+          }
+        });
+      }
     }
   }
 
@@ -2755,6 +2896,8 @@
     const doc = document;
     const isNodeListProto = NodeList.prototype.isPrototypeOf;
     const isHTMLCollectionProto = HTMLCollection.prototype.isPrototypeOf;
+
+    const childDataCache = new WeakMap();
 
     const transitionEventTypes = (() => {
 
@@ -2794,13 +2937,11 @@
 
     return class ComponentInstance {
 
-      constructor(element, imports, styles, keyframes) {
+      constructor(element, imports, styles) {
 
         this.element = element;
         this.imports = imports;
         this.styles = styles;
-        this.keyframes = keyframes;
-        this.reactions = new Map();
         this.events = new Map();
         this.autorun = true;
 
@@ -3023,41 +3164,21 @@
         }));
       }
 
-      setChildren(node, {
-        from = [],
-        to,
-        create,
-        update = NOOP
-      }) {
+      setChildren(parentNode, dataArray, createElement, updateElement = NOOP) {
 
-        node = arguments.length === 1 ? this.element : this.select(node);
+        // weak-cache previous child data
+        const previousData = childDataCache.get(parentNode) || [];
+        childDataCache.set(parentNode, dataArray.slice());
 
-        // the preferred method for updating a list of children after the underlying data model for a rendered list has changed.
-        // performs smart checking and optimized reconciliation to ensure only the minimum amount of dom-work is performed per update.
-
-        // "from" and "to" are raw data arrays which are formatted into dom elements by calling "create" or "update" on each item.
-        // "create" is a function that requires a single data-entry from the "to" array and returns a dom element. (likely a Cue.Component function).
-        // "update" is a function that updates existing elements. It requires two arguments: (domElement, newData). How the newData is rendered into the domElement is specified explicitly in the function body.
-        // "update" defaults to noop because in most cases property / attribute updates are handled by children themselves
-        // "update" is only required for non-reactive or primitive children in data array
-        // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive State module
-
-        // fast path clear all
-        if (to.length === 0) {
-          node.textContent = '';
-          return this;
-        }
-
-        // fast path create all
-        if (from.length === 0) {
-          for (let i = 0; i < to.length; i++) {
-            node.appendChild(create(to[i]))
+        if (dataArray.length === 0) { // fast path clear all
+          parentNode.textContent = '';
+        } else if (previousData.length === 0) { // fast path add all
+          for (let i = 0; i < dataArray.length; i++) {
+            parentNode.appendChild(createElement(dataArray[i]));
           }
-          return this;
+        } else { // reconcile current/new newData arrays
+          reconcile(parentNode, previousData, dataArray, createElement, updateElement);
         }
-
-        // reconcile current/new newData arrays
-        reconcile(node, from, to, create, update);
 
         return this;
 
@@ -3136,44 +3257,28 @@
       throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);
     }
 
-    if (!config.template) {
-      throw new TypeError(`UI Module requires "template" property that specifies a DOM Element. // expect(template).toEqual(HTMLString || Selector || DOMNode).`);
+    if (!config.element) {
+      throw new TypeError(`UI Module requires "element" property that specifies a DOM Element. // expect(element).toEqual(HTMLString || Selector || DOMNode).`);
     }
 
-    const templateNode = createTemplateRootElement(config.template);
+    const templateElement = createTemplateRootElement(config.element);
 
     // automatically scope classNames or keyframes to the component by replacing their names with unique names.
     // functions return a map of the original name to the unique name or an empty map if no component-level styles/keyframes exist.
-    const styles = scopeStylesToComponent(config.styles, templateNode);
-    const keyframes = scopeKeyframesToComponent(config.keyframes);
+    const styles = scopeStylesToComponent(config.styles, templateElement);
 
     // rewrite delegated event selectors to internally match the scoped classNames
-    if (config.bindEvents && styles.size > 0) {
-      let eventName, x, selector, scopedSelector;
-      for (eventName in config.bindEvents) {
-        x = config.bindEvents[eventName];
-        if (isObjectLike(x)) { // event type has sub-selectors
-          for (selector in x) {
-            if (selector[0] === '.') {
-              scopedSelector = styles.get(selector.substring(1));
-              if (scopedSelector) {
-                x['.' + scopedSelector] = x[selector]; // swap .scoped/.unscoped in-place
-                delete x[selector];
-              }
-            }
-          }
-        }
-      }
+    if (config.events && styles.size > 0) {
+      translateEventSelectorsToScope(config.events, styles);
     }
 
     return {
-      template: templateNode,
+      element: templateElement,
       imports: config.imports || null,
       styles: styles,
-      keyframes: keyframes,
       initialize: config.initialize || null,
-      bindEvents: config.bindEvents || null,
-      renderState: config.renderState || null
+      events: config.events || null,
+      render: config.render || null
     };
 
   }
@@ -3189,10 +3294,9 @@
 
       // create new UI Component Instance
       const instance = new ComponentInstance(
-        component.template.cloneNode(true),
+        component.element.cloneNode(true),
         component.imports,
-        component.styles,
-        component.keyframes
+        component.styles
       );
 
       // 1. Initialize
@@ -3201,13 +3305,13 @@
       }
 
       // 2. Render State
-      if (component.renderState) {
-        installStateReactions(instance, component.renderState);
+      if (component.render) {
+        installStateReactions(instance, component.render);
       }
 
       // 3. Bind Events
-      if (component.bindEvents) {
-        bindComponentEvents(instance, component.bindEvents);
+      if (component.events) {
+        bindComponentEvents(instance, component.events);
       }
 
       // return dom element for compositing

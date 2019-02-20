@@ -1,11 +1,10 @@
 Cue.UI('Todo-Container', Component => ({
 
-  template: (
+  element: (
     `<div class="container">
         <h1 class="headline"></h1>
         <div class="editorContainer"></div>
         <div class="footer">
-          <p>Double-click to edit a todo</p>
           <p>Written by monokee</p>
           <p>Not part of TodoMVC</p>
         </div>
@@ -66,17 +65,12 @@ Cue.UI('Todo-Container', Component => ({
   },
 
   initialize(state) {
-    this.state = state;
+
     this.headline = this.select('.headline');
+    this.headline.textContent = state.title;
+
     this.editorContainer = this.select('.editorContainer');
     this.editorContainer.appendChild(this.imports.Editor(state.editor));
-  },
-
-  renderState: {
-
-    title(text) {
-      this.headline.textContent = text;
-    }
 
   }
 

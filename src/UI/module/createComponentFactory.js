@@ -10,10 +10,9 @@ function createComponentFactory(initializer) {
 
     // create new UI Component Instance
     const instance = new ComponentInstance(
-      component.template.cloneNode(true),
+      component.element.cloneNode(true),
       component.imports,
-      component.styles,
-      component.keyframes
+      component.styles
     );
 
     // 1. Initialize
@@ -22,13 +21,13 @@ function createComponentFactory(initializer) {
     }
 
     // 2. Render State
-    if (component.renderState) {
-      installStateReactions(instance, component.renderState);
+    if (component.render) {
+      installStateReactions(instance, component.render);
     }
 
     // 3. Bind Events
-    if (component.bindEvents) {
-      bindComponentEvents(instance, component.bindEvents);
+    if (component.events) {
+      bindComponentEvents(instance, component.events);
     }
 
     // return dom element for compositing

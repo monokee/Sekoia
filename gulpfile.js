@@ -59,13 +59,12 @@ const FILES = {
     `${MODULES.ui}/index.js`,
     `${MODULES.ui}/proto.js`,
 
+    `${MODULES.ui}/utils/htmlTagNames.js`,
     `${MODULES.ui}/utils/CueStylesheet.js`,
-    `${MODULES.ui}/utils/replaceClassNameInElement.js`,
     `${MODULES.ui}/utils/scopeStylesToComponent.js`,
-    `${MODULES.ui}/utils/scopeKeyframesToComponent.js`,
+    `${MODULES.ui}/utils/translateEventSelectorsToScope.js`,
     `${MODULES.ui}/utils/createTemplateRootElement.js`,
     `${MODULES.ui}/utils/reconcile.js`,
-    `${MODULES.ui}/utils/longestIncreasingSubsequence.js`,
     `${MODULES.ui}/utils/installStateReactions.js`,
     `${MODULES.ui}/utils/bindComponentEvents.js`,
 

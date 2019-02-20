@@ -35,9 +35,8 @@ function applyState(props) {
     props = JSON.parse(props);
   }
 
-  patchState(internals.rootInternals.proxyState, internals.rootPropertyName, props);
+  patchState(internals.closestModuleParent.proxyState, internals.branchPropertyName, props);
 
-  cueAccumulated();
   react();
 
 }

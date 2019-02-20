@@ -8,44 +8,28 @@ function initializeUIComponent(initializer) { // runs only once per module
     throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);
   }
 
-  if (!config.template) {
-    throw new TypeError(`UI Module requires "template" property that specifies a DOM Element. // expect(template).toEqual(HTMLString || Selector || DOMNode).`);
+  if (!config.element) {
+    throw new TypeError(`UI Module requires "element" property that specifies a DOM Element. // expect(element).toEqual(HTMLString || Selector || DOMNode).`);
   }
 
-  const templateNode = createTemplateRootElement(config.template);
+  const templateElement = createTemplateRootElement(config.element);
 
   // automatically scope classNames or keyframes to the component by replacing their names with unique names.
   // functions return a map of the original name to the unique name or an empty map if no component-level styles/keyframes exist.
-  const styles = scopeStylesToComponent(config.styles, templateNode);
-  const keyframes = scopeKeyframesToComponent(config.keyframes);
+  const styles = scopeStylesToComponent(config.styles, templateElement);
 
   // rewrite delegated event selectors to internally match the scoped classNames
-  if (config.bindEvents && styles.size > 0) {
-    let eventName, x, selector, scopedSelector;
-    for (eventName in config.bindEvents) {
-      x = config.bindEvents[eventName];
-      if (isObjectLike(x)) { // event type has sub-selectors
-        for (selector in x) {
-          if (selector[0] === '.') {
-            scopedSelector = styles.get(selector.substring(1));
-            if (scopedSelector) {
-              x['.' + scopedSelector] = x[selector]; // swap .scoped/.unscoped in-place
-              delete x[selector];
-            }
-          }
-        }
-      }
-    }
+  if (config.events && styles.size > 0) {
+    translateEventSelectorsToScope(config.events, styles);
   }
 
   return {
-    template: templateNode,
+    element: templateElement,
     imports: config.imports || null,
     styles: styles,
-    keyframes: keyframes,
     initialize: config.initialize || null,
-    bindEvents: config.bindEvents || null,
-    renderState: config.renderState || null
+    events: config.events || null,
+    render: config.render || null
   };
 
 }

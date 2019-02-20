@@ -90,10 +90,26 @@ function insertStyleRule(selectorName, styleProperties) {
 
     if (styleProperties[prop].constructor === OBJ) {
 
-      if (prop[0] === '&') {
-        insertStyleRule(`${selectorName}${prop.substring(1)}`, styleProperties[prop]);
+      if (prop.indexOf(',') > -1) {
+
+        const selectors = prop.split(',');
+
+        for (let i = 0; i < selectors.length; i++) {
+          if (selectors[i][0] === '&') {
+            insertStyleRule(`${selectorName}${selectors[i].substring(1)}`, styleProperties[prop]);
+          } else {
+            insertStyleRule(`${selectorName} ${selectors[i]}`, styleProperties[prop]);
+          }
+        }
+
       } else {
-        insertStyleRule(`${selectorName} ${prop}`, styleProperties[prop]);
+
+        if (prop[0] === '&') {
+          insertStyleRule(`${selectorName}${prop.substring(1)}`, styleProperties[prop]);
+        } else {
+          insertStyleRule(`${selectorName} ${prop}`, styleProperties[prop]);
+        }
+
       }
 
     } else {
@@ -104,4 +120,11 @@ function insertStyleRule(selectorName, styleProperties) {
 
   }
 
+}
+
+function replaceClassNameInElement(a, b, element) {
+  element.classList.replace(a, b);
+  for (let i = 0; i < element.children.length; i++) {
+    replaceClassNameInElement(a, b, element.children[i]);
+  }
 }

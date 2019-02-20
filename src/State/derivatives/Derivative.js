@@ -36,14 +36,27 @@ class Derivative {
   get value() {
 
     if (this.needsUpdate) {
+
       this.intermediate = this.computation.call(null, this.source);
-      if (areDeepEqual(this._value, this.intermediate)) {
+
+      if (areShallowEqual(this._value, this.intermediate)) { // shallow compare objects
+
         this.hasChanged = false;
+
       } else {
-        this._value = this.intermediate;
+
+        this._value = isArray(this.intermediate) // shallow clone objects in cache
+          ? this.intermediate.slice()
+          : typeof this.intermediate === 'object' && this.intermediate !== null
+            ? oAssign({}, this.intermediate)
+            : this.intermediate;
+
         this.hasChanged = true;
+
       }
+
       this.needsUpdate = false;
+
     }
 
     return this._value;

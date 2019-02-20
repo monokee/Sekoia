@@ -29,6 +29,12 @@ function addHandlerToBaseEvent(eventStack, handlerOrDelegate, scope) {
   if (isFunction(handlerOrDelegate)) {
     eventStack.push(handlerOrDelegate);
   } else if (isObjectLike(handlerOrDelegate)) {
-    for (const selector in handlerOrDelegate) eventStack.push(e => e.target.closest(selector) && handlerOrDelegate[selector].call(scope, e));
+    for (const selector in handlerOrDelegate) {
+      eventStack.push(e => {
+        if (e.target.closest(selector)) {
+          handlerOrDelegate[selector].call(scope, e);
+        }
+      });
+    }
   }
 }

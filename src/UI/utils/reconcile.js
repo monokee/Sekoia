@@ -10,8 +10,8 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
   let loop = true;
   let prevEnd = currentArray.length-1, newEnd = newArray.length-1;
   let a, b;
-  let prevStartNode = parent.firstChild, newStartNode = prevStartNode;
-  let prevEndNode = parent.lastChild, newEndNode = prevEndNode;
+  let prevStartNode = parentElement.firstChild, newStartNode = prevStartNode;
+  let prevEndNode = parentElement.lastChild, newEndNode = prevEndNode;
   let afterNode;
 
   // scan over common prefixes, suffixes, and simple reversals
@@ -76,7 +76,7 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
       updateFn(prevEndNode, b);
 
       _node = prevEndNode.previousSibling;
-      parent.insertBefore(prevEndNode, newStartNode);
+      parentElement.insertBefore(prevEndNode, newStartNode);
       newEndNode = prevEndNode = _node;
 
       newStart++;
@@ -102,7 +102,7 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
       updateFn(prevStartNode, b);
 
       _node = prevStartNode.nextSibling;
-      parent.insertBefore(prevStartNode, afterNode);
+      parentElement.insertBefore(prevStartNode, afterNode);
       afterNode = newEndNode = prevStartNode;
       prevStartNode = _node;
 
@@ -126,10 +126,10 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
       let next;
       while(prevStart <= prevEnd) {
         if (prevEnd === 0) {
-          parent.removeChild(prevEndNode);
+          parentElement.removeChild(prevEndNode);
         } else {
           next = prevEndNode.previousSibling;
-          parent.removeChild(prevEndNode);
+          parentElement.removeChild(prevEndNode);
           prevEndNode = next;
         }
         prevEnd--;
@@ -143,8 +143,8 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
     if (newStart <= newEnd) {
       while(newStart <= newEnd) {
         afterNode
-          ? parent.insertBefore(createFn(newArray[newStart]), afterNode)
-          : parent.appendChild(createFn(newArray[newStart]));
+          ? parentElement.insertBefore(createFn(newArray[newStart]), afterNode)
+          : parentElement.appendChild(createFn(newArray[newStart]));
         newStart++
       }
     }
@@ -181,10 +181,10 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
   // Full Replace
   if (reusable === 0) {
 
-    parent.textContent = '';
+    parentElement.textContent = '';
 
     for(i = newStart; i <= newEnd; i++) {
-      parent.appendChild(createFn(newArray[i]));
+      parentElement.appendChild(createFn(newArray[i]));
     }
 
     return;
@@ -204,7 +204,7 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
   }
 
   for(i = 0; i < toRemove.length; i++) {
-    parent.removeChild(nodes[toRemove[i]]);
+    parentElement.removeChild(nodes[toRemove[i]]);
   }
 
   let snakeIndex = snake.length - 1, tempNode;
@@ -225,11 +225,75 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
         updateFn(tempNode, newArray[i]);
       }
 
-      parent.insertBefore(tempNode, afterNode);
+      parentElement.insertBefore(tempNode, afterNode);
       afterNode = tempNode;
 
     }
 
   }
+
+}
+
+function longestIncreasingSubsequence(ns, newStart) {
+
+  // inline-optimized implementation of longest-positive-increasing-subsequence algorithm
+  // https://en.wikipedia.org/wiki/Longest_increasing_subsequence
+
+  const seq = [];
+  const is  = [];
+  const pre = new Array(ns.length);
+
+  let l = -1, i, n, j;
+
+  for (i = newStart; i < ns.length; i++) {
+
+    n = ns[i];
+
+    if (n < 0) continue;
+
+    let lo = -1, hi = seq.length, mid;
+
+    if (hi > 0 && seq[hi - 1] <= n) {
+
+      j = hi - 1;
+
+    } else {
+
+      while (hi - lo > 1) {
+
+        mid = Math.floor((lo + hi) / 2);
+
+        if (seq[mid] > n) {
+          hi = mid;
+        } else {
+          lo = mid;
+        }
+
+      }
+
+      j = lo;
+
+    }
+
+    if (j !== -1) {
+      pre[i] = is[j];
+    }
+
+    if (j === l) {
+      l++;
+      seq[l] = n;
+      is[l]  = i;
+    } else if (n < seq[j + 1]) {
+      seq[j + 1] = n;
+      is[j + 1] = i;
+    }
+
+  }
+
+  for (i = is[l]; l >= 0; i = pre[i], l--) {
+    seq[l] = i;
+  }
+
+  return seq;
 
 }

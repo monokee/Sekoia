@@ -1,17 +1,17 @@
 Cue.UI('Todo-Item', {
 
-  template: (
-    `<div class="item" data-complete="false">
-        <div class="checkbox">
+  element: (
+    `<div class="item todoItem" data-complete="false">
+        <div class="checkbox todoCheckbox">
             <div class="bullet"></div>
             <div class="tick"></div>
             <div class="label"></div>
         </div>
-        <div class="textField">
+        <div class="textField todoTextField">
             <div class="text" contenteditable="false"></div>
             <div class="date"></div>
         </div>
-        <div class="editButton">edit</div>
+        <div class="editButton todoEditButton">edit</div>
      </div>`
   ),
 
@@ -20,6 +20,7 @@ Cue.UI('Todo-Item', {
     item: {
       position: 'relative',
       width: '100%',
+      flex: '0 0 auto',
       display: 'flex',
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -29,6 +30,7 @@ Cue.UI('Todo-Item', {
       background: 'rgba(128,135,142,0.1)',
       opacity: 0.9,
       borderRadius: '5px',
+      borderBottom: '1px solid transparent',
       cursor: 'default',
       transition: 'background 150ms, opacity 150ms',
       '&:hover': {
@@ -41,8 +43,11 @@ Cue.UI('Todo-Item', {
       '&:nth-child(odd)': {
         background: 'rgba(128,135,142,0.05)'
       },
-      '&.editing': {
-        opacity: 1
+      '&.selected': {
+        opacity: 1,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+        borderBottom: '1px solid rgb(0,115,255)'
       },
 
       '.textField': {
@@ -202,13 +207,10 @@ Cue.UI('Todo-Item', {
 
   },
 
-  bindEvents: {
+  events: {
 
     click: {
-      '.checkbox'() {
-        this.state.isComplete = !this.state.isComplete;
-      },
-      '.editButton'() {
+      editButton(e) {
         if (!this.isEditing) {
           this.goIntoEditMode();
         } else {
@@ -218,7 +220,7 @@ Cue.UI('Todo-Item', {
     },
 
     focusout: {
-      '.textField'() {
+      textField(e) {
         if (this.isEditing) {
           this.leaveEditMode();
         }
@@ -226,7 +228,7 @@ Cue.UI('Todo-Item', {
     },
 
     keydown: {
-      '.textField'(e) {
+      textField(e) {
         if (this.isEditing && e.which === 13) {
           e.preventDefault();
           this.leaveEditMode();
@@ -236,7 +238,7 @@ Cue.UI('Todo-Item', {
 
   },
 
-  renderState: {
+  render: {
 
     isComplete(flag) {
       if (flag === true) {
@@ -251,6 +253,14 @@ Cue.UI('Todo-Item', {
        this.element.dataset.complete = 'false';
       }
 
+    },
+
+    selected(flag) {
+      if (flag === true) {
+        this.addClass('selected');
+      } else {
+        this.removeClass('selected');
+      }
     },
 
     text(content) {

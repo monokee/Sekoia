@@ -64,7 +64,6 @@ const OrderedDerivatives = {
       }
 
       if (!target.has(sourceProperty)) {
-        console.log(`Adding ordered Derivative "${derivative.ownPropertyName}". Visited:`, JSON.stringify(this.visited));
         target.set(sourceProperty, derivative);
       }
 

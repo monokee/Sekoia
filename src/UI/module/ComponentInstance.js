@@ -8,6 +8,8 @@ const ComponentInstance = wrap(() => {
   const isNodeListProto = NodeList.prototype.isPrototypeOf;
   const isHTMLCollectionProto = HTMLCollection.prototype.isPrototypeOf;
 
+  const childDataCache = new WeakMap();
+
   const transitionEventTypes = (() => {
 
     const el = doc.createElement('tst'), ts = {
@@ -44,13 +46,11 @@ const ComponentInstance = wrap(() => {
 
   return class ComponentInstance {
 
-    constructor(element, imports, styles, keyframes) {
+    constructor(element, imports, styles) {
 
       this.element = element;
       this.imports = imports;
       this.styles = styles;
-      this.keyframes = keyframes;
-      this.reactions = new Map();
       this.events = new Map();
       this.autorun = true;
 
@@ -273,36 +273,21 @@ const ComponentInstance = wrap(() => {
       }));
     }
 
-    setChildren(node, {from = [], to, create, update = NOOP}) {
+    setChildren(parentNode, dataArray, createElement, updateElement = NOOP) {
 
-      node = arguments.length === 1 ? this.element : this.select(node);
+      // weak-cache previous child data
+      const previousData = childDataCache.get(parentNode) || [];
+      childDataCache.set(parentNode, dataArray.slice());
 
-      // the preferred method for updating a list of children after the underlying data model for a rendered list has changed.
-      // performs smart checking and optimized reconciliation to ensure only the minimum amount of dom-work is performed per update.
-
-      // "from" and "to" are raw data arrays which are formatted into dom elements by calling "create" or "update" on each item.
-      // "create" is a function that requires a single data-entry from the "to" array and returns a dom element. (likely a Cue.Component function).
-      // "update" is a function that updates existing elements. It requires two arguments: (domElement, newData). How the newData is rendered into the domElement is specified explicitly in the function body.
-      // "update" defaults to noop because in most cases property / attribute updates are handled by children themselves
-      // "update" is only required for non-reactive or primitive children in data array
-      // "update" hence offers a very fast alternative for rendering when it doesn't make sense for each array item to be an observe reactive State module
-
-      // fast path clear all
-      if (to.length === 0) {
-        node.textContent = '';
-        return this;
-      }
-
-      // fast path create all
-      if (from.length === 0) {
-        for(let i = 0; i < to.length; i++) {
-          node.appendChild(create(to[i]))
+      if (dataArray.length === 0) { // fast path clear all
+        parentNode.textContent = '';
+      } else if (previousData.length === 0) { // fast path add all
+        for(let i = 0; i < dataArray.length; i++) {
+          parentNode.appendChild(createElement(dataArray[i]));
         }
-        return this;
+      } else { // reconcile current/new newData arrays
+        reconcile(parentNode, previousData, dataArray, createElement, updateElement);
       }
-
-      // reconcile current/new newData arrays
-      reconcile(node, from, to, create, update);
 
       return this;
 

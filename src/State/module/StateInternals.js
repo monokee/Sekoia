@@ -80,7 +80,7 @@ class StateInternals {
   }
 
   instanceWillUnmount() {
-    console.log('[todo: instanceWillUnmount]', this);
+    //console.log('[todo: instanceWillUnmount]', this);
   }
 
 }
@@ -163,7 +163,7 @@ class StateModuleInternals extends StateInternals {
       const observers = this.observersOf.get(prop);
 
       for (let i = 0; i < observers.length; i++) {
-        MAIN_QUEUE.push(observers[i], value, prop);
+        MAIN_QUEUE.push(observers[i], value);
       }
 
     }
@@ -206,7 +206,7 @@ class StateModuleInternals extends StateInternals {
         this.cueDerivatives(derivative.ownPropertyName);
       }
 
-      return hasChanged; // if any derivative has changed its value, bubble
+      return hasChanged; // we return this that bubbling can stop if no top-level property changed.
 
     }
 

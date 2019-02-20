@@ -1,8 +1,9 @@
-Cue.State('Todo-Item', {
+Cue.State('Todo-Item', Module => ({
 
   props: {
     text: '',
-    isComplete: false
+    isComplete: false,
+    selected: false
   },
 
   initialize(props) {
@@ -10,4 +11,4 @@ Cue.State('Todo-Item', {
     this.isComplete = props.isComplete;
   }
 
-});
+}));
