@@ -8,6 +8,9 @@
  *
  */
 
+// Meta Keys used for closure scope lookup && safely extending foreign objects
+const __CUE__ = Symbol('🧿');
+
 // Builtins
 const OBJ = Object;
 const ARR = Array;

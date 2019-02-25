@@ -9,6 +9,9 @@
    *
    */
 
+  // Meta Keys used for closure scope lookup && safely extending foreign objects
+  const __CUE__ = Symbol('🧿');
+
   // Builtins
   const OBJ = Object;
   const ARR = Array;
@@ -157,7 +160,7 @@
   let accumulationDepth = 0;
 
   // Reaction Queue (cleared after each run)
-  const MAIN_QUEUE = [];
+  const MAIN_QUEUE = new Map();
 
   // Global derivative installer payload
   const DERIVATIVE_INSTALLER = {
@@ -169,9 +172,6 @@
   // Traversal Directions (needed for dependency branch walking)
   const TRAVERSE_DOWN = -1;
   const TRAVERSE_UP = 1;
-
-  // Meta Keys used for closure scope lookup && safely extending foreign objects
-  const __CUE__ = Symbol('🧿');
 
   const STATE_TYPE_ROOT = -1;
   const STATE_TYPE_MODULE = 1;
@@ -1390,12 +1390,11 @@
 
   }
 
-  const REACTION_BUFFER_TIME = 1000 / 60;
   let REACTION_BUFFER = null;
-
+  let FLUSHING_BUFFER = false;
   /**
    * Runs through the Main Queue to execute each collected reaction with each collected property value as the first and only argument.
-   * Calls to react() are automatically buffered and internal flush() is only called ~16.7ms after the last call to react().
+   * Calls to react() are automatically buffered and internal flush() is only called on the next available frame after the last call to react().
    * This accumulates reactions during batch operations with many successive calls to react() and flushes them in one go when the call
    * rate is decreased. Because reactions likely trigger rendering, this attempts to defer and separate rendering from internal value updating and change propagation.
    * Main Queue is emptied after each call to react.
@@ -1405,9 +1404,10 @@
    */
   function react() {
 
-    clearTimeout(REACTION_BUFFER);
-
-    REACTION_BUFFER = setTimeout(flushReactionBuffer, REACTION_BUFFER_TIME);
+    if (FLUSHING_BUFFER === false && MAIN_QUEUE.size > 0) {
+      cancelAnimationFrame(REACTION_BUFFER);
+      REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
+    }
 
     if (--accumulationDepth === 0) {
       while (ACCUMULATED_INSTANCES.length) ACCUMULATED_INSTANCES.pop();
@@ -1417,10 +1417,17 @@
   }
 
   function flushReactionBuffer() {
-    // Queue contains tuples of (handler, value) -> call i[0](i[1]) ie handler(value)
-    for (let i = 0; i < MAIN_QUEUE.length; i += 2) MAIN_QUEUE[i](MAIN_QUEUE[i + 1]);
-    while (MAIN_QUEUE.length) MAIN_QUEUE.pop(); // flush
+
+    FLUSHING_BUFFER = true;
+
+    for (const rxVAL of MAIN_QUEUE.entries()) {
+      rxVAL[0](rxVAL[1]);
+    }
+
     REACTION_BUFFER = null;
+    FLUSHING_BUFFER = false;
+    MAIN_QUEUE.clear();
+
   }
 
   /**
@@ -1441,8 +1448,8 @@
       throw new TypeError(`Can't create State Module "${module.name}" because the config function does not return a plain object.`);
     }
 
-    if (!isPlainObject(config.props)) {
-      throw new TypeError(`State Module requires "props" pojo containing default and optional computed properties.`);
+    if (!isPlainObject(config.data)) {
+      throw new TypeError(`State Module requires "data" pojo containing default and optional computed properties.`);
     }
 
     // static module properties
@@ -1467,9 +1474,9 @@
     // 1. Split props into defaults, computed properties and injected properties.
     // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances from this module.
 
-    for (const prop in config.props) {
+    for (const prop in config.data) {
 
-      const val = config.props[prop];
+      const val = config.data[prop];
 
       if (isFunction(val)) {
 
@@ -1525,7 +1532,7 @@
     }
 
     // 2. Install dependencies of derivatives by connecting properties
-    installDependencies(config.props, module.derivativesToInstall);
+    installDependencies(config.data, module.derivativesToInstall);
 
     // 2.1 Resolve dependencies and sort derivatives topologically
     module.derivativesToInstall = OrderedDerivatives.from(module.derivativesToInstall);
@@ -1726,7 +1733,7 @@
         const observers = this.observersOf.get(prop);
 
         for (let i = 0; i < observers.length; i++) {
-          MAIN_QUEUE.push(observers[i], value);
+          MAIN_QUEUE.set(observers[i], value);
         }
 
       }
@@ -1926,8 +1933,11 @@
       }
 
       if (autorun === true) {
-        const val = this.proxyState[property];
-        boundHandler(val, property);
+        accumulationDepth++;
+        MAIN_QUEUE.set(boundHandler, this.proxyState[property]);
+        react(); // debounce autorun
+        //const val = this.proxyState[property];
+        //boundHandler(val, property);
       }
 
       return boundHandler;
@@ -2111,34 +2121,26 @@
    * Creates a function that will run once when a module is first used.
    * It internally creates a StateFactory function for the module that will be called
    * on any subsequent requests. (Lazy instantiation of modules)
-   * @function createStateFactoryInitializer
-   * @param   {object}            module                  - The shared module object containing static module data (at this point it only contains the name).
+   * @function createStateFactory
+   * @param   {object}            _module                 - The shared module object containing static module data (at this point it only contains the name).
    * @param   {(object|function)} initializer             - The second argument passed to public Cue.State function. Can be a config object or a function returning a config object.
    * @returns {function}          StateFactoryInitializer - The self-overwriting function which creates the factory function that will be called in place of itself on any subsequent instantiations of the module.
    */
 
-  function createStateFactoryInitializer(module, initializer) {
+  function createStateFactory(_module, initializer) {
 
-    // A function that runs once to initialize itself, then overwrites itself with the factory function it creates for subsequent calls
+    let initializedModule = null;
+
+    const StateFactory = props => createState(
+      deepClonePlainObject(initializedModule.defaults),
+      initializedModule,
+      STATE_TYPE_MODULE,
+      props
+    ).proxyState;
+
     return props => {
-
-      // 1. lazily initialize the core state module
-      module = buildStateModule(module, initializer);
-
-      // 3. create a state factory function
-      const StateFactory = props => {
-        // 3.1. Create an object by deep cloning module default data.
-        const data = deepClonePlainObject(module.defaults);
-        // 3.2. Enhance the cloned data with reactive Cue Internals and return the PROXY STATE object.
-        return createState(data, module, STATE_TYPE_MODULE, props).proxyState;
-      };
-
-      // 4. overwrite this initialization function with the StateFactory for subsequent calls
-      CUE_STATE_MODULES.set(name, StateFactory);
-
-      // 5. call the StateFactory and return the result
+      initializedModule || (initializedModule = buildStateModule(_module, initializer));
       return StateFactory(props);
-
     }
 
   }
@@ -2195,7 +2197,11 @@
         name
       };
       CUE_STATE_INTERNALS.set(name, module);
-      CUE_STATE_MODULES.set(name, createStateFactoryInitializer(module, moduleInitializer));
+
+      const StateFactory = createStateFactory(module, moduleInitializer);
+      CUE_STATE_MODULES.set(name, StateFactory);
+
+      return StateFactory;
 
     },
 
@@ -2340,15 +2346,16 @@
    * - CSS Rules can be written in nested SCSS style syntax including nested chaining by inserting "&" before the property name ie "&:hover", "&.active" etc...
    * @param   {object}      styles    - The styles object. Must be a plain object of strings and nested objects containing style rules.
    * @param   {HTMLElement} template  - The template html element. This is the element that is used for cloning instances.
+   * @param   {string}      (scope)   - Scope.
    * @returns {Map}                   - A Map object which contains mapping from original class names to scoped class names (or an empty map)
    */
-  function scopeStylesToComponent(styles, template) {
+  function scopeStylesToComponent(styles, template, scope) {
 
     const classMap = new Map();
 
     if (!styles) return classMap;
 
-    const scope = `cue-${CUE_UI_STYLESHEET.cssRules.length.toString(36)}`;
+    scope || (scope = `cue-${CUE_UI_STYLESHEET.cssRules.length.toString(36)}`);
 
     for (const key in styles) {
       insertStyleRule(prepareSelectorName(key, scope, template, classMap), styles[key]);
@@ -2371,7 +2378,7 @@
       return selector;
     } else {
       selector = selector.replace('.', '');
-      return `.${classMap.set(selector, `${selector}__${scope}`).get(selector)}`;
+      return `.${classMap.set(selector, `${scope}-${selector}`).get(selector)}`;
     }
   }
 
@@ -2847,25 +2854,25 @@
 
   }
 
-  function bindComponentEvents(component, events) {
+  function bindComponentEvents(componentInstance, events) {
 
     let eventName, value;
     for (eventName in events) {
 
       value = events[eventName];
 
-      if (component.events.has(eventName)) { // base event already registered
+      if (componentInstance.events.has(eventName)) { // base event already registered
 
-        addHandlerToBaseEvent(component.events.get(eventName), value, component);
+        addHandlerToBaseEvent(componentInstance.events.get(eventName), value, componentInstance);
 
       } else { // register new base event
 
         const eventStack = [];
-        component.events.set(eventName, eventStack);
-        addHandlerToBaseEvent(eventStack, value, component);
+        componentInstance.events.set(eventName, eventStack);
+        addHandlerToBaseEvent(eventStack, value, componentInstance);
 
-        component.element.addEventListener(eventName, e => {
-          for (let i = 0; i < eventStack.length; i++) eventStack[i].call(component, e);
+        componentInstance.element.addEventListener(eventName, e => {
+          for (let i = 0; i < eventStack.length; i++) eventStack[i].call(componentInstance, e);
         });
 
       }
@@ -2888,10 +2895,8 @@
     }
   }
 
-  // Cue UI Component Instance available as "this" in component lifecycle methods.
-  // Provides access to the raw dom element, imports, keyframes and styles
-  // Don't refactor to Pojo (used for instanceof checks)
-  const ComponentInstance = wrap(() => {
+  // The base prototype of all Cue UI Components containing DOM related helper methods.
+  const ComponentPrototype = wrap(() => {
 
     const doc = document;
     const isNodeListProto = NodeList.prototype.isPrototypeOf;
@@ -2935,17 +2940,7 @@
 
     })();
 
-    return class ComponentInstance {
-
-      constructor(element, imports, styles) {
-
-        this.element = element;
-        this.imports = imports;
-        this.styles = styles;
-        this.events = new Map();
-        this.autorun = true;
-
-      }
+    return {
 
       select(x, within) {
 
@@ -2959,7 +2954,7 @@
               node = doc.getElementById(x.substring(1));
               break;
             case '.':
-              node = within.getElementsByClassName(this.styles.get((s = x.substring(1))) || s);
+              node = within.getElementsByClassName(this[__CUE__].styles.get((s = x.substring(1))) || s);
               break;
             default:
               node = within.querySelectorAll(x);
@@ -2988,17 +2983,17 @@
           return o;
         }
 
-      }
+      },
 
       hasContent(node) {
         node = node ? this.select(node) : this.element;
         return !!(node.children.length || node.textContent.trim().length);
-      }
+      },
 
       isIterable(node) {
         node = node ? this.select(node) : this.element;
         return node.nodeType !== Node.TEXT_NODE && node.length;
-      }
+      },
 
       hasClass(node, className) {
 
@@ -3009,45 +3004,45 @@
           node = this.select(node);
         }
 
-        return node.classList.contains(this.styles.get(className) || className);
+        return node.classList.contains(this[__CUE__].styles.get(className) || className);
 
-      }
+      },
 
       addClass(node, className) {
 
         let classNames;
 
         if (arguments.length === 1) {
-          classNames = node.split(' ').map(token => (this.styles.get(token) || token));
+          classNames = node.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
           node = this.element;
         } else {
           node = this.select(node);
-          classNames = className.split(' ').map(token => (this.styles.get(token) || token));
+          classNames = className.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
         }
 
         node.classList.add(...classNames);
 
         return this;
 
-      }
+      },
 
       removeClass(node, className) {
 
         let classNames;
 
         if (arguments.length === 1) {
-          classNames = node.split(' ').map(token => (this.styles.get(token) || token));
+          classNames = node.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
           node = this.element;
         } else {
           node = this.select(node);
-          classNames = className.split(' ').map(token => (this.styles.get(token) || token));
+          classNames = className.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
         }
 
         node.classList.remove(...classNames);
 
         return this;
 
-      }
+      },
 
       toggleClass(node, className) {
 
@@ -3058,11 +3053,11 @@
           node = this.select(node);
         }
 
-        node.classList.toggle(this.styles.get(className) || className);
+        node.classList.toggle(this[__CUE__].styles.get(className) || className);
 
         return this;
 
-      }
+      },
 
       replaceClass(node, oldClass, newClass) {
 
@@ -3074,16 +3069,16 @@
           node = this.select(node);
         }
 
-        node.classList.replace(this.styles.get(oldClass) || oldClass, this.styles.get(newClass) || newClass);
+        node.classList.replace(this[__CUE__].styles.get(oldClass) || oldClass, this[__CUE__].styles.get(newClass) || newClass);
 
         return this;
 
-      }
+      },
 
       index(node) {
         node = node ? this.select(node) : this.element;
         return toArray(node.parentNode.children).indexOf(node);
-      }
+      },
 
       siblings(node, includeSelf) {
 
@@ -3095,7 +3090,8 @@
         }
 
         return includeSelf ? toArray(node.parentNode.children) : toArray(node.parentNode.children).filter(sibling => sibling !== node);
-      }
+
+      },
 
       refs(within) {
 
@@ -3113,7 +3109,7 @@
           return refs;
         }
 
-      }
+      },
 
       boundingBox(node) {
         node = node ? this.select(node) : this.element;
@@ -3127,7 +3123,7 @@
         const bb = clone.getBoundingClientRect();
         clone.parentElement.removeChild(clone);
         return bb;
-      }
+      },
 
       position(node) {
         node = node ? this.select(node) : this.element;
@@ -3135,7 +3131,7 @@
           top: node.offsetTop,
           left: node.offsetLeft
         };
-      }
+      },
 
       offset(node) {
         node = node ? this.select(node) : this.element;
@@ -3144,7 +3140,7 @@
           top: rect.top + document.body.scrollTop,
           left: rect.left + document.body.scrollLeft
         };
-      }
+      },
 
       awaitTransition(...nodes) {
         nodes = nodes.length ? nodes.map(node => this.select(node)) : [this.element];
@@ -3162,7 +3158,7 @@
             return Promise.resolve();
           }
         }));
-      }
+      },
 
       setChildren(parentNode, dataArray, createElement, updateElement = NOOP) {
 
@@ -3182,7 +3178,7 @@
 
         return this;
 
-      }
+      },
 
       insertBefore(node, target) {
         if (arguments.length === 1) {
@@ -3194,7 +3190,7 @@
         }
         target.parentNode.insertBefore(node, target);
         return this;
-      }
+      },
 
       insertAfter(node, target) {
         if (arguments.length === 1) {
@@ -3206,7 +3202,7 @@
         }
         target.parentNode.insertBefore(node, target.nextSibling);
         return this;
-      }
+      },
 
       insertAt(node, index) {
 
@@ -3231,12 +3227,12 @@
 
         return this;
 
-      }
+      },
 
       detach(node) {
         node = node ? this.select(node) : this.element;
         return node.parentNode.removeChild(node);
-      }
+      },
 
       remove(node) {
         node = node ? this.select(node) : this.element;
@@ -3248,7 +3244,7 @@
 
   });
 
-  function initializeUIComponent(initializer) { // runs only once per module
+  function buildUIComponent(name, initializer) { // runs only once per component
 
     // componentInitializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
     const config = typeof initializer === 'function' ? initializer.call(null, UI_COMPONENT) : initializer;
@@ -3263,55 +3259,75 @@
 
     const templateElement = createTemplateRootElement(config.element);
 
-    // automatically scope classNames or keyframes to the component by replacing their names with unique names.
-    // functions return a map of the original name to the unique name or an empty map if no component-level styles/keyframes exist.
-    const styles = scopeStylesToComponent(config.styles, templateElement);
+    // Automatically scope classNames to the component by replacing their names with unique names.
+    // Scope prefix can be specified via '$scope' property on styles object. By default we use 'name' as prefix.
+    // Output looks like: Scope-className for classes.
+    // Function returns a map of the original name to the unique name or an empty map if no component-level styles exist.
+    const styleScope = config.styles['$scope'] || name;
+    const styles = scopeStylesToComponent(config.styles, templateElement, styleScope);
 
     // rewrite delegated event selectors to internally match the scoped classNames
     if (config.events && styles.size > 0) {
       translateEventSelectorsToScope(config.events, styles);
     }
 
-    return {
-      element: templateElement,
-      imports: config.imports || null,
+    // Create an object that inherits from ComponentPrototype (DOM helper methods)
+    const Component = oCreate(ComponentPrototype);
+
+    // Add internal __CUE__ object to Component
+    Component[__CUE__] = {
+      template: templateElement,
       styles: styles,
-      initialize: config.initialize || null,
+      imports: config.imports || null,
       events: config.events || null,
-      render: config.render || null
+      render: config.render || null,
+      initialize: isFunction(config.initialize) ? config.initialize : NOOP
     };
+
+    // Make imports top-level properties on instances
+    if (isObjectLike(config.imports)) {
+      oAssign(Component, config.imports);
+    }
+
+    // Make custom methods top-level props on instances
+    let key, val;
+    for (key in config) {
+      val = config[key];
+      if (isFunction(val)) {
+        Component[key] = val;
+      }
+    }
+
+    return Component;
 
   }
 
-  function createComponentFactory(initializer) {
+  function createComponentFactory(name, initializer) {
 
-    let component = null;
+    let Component = null;
+    let Internals = null;
 
     return state => {
 
       // lazily initialize the component
-      component || (component = initializeUIComponent(initializer));
+      Component || ((Component = buildUIComponent(name, initializer)) && (Internals = Component[__CUE__]));
 
       // create new UI Component Instance
-      const instance = new ComponentInstance(
-        component.element.cloneNode(true),
-        component.imports,
-        component.styles
-      );
+      const instance = oCreate(Component);
+      instance.element = Internals.template.cloneNode(true);
+      instance.events = new Map();
 
-      // 1. Initialize
-      if (component.initialize) {
-        component.initialize.call(instance, state);
-      }
+      // 1. Initialize or NOOP
+      Internals.initialize.call(instance, state);
 
       // 2. Render State
-      if (component.render) {
-        installStateReactions(instance, component.render);
+      if (Internals.render) {
+        installStateReactions(instance, Internals.render);
       }
 
       // 3. Bind Events
-      if (component.events) {
-        bindComponentEvents(instance, component.events);
+      if (Internals.events) {
+        bindComponentEvents(instance, Internals.events);
       }
 
       // return dom element for compositing
@@ -3333,7 +3349,7 @@
         throw new Error(`A UI Module has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
       }
 
-      const ComponentFactory = createComponentFactory(componentInitializer);
+      const ComponentFactory = createComponentFactory(name, componentInitializer);
 
       CUE_UI_MODULES.set(name, ComponentFactory);
 
@@ -3341,7 +3357,7 @@
 
     },
 
-    isComponent: x => x instanceof ComponentInstance
+    isComponent: x => x instanceof ComponentPrototype
 
   };
 

@@ -11,15 +11,16 @@
  * - CSS Rules can be written in nested SCSS style syntax including nested chaining by inserting "&" before the property name ie "&:hover", "&.active" etc...
  * @param   {object}      styles    - The styles object. Must be a plain object of strings and nested objects containing style rules.
  * @param   {HTMLElement} template  - The template html element. This is the element that is used for cloning instances.
+ * @param   {string}      (scope)   - Scope.
  * @returns {Map}                   - A Map object which contains mapping from original class names to scoped class names (or an empty map)
  */
-function scopeStylesToComponent(styles, template) {
+function scopeStylesToComponent(styles, template, scope) {
 
   const classMap = new Map();
 
   if (!styles) return classMap;
 
-  const scope = `cue-${CUE_UI_STYLESHEET.cssRules.length.toString(36)}`;
+  scope || (scope = `cue-${CUE_UI_STYLESHEET.cssRules.length.toString(36)}`);
 
   for (const key in styles) {
     insertStyleRule(prepareSelectorName(key, scope, template, classMap), styles[key]);
@@ -42,7 +43,7 @@ function getScopedSelectorName(element, scope, selector, classMap) {
     return selector;
   } else {
     selector = selector.replace('.','');
-    return `.${classMap.set(selector, `${selector}__${scope}`).get(selector)}`;
+    return `.${classMap.set(selector, `${scope}-${selector}`).get(selector)}`;
   }
 }
 

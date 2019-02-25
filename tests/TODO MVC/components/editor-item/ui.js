@@ -1,17 +1,17 @@
 Cue.UI('Todo-Item', {
 
   element: (
-    `<div class="item todoItem" data-complete="false">
-        <div class="checkbox todoCheckbox">
+    `<div class="item" data-complete="false">
+        <div class="checkbox">
             <div class="bullet"></div>
             <div class="tick"></div>
             <div class="label"></div>
         </div>
-        <div class="textField todoTextField">
+        <div class="textField">
             <div class="text" contenteditable="false"></div>
             <div class="date"></div>
         </div>
-        <div class="editButton todoEditButton">edit</div>
+        <div class="editButton">edit</div>
      </div>`
   ),
 
@@ -102,7 +102,7 @@ Cue.UI('Todo-Item', {
       '&.complete': {
 
         '.editButton': {
-          userSelect: 'none'
+          pointerEvents: 'none'
         },
 
         '.textField div': {
@@ -177,6 +177,7 @@ Cue.UI('Todo-Item', {
   },
 
   initialize(state) {
+
     this.state = state;
     this.checkBox = this.select('.checkbox');
     this.textField = this.select('.textField');
@@ -184,26 +185,7 @@ Cue.UI('Todo-Item', {
     this.date = this.select('.date');
     this.editButton = this.select('.editButton');
 
-    this.goIntoEditMode = () => {
-      this.isEditing = true;
-      this.text.setAttribute('contenteditable', 'true');
-      this.editButton.textContent = 'ok';
-      this.addClass(this.textField, 'editing');
-      const range = document.createRange();
-      range.selectNodeContents(this.text);
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-    };
-
-    this.leaveEditMode = () => {
-      this.text.setAttribute('contenteditable', 'false');
-      this.editButton.textContent = 'edit';
-      this.removeClass(this.textField, 'editing');
-      this.state.text = this.text.textContent;
-      window.getSelection().removeAllRanges();
-      setTimeout(() => this.isEditing = false, 100);
-    };
+    this.isEditing = false;
 
   },
 
@@ -212,7 +194,7 @@ Cue.UI('Todo-Item', {
     click: {
       editButton(e) {
         if (!this.isEditing) {
-          this.goIntoEditMode();
+          this.enterEditMode();
         } else {
           this.leaveEditMode();
         }
@@ -240,23 +222,22 @@ Cue.UI('Todo-Item', {
 
   render: {
 
-    isComplete(flag) {
-      if (flag === true) {
+    isComplete(itIs) {
+      if (itIs) {
         this.addClass('complete');
         this.addClass(this.checkBox, 'checked');
         this.addClass(this.editButton, 'disabled');
         this.element.dataset.complete = 'true';
       } else {
-       this.removeClass('complete');
-       this.removeClass(this.checkBox, 'checked');
-       this.removeClass(this.editButton, 'disabled');
-       this.element.dataset.complete = 'false';
+        this.removeClass('complete');
+        this.removeClass(this.checkBox, 'checked');
+        this.removeClass(this.editButton, 'disabled');
+        this.element.dataset.complete = 'false';
       }
-
     },
 
-    selected(flag) {
-      if (flag === true) {
+    selected(itIs) {
+      if (itIs) {
         this.addClass('selected');
       } else {
         this.removeClass('selected');
@@ -267,6 +248,40 @@ Cue.UI('Todo-Item', {
       this.text.textContent = content;
       this.date.textContent = new Date().toLocaleDateString('en-us', { weekday: 'short', year: '2-digit', month: 'short', day: 'numeric' });
     }
+
+  },
+
+  enterEditMode() {
+
+    this.isEditing = true;
+    this.text.setAttribute('contenteditable', 'true');
+    this.editButton.textContent = 'ok';
+
+    this.addClass(this.textField, 'editing');
+
+    const range = document.createRange();
+    range.selectNodeContents(this.text);
+
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+  },
+
+  leaveEditMode() {
+
+    this.text.setAttribute('contenteditable', 'false');
+    this.editButton.textContent = 'edit';
+
+    this.removeClass(this.textField, 'editing');
+
+    this.state.text = this.text.textContent;
+
+    window.getSelection().removeAllRanges();
+
+    setTimeout(() => {
+      this.isEditing = false
+    }, 100);
 
   }
 

@@ -11,7 +11,7 @@ CUE_API.UI = {
       throw new Error(`A UI Module has already been registered under name "${name}". Unregister, use a unique name or consider namespacing.with.dots-or-hyphens...`);
     }
 
-    const ComponentFactory = createComponentFactory(componentInitializer);
+    const ComponentFactory = createComponentFactory(name, componentInitializer);
 
     CUE_UI_MODULES.set(name, ComponentFactory);
 
@@ -19,6 +19,6 @@ CUE_API.UI = {
 
   },
 
-  isComponent: x => x instanceof ComponentInstance
+  isComponent: x => x instanceof ComponentPrototype
 
 };

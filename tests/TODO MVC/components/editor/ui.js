@@ -185,7 +185,6 @@ Cue.UI('Todo-Editor', Component => ({
 
     this.input = this.select('.todoInput');
     this.list = this.select('.todoList');
-    this.listItems = this.list.children;
     this.itemCount = this.select('.itemCount');
     this.footer = this.select('.footer');
     this.clearButton = this.select('.clearButton');
@@ -221,11 +220,11 @@ Cue.UI('Todo-Editor', Component => ({
       todoList(e) {
         e.stopPropagation();
         const el = e.target;
-        const item = el.closest('.todoItem');
+        const item = el.closest('.Todo-Item-item');
         const index = this.index(item);
-        if (el.closest('.todoCheckbox')) {
+        if (el.closest('.Todo-Item-checkbox')) {
           this.state.toggleCompletion(index);
-        } else if (!(!!el.closest('.todoEditButton') || !!el.closest('.todoTextField.editing'))) {
+        } else if (!(!!el.closest('.Todo-Item-editButton') || !!el.closest('.Todo-Item-textField.editing'))) {
           const mode = e.shiftKey ? 'range' : (e.metaKey || e.ctrlKey) ? 'meta' : 'radio';
           this.state.selectTodo({mode, index});
         }
@@ -234,15 +233,6 @@ Cue.UI('Todo-Editor', Component => ({
         this.state.filter = e.target.dataset.type;
       },
       clearButton(e) {
-
-        const completedItems = [];
-
-        for (const item of this.listItems) {
-          if (item.dataset.complete === 'true') {
-            completedItems.push(item);
-            //TODO: transform scaleY item and transform: translateY next elements into previous position. then listen for css transition end and remove all of the elements. after the removal, reset transforms. wrap into a cool generic method.
-          }
-        }
 
         console.warn('todo - not implemented.')
 
@@ -286,7 +276,7 @@ Cue.UI('Todo-Editor', Component => ({
     },
 
     visibleTodos(todoArray) {
-      this.setChildren(this.list, todoArray, this.imports.TodoItem);
+      this.setChildren(this.list, todoArray, this.TodoItem);
     }
 
   }

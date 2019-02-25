@@ -1,33 +1,30 @@
 
-function createComponentFactory(initializer) {
+function createComponentFactory(name, initializer) {
 
-  let component = null;
+  let Component = null;
+  let Internals = null;
 
   return state => {
 
     // lazily initialize the component
-    component || (component = initializeUIComponent(initializer));
+    Component || ((Component = buildUIComponent(name, initializer)) && (Internals = Component[__CUE__]));
 
     // create new UI Component Instance
-    const instance = new ComponentInstance(
-      component.element.cloneNode(true),
-      component.imports,
-      component.styles
-    );
+    const instance = oCreate(Component);
+    instance.element = Internals.template.cloneNode(true);
+    instance.events = new Map();
 
-    // 1. Initialize
-    if (component.initialize) {
-      component.initialize.call(instance, state);
-    }
+    // 1. Initialize or NOOP
+    Internals.initialize.call(instance, state);
 
     // 2. Render State
-    if (component.render) {
-      installStateReactions(instance, component.render);
+    if (Internals.render) {
+      installStateReactions(instance, Internals.render);
     }
 
     // 3. Bind Events
-    if (component.events) {
-      bindComponentEvents(instance, component.events);
+    if (Internals.events) {
+      bindComponentEvents(instance, Internals.events);
     }
 
     // return dom element for compositing

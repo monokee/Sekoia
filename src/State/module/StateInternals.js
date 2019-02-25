@@ -163,7 +163,7 @@ class StateModuleInternals extends StateInternals {
       const observers = this.observersOf.get(prop);
 
       for (let i = 0; i < observers.length; i++) {
-        MAIN_QUEUE.push(observers[i], value);
+        MAIN_QUEUE.set(observers[i], value);
       }
 
     }
@@ -357,8 +357,11 @@ class StateModuleInternals extends StateInternals {
     }
 
     if (autorun === true) {
-      const val = this.proxyState[property];
-      boundHandler(val, property);
+      accumulationDepth++;
+      MAIN_QUEUE.set(boundHandler, this.proxyState[property]);
+      react(); // debounce autorun
+      //const val = this.proxyState[property];
+      //boundHandler(val, property);
     }
 
     return boundHandler;

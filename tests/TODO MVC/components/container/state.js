@@ -1,6 +1,6 @@
 Cue.State('Todo-Container', Module => ({
 
-  props: {
+  data: {
     title: 'Cue TODO MVC',
     author: 'monokee',
     editor: {}

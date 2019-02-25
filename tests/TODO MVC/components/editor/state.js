@@ -1,6 +1,6 @@
 Cue.State('Todo-Editor', Module => ({
 
-  props: {
+  data: {
     todos: [],
     filter: 'all',
     active({todos}) {

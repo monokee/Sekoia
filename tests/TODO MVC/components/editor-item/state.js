@@ -1,6 +1,6 @@
 Cue.State('Todo-Item', Module => ({
 
-  props: {
+  data: {
     text: '',
     isComplete: false,
     selected: false

@@ -11,7 +11,11 @@ CUE_API.State = {
 
     const module = { name };
     CUE_STATE_INTERNALS.set(name, module);
-    CUE_STATE_MODULES.set(name, createStateFactoryInitializer(module, moduleInitializer));
+
+    const StateFactory = createStateFactory(module, moduleInitializer);
+    CUE_STATE_MODULES.set(name, StateFactory);
+
+    return StateFactory;
 
   },
 

@@ -1,22 +1,23 @@
-function bindComponentEvents(component, events) {
+
+function bindComponentEvents(componentInstance, events) {
 
   let eventName, value;
   for (eventName in events) {
 
     value = events[eventName];
 
-    if (component.events.has(eventName)) { // base event already registered
+    if (componentInstance.events.has(eventName)) { // base event already registered
 
-      addHandlerToBaseEvent(component.events.get(eventName), value, component);
+      addHandlerToBaseEvent(componentInstance.events.get(eventName), value, componentInstance);
 
     } else { // register new base event
 
       const eventStack = [];
-      component.events.set(eventName, eventStack);
-      addHandlerToBaseEvent(eventStack, value, component);
+      componentInstance.events.set(eventName, eventStack);
+      addHandlerToBaseEvent(eventStack, value, componentInstance);
 
-      component.element.addEventListener(eventName, e => {
-        for (let i = 0; i < eventStack.length; i++) eventStack[i].call(component, e);
+      componentInstance.element.addEventListener(eventName, e => {
+        for (let i = 0; i < eventStack.length; i++) eventStack[i].call(componentInstance, e);
       });
 
     }

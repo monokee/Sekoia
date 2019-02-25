@@ -24,7 +24,7 @@ const ACCUMULATED_INSTANCES = [];
 let accumulationDepth = 0;
 
 // Reaction Queue (cleared after each run)
-const MAIN_QUEUE = [];
+const MAIN_QUEUE = new Map();
 
 // Global derivative installer payload
 const DERIVATIVE_INSTALLER = {
@@ -36,9 +36,6 @@ const DERIVATIVE_INSTALLER = {
 // Traversal Directions (needed for dependency branch walking)
 const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
-
-// Meta Keys used for closure scope lookup && safely extending foreign objects
-const __CUE__ = Symbol('🧿');
 
 const STATE_TYPE_ROOT = -1;
 const STATE_TYPE_MODULE = 1;

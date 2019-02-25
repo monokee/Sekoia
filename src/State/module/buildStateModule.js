@@ -17,8 +17,8 @@ function buildStateModule(module, moduleInitializer) {
     throw new TypeError(`Can't create State Module "${module.name}" because the config function does not return a plain object.`);
   }
 
-  if (!isPlainObject(config.props)) {
-    throw new TypeError(`State Module requires "props" pojo containing default and optional computed properties.`);
+  if (!isPlainObject(config.data)) {
+    throw new TypeError(`State Module requires "data" pojo containing default and optional computed properties.`);
   }
 
   // static module properties
@@ -44,9 +44,9 @@ function buildStateModule(module, moduleInitializer) {
   // 1. Split props into defaults, computed properties and injected properties.
   // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances from this module.
 
-  for (const prop in config.props) {
+  for (const prop in config.data) {
 
-    const val = config.props[prop];
+    const val = config.data[prop];
 
     if (isFunction(val)) {
 
@@ -102,7 +102,7 @@ function buildStateModule(module, moduleInitializer) {
   }
 
   // 2. Install dependencies of derivatives by connecting properties
-  installDependencies(config.props, module.derivativesToInstall);
+  installDependencies(config.data, module.derivativesToInstall);
 
   // 2.1 Resolve dependencies and sort derivatives topologically
   module.derivativesToInstall = OrderedDerivatives.from(module.derivativesToInstall);

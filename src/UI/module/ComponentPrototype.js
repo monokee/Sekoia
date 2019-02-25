@@ -1,8 +1,7 @@
 
-// Cue UI Component Instance available as "this" in component lifecycle methods.
-// Provides access to the raw dom element, imports, keyframes and styles
-// Don't refactor to Pojo (used for instanceof checks)
-const ComponentInstance = wrap(() => {
+
+// The base prototype of all Cue UI Components containing DOM related helper methods.
+const ComponentPrototype = wrap(() => {
 
   const doc = document;
   const isNodeListProto = NodeList.prototype.isPrototypeOf;
@@ -44,17 +43,7 @@ const ComponentInstance = wrap(() => {
 
   })();
 
-  return class ComponentInstance {
-
-    constructor(element, imports, styles) {
-
-      this.element = element;
-      this.imports = imports;
-      this.styles = styles;
-      this.events = new Map();
-      this.autorun = true;
-
-    }
+  return {
 
     select(x, within) {
 
@@ -68,7 +57,7 @@ const ComponentInstance = wrap(() => {
             node = doc.getElementById(x.substring(1));
             break;
           case '.':
-            node = within.getElementsByClassName(this.styles.get((s = x.substring(1))) || s);
+            node = within.getElementsByClassName(this[__CUE__].styles.get((s = x.substring(1))) || s);
             break;
           default:
             node = within.querySelectorAll(x);
@@ -97,17 +86,17 @@ const ComponentInstance = wrap(() => {
         return o;
       }
 
-    }
+    },
 
     hasContent(node) {
       node = node ? this.select(node) : this.element;
       return !!(node.children.length || node.textContent.trim().length);
-    }
+    },
 
     isIterable(node) {
       node = node ? this.select(node) : this.element;
       return node.nodeType !== Node.TEXT_NODE && node.length;
-    }
+    },
 
     hasClass(node, className) {
 
@@ -118,45 +107,45 @@ const ComponentInstance = wrap(() => {
         node = this.select(node);
       }
 
-      return node.classList.contains(this.styles.get(className) || className);
+      return node.classList.contains(this[__CUE__].styles.get(className) || className);
 
-    }
+    },
 
     addClass(node, className) {
 
       let classNames;
 
       if (arguments.length === 1) {
-        classNames = node.split(' ').map(token => (this.styles.get(token) || token));
+        classNames = node.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
         node = this.element;
       } else {
         node = this.select(node);
-        classNames = className.split(' ').map(token => (this.styles.get(token) || token));
+        classNames = className.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
       }
 
       node.classList.add(...classNames);
 
       return this;
 
-    }
+    },
 
     removeClass(node, className) {
 
       let classNames;
 
       if (arguments.length === 1) {
-        classNames = node.split(' ').map(token => (this.styles.get(token) || token));
+        classNames = node.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
         node = this.element;
       } else {
         node = this.select(node);
-        classNames = className.split(' ').map(token => (this.styles.get(token) || token));
+        classNames = className.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
       }
 
       node.classList.remove(...classNames);
 
       return this;
 
-    }
+    },
 
     toggleClass(node, className) {
 
@@ -167,11 +156,11 @@ const ComponentInstance = wrap(() => {
         node = this.select(node);
       }
 
-      node.classList.toggle(this.styles.get(className) || className);
+      node.classList.toggle(this[__CUE__].styles.get(className) || className);
 
       return this;
 
-    }
+    },
 
     replaceClass(node, oldClass, newClass) {
 
@@ -183,16 +172,16 @@ const ComponentInstance = wrap(() => {
         node = this.select(node);
       }
 
-      node.classList.replace(this.styles.get(oldClass) || oldClass, this.styles.get(newClass) || newClass);
+      node.classList.replace(this[__CUE__].styles.get(oldClass) || oldClass, this[__CUE__].styles.get(newClass) || newClass);
 
       return this;
 
-    }
+    },
 
     index(node) {
       node = node ? this.select(node) : this.element;
       return toArray(node.parentNode.children).indexOf(node);
-    }
+    },
 
     siblings(node, includeSelf) {
 
@@ -204,7 +193,8 @@ const ComponentInstance = wrap(() => {
       }
 
       return includeSelf ? toArray(node.parentNode.children) : toArray(node.parentNode.children).filter(sibling => sibling !== node);
-    }
+
+    },
 
     refs(within) {
 
@@ -222,7 +212,7 @@ const ComponentInstance = wrap(() => {
         return refs;
       }
 
-    }
+    },
 
     boundingBox(node) {
       node = node ? this.select(node) : this.element;
@@ -236,7 +226,7 @@ const ComponentInstance = wrap(() => {
       const bb = clone.getBoundingClientRect();
       clone.parentElement.removeChild(clone);
       return bb;
-    }
+    },
 
     position(node) {
       node = node ? this.select(node) : this.element;
@@ -244,7 +234,7 @@ const ComponentInstance = wrap(() => {
         top: node.offsetTop,
         left: node.offsetLeft
       };
-    }
+    },
 
     offset(node) {
       node = node ? this.select(node) : this.element;
@@ -253,7 +243,7 @@ const ComponentInstance = wrap(() => {
         top: rect.top + document.body.scrollTop,
         left: rect.left + document.body.scrollLeft
       };
-    }
+    },
 
     awaitTransition(...nodes) {
       nodes = nodes.length ? nodes.map(node => this.select(node)) : [this.element];
@@ -271,7 +261,7 @@ const ComponentInstance = wrap(() => {
           return Promise.resolve();
         }
       }));
-    }
+    },
 
     setChildren(parentNode, dataArray, createElement, updateElement = NOOP) {
 
@@ -291,7 +281,7 @@ const ComponentInstance = wrap(() => {
 
       return this;
 
-    }
+    },
 
     insertBefore(node, target) {
       if (arguments.length === 1) {
@@ -303,7 +293,7 @@ const ComponentInstance = wrap(() => {
       }
       target.parentNode.insertBefore(node, target);
       return this;
-    }
+    },
 
     insertAfter(node, target) {
       if (arguments.length === 1) {
@@ -315,7 +305,7 @@ const ComponentInstance = wrap(() => {
       }
       target.parentNode.insertBefore(node, target.nextSibling);
       return this;
-    }
+    },
 
     insertAt(node, index) {
 
@@ -339,12 +329,12 @@ const ComponentInstance = wrap(() => {
 
       return this;
 
-    }
+    },
 
     detach(node) {
       node = node ? this.select(node) : this.element;
       return node.parentNode.removeChild(node);
-    }
+    },
 
     remove(node) {
       node = node ? this.select(node) : this.element;

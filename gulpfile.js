@@ -48,7 +48,7 @@ const FILES = {
     `${MODULES.state}/module/buildStateModule.js`,
     `${MODULES.state}/module/StateInternals.js`,
     `${MODULES.state}/module/createState.js`,
-    `${MODULES.state}/module/createStateFactoryInitializer.js`,
+    `${MODULES.state}/module/createStateFactory.js`,
 
     `${MODULES.state}/proto.js`,
     `${MODULES.state}/public-api.js`
@@ -68,8 +68,8 @@ const FILES = {
     `${MODULES.ui}/utils/installStateReactions.js`,
     `${MODULES.ui}/utils/bindComponentEvents.js`,
 
-    `${MODULES.ui}/module/ComponentInstance.js`,
-    `${MODULES.ui}/module/initializeUIComponent.js`,
+    `${MODULES.ui}/module/ComponentPrototype.js`,
+    `${MODULES.ui}/module/buildUIComponent.js`,
     `${MODULES.ui}/module/createComponentFactory.js`,
 
     `${MODULES.ui}/public-api.js`

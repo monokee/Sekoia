@@ -1,10 +1,9 @@
 
-const REACTION_BUFFER_TIME = 1000 / 60;
 let REACTION_BUFFER = null;
-
+let FLUSHING_BUFFER = false;
 /**
  * Runs through the Main Queue to execute each collected reaction with each collected property value as the first and only argument.
- * Calls to react() are automatically buffered and internal flush() is only called ~16.7ms after the last call to react().
+ * Calls to react() are automatically buffered and internal flush() is only called on the next available frame after the last call to react().
  * This accumulates reactions during batch operations with many successive calls to react() and flushes them in one go when the call
  * rate is decreased. Because reactions likely trigger rendering, this attempts to defer and separate rendering from internal value updating and change propagation.
  * Main Queue is emptied after each call to react.
@@ -14,9 +13,10 @@ let REACTION_BUFFER = null;
  */
 function react() {
 
-  clearTimeout(REACTION_BUFFER);
-
-  REACTION_BUFFER = setTimeout(flushReactionBuffer, REACTION_BUFFER_TIME);
+  if (FLUSHING_BUFFER === false && MAIN_QUEUE.size > 0) {
+    cancelAnimationFrame(REACTION_BUFFER);
+    REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
+  }
 
   if (--accumulationDepth === 0) {
     while(ACCUMULATED_INSTANCES.length) ACCUMULATED_INSTANCES.pop();
@@ -26,8 +26,15 @@ function react() {
 }
 
 function flushReactionBuffer() {
-  // Queue contains tuples of (handler, value) -> call i[0](i[1]) ie handler(value)
-  for (let i = 0; i < MAIN_QUEUE.length; i += 2) MAIN_QUEUE[i](MAIN_QUEUE[i + 1]);
-  while(MAIN_QUEUE.length) MAIN_QUEUE.pop(); // flush
+
+  FLUSHING_BUFFER = true;
+
+  for (const rxVAL of MAIN_QUEUE.entries()) {
+    rxVAL[0](rxVAL[1]);
+  }
+
   REACTION_BUFFER = null;
+  FLUSHING_BUFFER = false;
+  MAIN_QUEUE.clear();
+
 }
