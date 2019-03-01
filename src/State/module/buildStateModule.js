@@ -7,7 +7,6 @@
  * @param   {(object|function)} moduleInitializer - The module configuration. When it is a function it is called with the "Module" utility object and must return a plain configuration pojo.
  * @returns {object}            module            - The extended module
  */
-
 function buildStateModule(module, moduleInitializer) {
 
   // when function, we call it with STATE_MODULE namespace so that the "Module" utility namespace object is publicly available
@@ -59,7 +58,7 @@ function buildStateModule(module, moduleInitializer) {
       });
 
       module.internalGetters.set(prop, internals => {
-        return internals.derivedProperties.get(prop).value;
+        return internals.derivedProperties.get(prop).value();
       });
 
     } else if (val instanceof ProviderDescription) {
@@ -112,23 +111,30 @@ function buildStateModule(module, moduleInitializer) {
 
     const val = config[prop];
 
-    if (prop === 'initialize') {
+    if (prop === 'initialize') { // INITIALIZE
 
       if (isFunction(val)) {
         module.initialize = val;
       } else {
-        throw new TypeError(`"${prop}" is a reserved word for Cue State Modules and must be a function but is of type "${typeof val}"`);
+        throw new TypeError(`"initialize" is a reserved word for Cue State Modules and must be a function but is of type "${typeof val}"`);
       }
 
-    } else if (isFunction(val)) {
+    } else if (prop === 'imports' && isObjectLike(config.imports)) { // IMPORTS (top-level getter)
+
+      for (const imported in config.imports) {
+        if (!module.internalGetters.has(imported)) {
+          module.internalGetters.set(imported, () => config.imports[imported]);
+        } else {
+          throw new Error(`Name of imported Module "${imported}" clashes with another top-level data property, a builtin property ("get"/"set" are reserved) or a method name.`);
+        }
+      }
+
+    } else if (isFunction(val)) { // ACTIONS (top-level getter)
 
       if (!module.internalGetters.has(prop)) {
-
-        // create a bound-action which accumulates and releases
         module.internalGetters.set(prop, () => val);
-
       } else {
-        throw new Error(`Module method name "${prop}" clashes with a property from "props" or with a default Cue property ("get" and "set" are reserved properties). Make sure that props and method names are distinct.`);
+        throw new Error(`Module method name "${prop}" clashes with another data property, an import, a method name or a builtin property ("get"/"set" are reserved).`);
       }
 
     }

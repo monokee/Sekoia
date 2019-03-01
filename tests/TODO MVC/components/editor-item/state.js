@@ -1,14 +1,15 @@
-Cue.State('Todo-Item', Module => ({
+Cue.State('Todo-Item', {
 
   data: {
     text: '',
     isComplete: false,
-    selected: false
+    selected: false,
+    visible: true
   },
 
-  initialize(props) {
-    this.text = props.text;
-    this.isComplete = props.isComplete;
+  initialize({text = this.text, isComplete = this.isComplete}) {
+    this.text = text;
+    this.isComplete = isComplete;
   }
 
-}));
+});

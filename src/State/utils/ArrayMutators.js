@@ -10,9 +10,6 @@ function intercepted_array_fill(value, start = 0, end = this.length) {
     return this;
   }
 
-  accumulationDepth++;
-  let trackedDepth = 0;
-
   const internals = this[__CUE__];
   const array = internals.plainState;
 
@@ -25,8 +22,6 @@ function intercepted_array_fill(value, start = 0, end = this.length) {
     if (oldValue !== value) {
       array[i] = value;
       if (value && (subInternals = value[__CUE__]) && subInternals.mounted === false) {
-        accumulationDepth++;
-        trackedDepth++;
         subInternals.instanceDidMount(array, i);
         createAndMountSubStates(subInternals);
       }
@@ -34,7 +29,6 @@ function intercepted_array_fill(value, start = 0, end = this.length) {
   }
 
   internals.propertyDidChange();
-  accumulationDepth -= trackedDepth;
   react();
 
   return this;
@@ -48,17 +42,11 @@ function intercepted_array_push(...rest) {
     const internals = this[__CUE__];
     const array = internals.plainState;
 
-    accumulationDepth++;
-    let trackedDepth = 0;
-
     for (let i = 0, value, subInternals; i < rest.length; i++) {
 
       value = rest[i];
 
       if (typeof value === 'object' && value !== null) {
-
-        accumulationDepth++;
-        trackedDepth++;
 
         subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
@@ -76,8 +64,6 @@ function intercepted_array_push(...rest) {
 
     internals.propertyDidChange();
 
-    accumulationDepth -= trackedDepth;
-
     react();
 
   }
@@ -93,9 +79,6 @@ function intercepted_array_unshift(...rest) {
     const internals = this[__CUE__];
     const array = internals.plainState;
 
-    accumulationDepth++;
-    let trackedDepth = 0;
-
     let i = rest.length, value, subInternals;
     while (--i >= 0) {
 
@@ -106,8 +89,6 @@ function intercepted_array_unshift(...rest) {
         subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
         if (subInternals.mounted === false) {
-          accumulationDepth++;
-          trackedDepth++;
           array.unshift(subInternals.proxyState);
           subInternals.instanceDidMount(array, 0);
           createAndMountSubStates(subInternals);
@@ -122,7 +103,6 @@ function intercepted_array_unshift(...rest) {
     }
 
     internals.propertyDidChange();
-    accumulationDepth -= trackedDepth;
     react();
 
   }
@@ -149,9 +129,6 @@ function intercepted_array_splice(start, deleteCount, ...items) {
   }
 
   const deleted = [];
-
-  accumulationDepth++;
-  let trackedDepth = 0;
 
   // 1. delete elements from array, collected on "deleted", notify state of unmount if deleted elements are state objects. if we're deleting from an index that we will not be adding a replacement for, cue the property
   if (actualDeleteCount > 0) {
@@ -187,8 +164,6 @@ function intercepted_array_splice(start, deleteCount, ...items) {
         subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
         if (subInternals.mounted === false) {
-          accumulationDepth++;
-          trackedDepth++;
           array.splice(arrayIndex, 0, subInternals.proxyState);
           subInternals.instanceDidMount(array, arrayIndex);
           createAndMountSubStates(subInternals);
@@ -204,7 +179,6 @@ function intercepted_array_splice(start, deleteCount, ...items) {
 
   }
 
-  accumulationDepth -= trackedDepth;
   internals.propertyDidChange();
   react();
 
@@ -220,8 +194,6 @@ function intercepted_array_pop() {
   if (array.length === 0) {
     return undefined;
   }
-
-  accumulationDepth++;
 
   const last = array[array.length - 1];
   const subInternals = last ? last[__CUE__] : undefined;
@@ -247,8 +219,6 @@ function intercepted_array_shift() {
   if (array.length === 0) {
     return undefined;
   }
-
-  accumulationDepth++;
 
   const last = array[0];
   const subInternals = last ? last[__CUE__] : undefined;
@@ -286,8 +256,6 @@ function intercepted_array_copyWithin(target, start = 0, end = this.length) {
     direction = 1;
   }
 
-  accumulationDepth++;
-
   let value, subState;
   while (count > 0) {
     if (from in array) {
@@ -321,8 +289,6 @@ function intercepted_array_reverse() {
   const internals = this[__CUE__];
   const array = internals.plainState;
 
-  accumulationDepth++;
-
   array.reverse();
 
   internals.propertyDidChange();
@@ -336,8 +302,6 @@ function intercepted_array_sort(compareFunction) {
 
   const internals = this[__CUE__];
   const array = internals.plainState;
-
-  accumulationDepth++;
 
   array.sort(compareFunction);
 

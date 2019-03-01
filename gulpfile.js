@@ -62,11 +62,9 @@ const FILES = {
     `${MODULES.ui}/utils/htmlTagNames.js`,
     `${MODULES.ui}/utils/CueStylesheet.js`,
     `${MODULES.ui}/utils/scopeStylesToComponent.js`,
-    `${MODULES.ui}/utils/translateEventSelectorsToScope.js`,
+    `${MODULES.ui}/utils/syntheticEvents.js`,
     `${MODULES.ui}/utils/createTemplateRootElement.js`,
     `${MODULES.ui}/utils/reconcile.js`,
-    `${MODULES.ui}/utils/installStateReactions.js`,
-    `${MODULES.ui}/utils/bindComponentEvents.js`,
 
     `${MODULES.ui}/module/ComponentPrototype.js`,
     `${MODULES.ui}/module/buildUIComponent.js`,

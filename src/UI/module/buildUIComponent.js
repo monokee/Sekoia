@@ -21,10 +21,8 @@ function buildUIComponent(name, initializer) { // runs only once per component
   const styleScope = config.styles['$scope'] || name;
   const styles = scopeStylesToComponent(config.styles, templateElement, styleScope);
 
-  // rewrite delegated event selectors to internally match the scoped classNames
-  if (config.events && styles.size > 0) {
-    translateEventSelectorsToScope(config.events, styles);
-  }
+  // map of (eventTypeToken -> [Array, of, selector + handler pairs]. We attach these arrays to every instance directly under the token prop.
+  const events = isObjectLike(config.events) ? createSyntheticEvents(config.events, styleScope, styles) : EMPTY_MAP;
 
   // Create an object that inherits from ComponentPrototype (DOM helper methods)
   const Component = oCreate(ComponentPrototype);
@@ -33,13 +31,13 @@ function buildUIComponent(name, initializer) { // runs only once per component
   Component[__CUE__] = {
     template: templateElement,
     styles: styles,
+    events: events,
     imports: config.imports || null,
-    events: config.events || null,
     render: config.render || null,
     initialize: isFunction(config.initialize) ? config.initialize : NOOP
   };
 
-  // Make imports top-level properties on instances
+  // Make imports top-level properties on instances (we do the same with state modules, via internalGetters)
   if (isObjectLike(config.imports)) {
     oAssign(Component, config.imports);
   }

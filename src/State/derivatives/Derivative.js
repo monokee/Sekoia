@@ -5,12 +5,6 @@
  */
 class Derivative {
 
-  /**
-   * @constructs
-   * @param {string}    ownPropertyName   - The name of the derived property on the parent node graph (state instance).
-   * @param {function}  computation       - The pure computation function that should return its result.
-   * @param {array}     sourceProperties  - Array of property keys that this derivative depends on.
-   */
   constructor(ownPropertyName, computation, sourceProperties) {
 
     this.ownPropertyName = ownPropertyName;
@@ -25,7 +19,7 @@ class Derivative {
 
     this.intermediate = undefined; // intermediate computation result
     this._value = undefined; // current computation result
-    this._cachedValue = undefined; // deep structural copy of current computation result for value comparison
+    this._type = DATA_TYPE_UNDEFINED;
 
     this.needsUpdate = true; // flag indicating that one or many dependencies have been updated (required by this.value getter) DEFAULT TRUE
     this.stopPropagation = false; // flag for the last observed derivative in a dependency branch (optimization)
@@ -33,25 +27,30 @@ class Derivative {
 
   }
 
-  get value() {
+  value() {
 
-    if (this.needsUpdate) {
+    if (this.needsUpdate === true) {
 
-      this.intermediate = this.computation.call(null, this.source);
+      this.intermediate = this.computation.call(this.source, this.source);
 
-      if (areShallowEqual(this._value, this.intermediate)) { // shallow compare objects
+      if (isArray(this.intermediate)) {
 
-        this.hasChanged = false;
+        if ((this.hasChanged = this._type !== DATA_TYPE_ARRAY || this.intermediate.length !== this._value.length || !areArraysShallowEqual(this._value, this.intermediate))) {
+          this._value = this.intermediate.slice();
+          this._type = DATA_TYPE_ARRAY;
+        }
 
-      } else {
+      } else if (typeof this.intermediate === 'object' && this.intermediate !== null) {
 
-        this._value = isArray(this.intermediate) // shallow clone objects in cache
-          ? this.intermediate.slice()
-          : typeof this.intermediate === 'object' && this.intermediate !== null
-            ? oAssign({}, this.intermediate)
-            : this.intermediate;
+        if ((this.hasChanged = this._type !== DATA_TYPE_POJO || !arePlainObjectsShallowEqual(this._value, this.intermediate))) {
+          this._value = oAssign({}, this.intermediate);
+          this._type = DATA_TYPE_POJO;
+        }
 
-        this.hasChanged = true;
+      } else if ((this.hasChanged = this._value !== this.intermediate)) {
+
+        this._value = this.intermediate;
+        this._type = DATA_TYPE_PRIMITIVE;
 
       }
 

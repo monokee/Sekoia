@@ -7,7 +7,7 @@
  * @param     {*}       a - Compare this to:
  * @param     {*}       b - this...
  * @returns   {boolean}   - True or false, depending on the evaluated shallow equality.
- * */
+ *
 function areShallowEqual(a, b) {
 
   if (isArray(a)) return !isArray(b) || a.length !== b.length ? false : areArraysShallowEqual(a, b);
@@ -17,6 +17,7 @@ function areShallowEqual(a, b) {
   return a === b;
 
 }
+*/
 
 /**
  * One-level (shallow), ordered equality check for arrays.

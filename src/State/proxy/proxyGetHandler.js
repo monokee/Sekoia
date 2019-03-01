@@ -1,3 +1,4 @@
+
 /**
  * Intercept "get" requests of properties in a reactive state object.
  * When prop is special symbol key, interceptor can return special data for recursive access etc.
@@ -12,12 +13,6 @@ function proxyGetHandler(target, prop) {
 
   const internals = target[__CUE__];
 
-  return prop === __CUE__
-    ? internals
-    : prop === 'imports'
-      ? internals.imports
-      : internals.internalGetters.has(prop)
-        ? internals.internalGetters.get(prop)(internals)
-        : target[prop];
+  return prop === __CUE__ ? internals : internals.internalGetters.has(prop) ? internals.internalGetters.get(prop)(internals) : target[prop];
 
 }

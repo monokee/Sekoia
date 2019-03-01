@@ -24,6 +24,9 @@ Cue.State('Todo-Editor', Module => ({
         case 'active': return active;
         case 'completed': return completed;
       }
+    },
+    hiddenTodos({todos, visibleTodos}) {
+      return todos.filter(item => visibleTodos.indexOf(item) === -1);
     }
   },
 
@@ -33,12 +36,12 @@ Cue.State('Todo-Editor', Module => ({
 
   initialize({filter = this.filter, todos = this.todos}) {
     this.filter = filter;
-    this.todos = todos.map(item => this.imports.TodoItem(item));
+    this.todos = todos.map(item => this.TodoItem(item));
   },
 
   addTodo(item) {
     this.todos.push(
-      this.imports.TodoItem(item)
+      this.TodoItem(item)
     );
   },
 
@@ -51,6 +54,13 @@ Cue.State('Todo-Editor', Module => ({
     const selected = this.todos.filter(item => item.selected);
     while(selected.length) {
       this.todos.splice(this.todos.indexOf(selected.pop()), 1);
+    }
+  },
+
+  removeCompleted() {
+    const completed = this.todos.filter(item => item.isComplete);
+    while(completed.length) {
+      this.todos.splice(this.todos.indexOf(completed.pop()), 1);
     }
   },
 

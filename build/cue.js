@@ -154,13 +154,10 @@
   // Internals of State Modules for internally passing module data around: name -> object
   const CUE_STATE_INTERNALS = new Map();
 
-  // Accumulation Stacks used for property tracking during mutation calls
-  const QUEUED_DERIVATIVE_INSTANCES = [];
-  const ACCUMULATED_INSTANCES = [];
-  let accumulationDepth = 0;
-
   // Reaction Queue (cleared after each run)
-  const MAIN_QUEUE = new Map();
+  const REACTION_QUEUE = new Map();
+  const DERIVATIVE_QUEUE = new Map();
+  const SUB_DERIVATIVE_QUEUE = new Map();
 
   // Global derivative installer payload
   const DERIVATIVE_INSTALLER = {
@@ -173,9 +170,16 @@
   const TRAVERSE_DOWN = -1;
   const TRAVERSE_UP = 1;
 
+  // State Type Constants
   const STATE_TYPE_ROOT = -1;
   const STATE_TYPE_MODULE = 1;
   const STATE_TYPE_EXTENSION = 2;
+
+  // Data Type Constants
+  const DATA_TYPE_UNDEFINED = -1;
+  const DATA_TYPE_PRIMITIVE = 0;
+  const DATA_TYPE_POJO = 1;
+  const DATA_TYPE_ARRAY = 2;
 
   // Root State Store
   const CUE_ROOT_STATE = {};
@@ -207,9 +211,6 @@
       return this;
     }
 
-    accumulationDepth++;
-    let trackedDepth = 0;
-
     const internals = this[__CUE__];
     const array = internals.plainState;
 
@@ -222,8 +223,6 @@
       if (oldValue !== value) {
         array[i] = value;
         if (value && (subInternals = value[__CUE__]) && subInternals.mounted === false) {
-          accumulationDepth++;
-          trackedDepth++;
           subInternals.instanceDidMount(array, i);
           createAndMountSubStates(subInternals);
         }
@@ -231,7 +230,6 @@
     }
 
     internals.propertyDidChange();
-    accumulationDepth -= trackedDepth;
     react();
 
     return this;
@@ -245,17 +243,11 @@
       const internals = this[__CUE__];
       const array = internals.plainState;
 
-      accumulationDepth++;
-      let trackedDepth = 0;
-
       for (let i = 0, value, subInternals; i < rest.length; i++) {
 
         value = rest[i];
 
         if (typeof value === 'object' && value !== null) {
-
-          accumulationDepth++;
-          trackedDepth++;
 
           subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
@@ -273,8 +265,6 @@
 
       internals.propertyDidChange();
 
-      accumulationDepth -= trackedDepth;
-
       react();
 
     }
@@ -290,9 +280,6 @@
       const internals = this[__CUE__];
       const array = internals.plainState;
 
-      accumulationDepth++;
-      let trackedDepth = 0;
-
       let i = rest.length,
         value, subInternals;
       while (--i >= 0) {
@@ -304,8 +291,6 @@
           subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
           if (subInternals.mounted === false) {
-            accumulationDepth++;
-            trackedDepth++;
             array.unshift(subInternals.proxyState);
             subInternals.instanceDidMount(array, 0);
             createAndMountSubStates(subInternals);
@@ -320,7 +305,6 @@
       }
 
       internals.propertyDidChange();
-      accumulationDepth -= trackedDepth;
       react();
 
     }
@@ -347,9 +331,6 @@
     }
 
     const deleted = [];
-
-    accumulationDepth++;
-    let trackedDepth = 0;
 
     // 1. delete elements from array, collected on "deleted", notify state of unmount if deleted elements are state objects. if we're deleting from an index that we will not be adding a replacement for, cue the property
     if (actualDeleteCount > 0) {
@@ -386,8 +367,6 @@
           subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
 
           if (subInternals.mounted === false) {
-            accumulationDepth++;
-            trackedDepth++;
             array.splice(arrayIndex, 0, subInternals.proxyState);
             subInternals.instanceDidMount(array, arrayIndex);
             createAndMountSubStates(subInternals);
@@ -403,7 +382,6 @@
 
     }
 
-    accumulationDepth -= trackedDepth;
     internals.propertyDidChange();
     react();
 
@@ -419,8 +397,6 @@
     if (array.length === 0) {
       return undefined;
     }
-
-    accumulationDepth++;
 
     const last = array[array.length - 1];
     const subInternals = last ? last[__CUE__] : undefined;
@@ -446,8 +422,6 @@
     if (array.length === 0) {
       return undefined;
     }
-
-    accumulationDepth++;
 
     const last = array[0];
     const subInternals = last ? last[__CUE__] : undefined;
@@ -485,8 +459,6 @@
       direction = 1;
     }
 
-    accumulationDepth++;
-
     let value, subState;
     while (count > 0) {
       if (from in array) {
@@ -520,8 +492,6 @@
     const internals = this[__CUE__];
     const array = internals.plainState;
 
-    accumulationDepth++;
-
     array.reverse();
 
     internals.propertyDidChange();
@@ -535,8 +505,6 @@
 
     const internals = this[__CUE__];
     const array = internals.plainState;
-
-    accumulationDepth++;
 
     array.sort(compareFunction);
 
@@ -648,12 +616,11 @@
    * State reconciliation to "batch-patch" data collections into the current state tree.
    * Instead of replacing the entire tree, the algorithm attempts to mutate existing data points in the "parent[property]" object
    * to match the shape of the provided "value" object. This avoids unnecessary change-reactions throughout the system.
-   * @param parent    - The parent object graph holding a property that contains the object to be patched.
+   * @param parent    - The parent object graph holding a property that contains the object to be patched. When parent is reactive, parent is the proxy object, not the plain data.
    * @param property  - The target property name of the object to be patched on the parent node graph.
    * @param value     - The object dictating the future shape of parent[property].
-   * @param [key]     - When provided, this key is used to determine object equality.
    */
-  function patchState(parent, property, value, key = 'id') {
+  function patchState(parent, property, value) {
 
     const previous = parent[property];
 
@@ -661,56 +628,55 @@
       return;
     }
 
+    if (value === undefined) {
+      delete parent[property];
+      return;
+    }
+
     if (previous === null || previous === undefined || value === null || typeof value !== 'object') {
-      if (value === undefined) {
-        delete parent[property]
-      } else {
-        parent[property] = value;
-      }
+      parent[property] = value;
       return;
     }
 
     if (isArray(value)) {
 
-      if (value.length && previous.length && (key && value[0][key] != null)) {
+      const vLen = value.length;
+      const pLen = previous.length;
 
-        let i, j, start, end, newEnd, item, newIndicesNext, keyVal, temp = new Array(value.length),
-          newIndices = new Map();
+      if (vLen && pLen) {
 
-        // skip common prefix and suffix
-        for (start = 0, end = Math.min(previous.length, value.length); start < end && (previous[start] === value[start] || key && previous[start][key] === value[start][key]); start++) {
-          patchState(previous, start, value[start], key);
+        let i, j, start, end, newEnd, item, newIndicesNext;
+        const temp = new Array(vLen);
+        const newIndices = new Map();
+
+        for (start = 0, end = Math.min(pLen, vLen); start < end && (previous[start] === value[start]); start++) {
+          patchState(previous, start, value[start]);
         }
 
-        for (end = previous.length - 1, newEnd = value.length - 1; end >= 0 && newEnd >= 0 && (previous[end] === value[newEnd] || key && previous[end][key] === value[newEnd][key]); end--, newEnd--) {
+        for (end = pLen - 1, newEnd = vLen - 1; end >= 0 && newEnd >= 0 && (previous[end] === value[newEnd]); end--, newEnd--) {
           temp[newEnd] = previous[end];
         }
 
-        // prepare a map of all indices in value
         newIndicesNext = new Array(newEnd + 1);
 
         for (j = newEnd; j >= start; j--) {
           item = value[j];
-          keyVal = key ? item[key] : item;
-          i = newIndices.get(keyVal);
+          i = newIndices.get(item);
           newIndicesNext[j] = i === undefined ? -1 : i;
-          newIndices.set(keyVal, j);
+          newIndices.set(item, j);
         }
 
-        // step through all old items to check reuse
         for (i = start; i <= end; i++) {
           item = previous[i];
-          keyVal = key ? item[key] : item;
-          j = newIndices.get(keyVal);
+          j = newIndices.get(item);
           if (j !== undefined && j !== -1) {
             temp[j] = previous[i];
             j = newIndicesNext[j];
-            newIndices.set(keyVal, j);
+            newIndices.set(item, j);
           }
         }
 
-        // set all the new values
-        for (j = start; j < value.length; j++) {
+        for (j = start; j < vLen; j++) {
 
           if (temp.hasOwnProperty(j)) {
 
@@ -722,7 +688,7 @@
               }
             }
 
-            patchState(previous, j, value[j], key);
+            patchState(previous, j, value[j]);
 
           } else {
 
@@ -740,27 +706,29 @@
 
       } else {
 
-        for (let i = 0, len = value.length; i < len; i++) {
-          patchState(previous, i, value[i], key);
+        for (let i = 0; i < vLen; i++) {
+          patchState(previous, i, value[i]);
         }
 
       }
 
-      if (previous.length > value.length) {
+      if (pLen > vLen) {
         previous.length = value.length;
       }
 
     } else {
 
-      const valueKeys = Object.keys(value);
-      for (let i = 0, len = valueKeys.length; i < len; i++) {
-        patchState(previous, valueKeys[i], value[valueKeys[i]], key);
+      const valueKeys = oKeys(value);
+      for (let i = 0, vk; i < valueKeys.length; i++) {
+        vk = valueKeys[i];
+        patchState(previous, vk, value[vk]);
       }
 
-      const previousKeys = Object.keys(previous);
-      for (let i = 0, len = previousKeys.length; i < len; i++) {
-        if (value[previousKeys[i]] === undefined && previous[previousKeys[i]] !== undefined) {
-          delete previous[previousKeys[i]];
+      const previousKeys = oKeys(previous);
+      for (let i = 0, pk; i < previousKeys.length; i++) {
+        pk = previousKeys[i];
+        if (value[pk] === undefined && previous[pk] !== undefined) {
+          delete previous[pk];
         }
       }
 
@@ -776,7 +744,7 @@
    * @param     {*}       a - Compare this to:
    * @param     {*}       b - this...
    * @returns   {boolean}   - True or false, depending on the evaluated shallow equality.
-   * */
+   *
   function areShallowEqual(a, b) {
 
     if (isArray(a)) return !isArray(b) || a.length !== b.length ? false : areArraysShallowEqual(a, b);
@@ -786,6 +754,7 @@
     return a === b;
 
   }
+  */
 
   /**
    * One-level (shallow), ordered equality check for arrays.
@@ -966,12 +935,6 @@
    */
   class Derivative {
 
-    /**
-     * @constructs
-     * @param {string}    ownPropertyName   - The name of the derived property on the parent node graph (state instance).
-     * @param {function}  computation       - The pure computation function that should return its result.
-     * @param {array}     sourceProperties  - Array of property keys that this derivative depends on.
-     */
     constructor(ownPropertyName, computation, sourceProperties) {
 
       this.ownPropertyName = ownPropertyName;
@@ -986,7 +949,7 @@
 
       this.intermediate = undefined; // intermediate computation result
       this._value = undefined; // current computation result
-      this._cachedValue = undefined; // deep structural copy of current computation result for value comparison
+      this._type = DATA_TYPE_UNDEFINED;
 
       this.needsUpdate = true; // flag indicating that one or many dependencies have been updated (required by this.value getter) DEFAULT TRUE
       this.stopPropagation = false; // flag for the last observed derivative in a dependency branch (optimization)
@@ -994,26 +957,30 @@
 
     }
 
-    get value() {
+    value() {
 
-      if (this.needsUpdate) {
+      if (this.needsUpdate === true) {
 
-        this.intermediate = this.computation.call(null, this.source);
+        this.intermediate = this.computation.call(this.source, this.source);
 
-        if (areShallowEqual(this._value, this.intermediate)) { // shallow compare objects
+        if (isArray(this.intermediate)) {
 
-          this.hasChanged = false;
+          if ((this.hasChanged = this._type !== DATA_TYPE_ARRAY || this.intermediate.length !== this._value.length || !areArraysShallowEqual(this._value, this.intermediate))) {
+            this._value = this.intermediate.slice();
+            this._type = DATA_TYPE_ARRAY;
+          }
 
-        } else {
+        } else if (typeof this.intermediate === 'object' && this.intermediate !== null) {
 
-          this._value = isArray(this.intermediate) // shallow clone objects in cache
-            ?
-            this.intermediate.slice() :
-            typeof this.intermediate === 'object' && this.intermediate !== null ?
-            oAssign({}, this.intermediate) :
-            this.intermediate;
+          if ((this.hasChanged = this._type !== DATA_TYPE_POJO || !arePlainObjectsShallowEqual(this._value, this.intermediate))) {
+            this._value = oAssign({}, this.intermediate);
+            this._type = DATA_TYPE_POJO;
+          }
 
-          this.hasChanged = true;
+        } else if ((this.hasChanged = this._value !== this.intermediate)) {
+
+          this._value = this.intermediate;
+          this._type = DATA_TYPE_PRIMITIVE;
 
         }
 
@@ -1280,6 +1247,7 @@
       }
     }
   }
+
   /**
    * Intercept "get" requests of properties in a reactive state object.
    * When prop is special symbol key, interceptor can return special data for recursive access etc.
@@ -1294,13 +1262,7 @@
 
     const internals = target[__CUE__];
 
-    return prop === __CUE__ ?
-      internals :
-      prop === 'imports' ?
-      internals.imports :
-      internals.internalGetters.has(prop) ?
-      internals.internalGetters.get(prop)(internals) :
-      target[prop];
+    return prop === __CUE__ ? internals : internals.internalGetters.has(prop) ? internals.internalGetters.get(prop)(internals) : target[prop];
 
   }
   /**
@@ -1325,8 +1287,6 @@
 
     if (value !== internals.valueCache.get(prop)) {
 
-      accumulationDepth++;
-
       if (typeof value === 'object' && value !== null) { // any object
 
         const subInternals = value[__CUE__] || createState(value, internals.module, STATE_TYPE_EXTENSION, null);
@@ -1344,7 +1304,7 @@
         react();
         return true;
 
-      } else {
+      } else { // any primitive
 
         target[prop] = value;
         internals.propertyDidChange(prop, value);
@@ -1369,8 +1329,6 @@
 
     if (target.hasOwnProperty(prop)) {
 
-      accumulationDepth++;
-
       const internals = target[__CUE__];
       const value = target[prop];
 
@@ -1392,6 +1350,7 @@
 
   let REACTION_BUFFER = null;
   let FLUSHING_BUFFER = false;
+
   /**
    * Runs through the Main Queue to execute each collected reaction with each collected property value as the first and only argument.
    * Calls to react() are automatically buffered and internal flush() is only called on the next available frame after the last call to react().
@@ -1403,30 +1362,75 @@
    * Note that this is done synchronously and outside of buffering.
    */
   function react() {
-
-    if (FLUSHING_BUFFER === false && MAIN_QUEUE.size > 0) {
-      cancelAnimationFrame(REACTION_BUFFER);
+    if (FLUSHING_BUFFER === false) {
+      REACTION_BUFFER !== null && cancelAnimationFrame(REACTION_BUFFER);
       REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
     }
-
-    if (--accumulationDepth === 0) {
-      while (ACCUMULATED_INSTANCES.length) ACCUMULATED_INSTANCES.pop();
-      while (QUEUED_DERIVATIVE_INSTANCES.length) QUEUED_DERIVATIVE_INSTANCES.pop();
-    }
-
   }
 
   function flushReactionBuffer() {
 
     FLUSHING_BUFFER = true;
 
-    for (const rxVAL of MAIN_QUEUE.entries()) {
-      rxVAL[0](rxVAL[1]);
+    let tuple, derivative, scope, result;
+    const resolved = [];
+
+    // DERIVATIVES ------------>
+
+    while (DERIVATIVE_QUEUE.size > 0) {
+
+      for (tuple of DERIVATIVE_QUEUE.entries()) {
+
+        derivative = tuple[0];
+        scope = tuple[1];
+
+        if (resolved.indexOf(derivative) === -1) {
+
+          derivative.needsUpdate = true;
+          result = derivative.value();
+          resolved.push(derivative);
+
+          if (derivative.hasChanged === true) {
+            scope.cueObservers.call(scope, derivative.ownPropertyName, result);
+            SUB_DERIVATIVE_QUEUE.set(derivative, scope);
+          }
+
+        }
+
+      }
+
+      DERIVATIVE_QUEUE.clear();
+
+      for (tuple of SUB_DERIVATIVE_QUEUE.entries()) {
+
+        derivative = tuple[0];
+        scope = tuple[1];
+
+        if (scope.derivativesOf.has(derivative.ownPropertyName)) {
+
+          const subDerivatives = scope.derivativesOf.get(derivative.ownPropertyName);
+
+          for (let i = 0; i < subDerivatives.length; i++) {
+            DERIVATIVE_QUEUE.set(subDerivatives[i], scope);
+          }
+
+        }
+
+      }
+
+      SUB_DERIVATIVE_QUEUE.clear();
+
+    }
+
+    // REACTIONS ----------->
+
+    for (tuple of REACTION_QUEUE.entries()) {
+      tuple[0](tuple[1]);
     }
 
     REACTION_BUFFER = null;
     FLUSHING_BUFFER = false;
-    MAIN_QUEUE.clear();
+    REACTION_QUEUE.clear();
 
   }
 
@@ -1438,7 +1442,6 @@
    * @param   {(object|function)} moduleInitializer - The module configuration. When it is a function it is called with the "Module" utility object and must return a plain configuration pojo.
    * @returns {object}            module            - The extended module
    */
-
   function buildStateModule(module, moduleInitializer) {
 
     // when function, we call it with STATE_MODULE namespace so that the "Module" utility namespace object is publicly available
@@ -1489,7 +1492,7 @@
         });
 
         module.internalGetters.set(prop, internals => {
-          return internals.derivedProperties.get(prop).value;
+          return internals.derivedProperties.get(prop).value();
         });
 
       } else if (val instanceof ProviderDescription) {
@@ -1542,23 +1545,30 @@
 
       const val = config[prop];
 
-      if (prop === 'initialize') {
+      if (prop === 'initialize') { // INITIALIZE
 
         if (isFunction(val)) {
           module.initialize = val;
         } else {
-          throw new TypeError(`"${prop}" is a reserved word for Cue State Modules and must be a function but is of type "${typeof val}"`);
+          throw new TypeError(`"initialize" is a reserved word for Cue State Modules and must be a function but is of type "${typeof val}"`);
         }
 
-      } else if (isFunction(val)) {
+      } else if (prop === 'imports' && isObjectLike(config.imports)) { // IMPORTS (top-level getter)
+
+        for (const imported in config.imports) {
+          if (!module.internalGetters.has(imported)) {
+            module.internalGetters.set(imported, () => config.imports[imported]);
+          } else {
+            throw new Error(`Name of imported Module "${imported}" clashes with another top-level data property, a builtin property ("get"/"set" are reserved) or a method name.`);
+          }
+        }
+
+      } else if (isFunction(val)) { // ACTIONS (top-level getter)
 
         if (!module.internalGetters.has(prop)) {
-
-          // create a bound-action which accumulates and releases
           module.internalGetters.set(prop, () => val);
-
         } else {
-          throw new Error(`Module method name "${prop}" clashes with a property from "props" or with a default Cue property ("get" and "set" are reserved properties). Make sure that props and method names are distinct.`);
+          throw new Error(`Module method name "${prop}" clashes with another data property, an import, a method name or a builtin property ("get"/"set" are reserved).`);
         }
 
       }
@@ -1600,21 +1610,14 @@
       let ownProp = this.ownPropertyName;
       let ownValue = this.proxyState;
 
-      let topLevelPropertyUpdated = true;
-
       // (only bubble top-level property changes as they are considered inherent modifications to objects (ie break on noChange)
-      while (topLevelPropertyUpdated && directParent.type === STATE_TYPE_MODULE) {
+      while (directParent.type === STATE_TYPE_MODULE) {
 
-        if (ACCUMULATED_INSTANCES.indexOf(directParent) === -1) {
-          ACCUMULATED_INSTANCES.push(directParent);
+        directParent.cueObservers.call(directParent, ownProp, ownValue);
+        directParent.cueDerivatives.call(directParent, ownProp);
 
-          directParent.cueObservers.call(directParent, ownProp, ownValue);
-          topLevelPropertyUpdated = directParent.cueDerivatives.call(directParent, ownProp);
-
-          if (directParent.consumersOf.has(ownProp)) {
-            directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
-          }
-
+        if (directParent.consumersOf.has(ownProp)) {
+          directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
         }
 
         ownProp = directParent.ownPropertyName;
@@ -1634,15 +1637,9 @@
         let branchPropertyName = directParent.branchPropertyName;
 
         while (nextModuleParent && nextModuleParent.type !== STATE_TYPE_ROOT) {
-
-          if (ACCUMULATED_INSTANCES.indexOf(nextModuleParent) === -1) {
-            ACCUMULATED_INSTANCES.push(nextModuleParent);
-            nextModuleParent.cueDerivatives.call(nextModuleParent, branchPropertyName);
-          }
-
+          nextModuleParent.cueDerivatives.call(nextModuleParent, branchPropertyName);
           branchPropertyName = nextModuleParent.branchPropertyName;
           nextModuleParent = nextModuleParent.closestModuleParent;
-
         }
 
       }
@@ -1708,21 +1705,15 @@
 
     propertyDidChange(prop, value) {
 
-      if (ACCUMULATED_INSTANCES.indexOf(this) === -1) {
+      // add own dependencies to cue.
+      this.cueObservers(prop, value);
+      this.cueDerivatives(prop);
 
-        ACCUMULATED_INSTANCES.push(this);
-
-        // add own dependencies to cue.
-        this.cueObservers(prop, value);
-        this.cueDerivatives(prop);
-
-        if (this.consumersOf.has(prop)) {
-          this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
-        }
-
-        this.bubble();
-
+      if (this.consumersOf.has(prop)) {
+        this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
       }
+
+      this.bubble();
 
     }
 
@@ -1733,7 +1724,8 @@
         const observers = this.observersOf.get(prop);
 
         for (let i = 0; i < observers.length; i++) {
-          MAIN_QUEUE.set(observers[i], value);
+          // note that this will overwrite existing reactions with a new value when called multiple times within batch.
+          REACTION_QUEUE.set(observers[i], value);
         }
 
       }
@@ -1745,39 +1737,13 @@
       if (this.derivativesOf.has(prop)) {
 
         const derivatives = this.derivativesOf.get(prop);
-        const subDerivatives = [];
 
-        let hasChanged = false,
-          i, derivative, result;
-
-        for (i = 0; i < derivatives.length; i++) {
-
+        for (let i = 0, derivative; i < derivatives.length; i++) {
           derivative = derivatives[i];
-
-          if (QUEUED_DERIVATIVE_INSTANCES.indexOf(derivative) === -1) {
-
-            QUEUED_DERIVATIVE_INSTANCES.push(derivative);
-
-            derivative.needsUpdate = true;
-
-            result = derivative.value; // call getter, recompute
-
-            if (derivative.hasChanged === true && subDerivatives.indexOf(derivative) === -1) {
-              subDerivatives.push(derivative);
-              this.cueObservers(derivative.ownPropertyName, result);
-              hasChanged = true;
-            }
-
+          if (!DERIVATIVE_QUEUE.has(derivative)) {
+            DERIVATIVE_QUEUE.set(derivative, this);
           }
-
         }
-
-        for (i = 0; i < subDerivatives.length; i++) {
-          derivative = subDerivatives[i];
-          this.cueDerivatives(derivative.ownPropertyName);
-        }
-
-        return hasChanged; // we return this that bubbling can stop if no top-level property changed.
 
       }
 
@@ -1912,35 +1878,23 @@
 
     }
 
-    addChangeReaction(property, handler, scope, autorun = true) {
-
-      if (!isFunction(handler)) {
-        throw new TypeError(`Property change reaction for "${property}" is not a function...`);
-      }
-
-      const boundHandler = handler.bind(scope);
+    addChangeReaction(property, handler) {
 
       if (this.observersOf.has(property)) {
-        this.observersOf.get(property).push(boundHandler);
+        this.observersOf.get(property).push(handler);
       } else {
-        this.observersOf.set(property, [boundHandler]);
+        this.observersOf.set(property, [handler]);
       }
 
       if (this.derivedProperties.has(property)) {
         const derivative = this.derivedProperties.get(property);
-        derivative.observers.push(boundHandler);
+        derivative.observers.push(handler);
         setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
       }
 
-      if (autorun === true) {
-        accumulationDepth++;
-        MAIN_QUEUE.set(boundHandler, this.proxyState[property]);
-        react(); // debounce autorun
-        //const val = this.proxyState[property];
-        //boundHandler(val, property);
-      }
-
-      return boundHandler;
+      // autorun the reaction
+      REACTION_QUEUE.set(handler, this.proxyState[property]);
+      react();
 
     }
 
@@ -2212,6 +2166,8 @@
   // Registered UI Components
   const CUE_UI_MODULES = new Map();
 
+  const SYNTHETIC_EVENT_KEYS = new Map();
+
   // The helper object available to public component registration closure as "Component".
   // inherits methods and properties from main LIB object and thus has access to plugins and generic utilities
   oAssign(UI_COMPONENT, {
@@ -2465,44 +2421,94 @@
     }
   }
 
-  function translateEventSelectorsToScope(events, scopedStyles) {
+  function createSyntheticEvents(events, rootScope, scopedStyles) {
 
-    let eventName, x, selector;
+    const types = oKeys(events);
 
-    for (eventName in events) {
+    const eventHandlers = new Map();
 
-      x = events[eventName];
+    for (let i = 0, type, token, val; i < types.length; i++) {
 
-      if (isObjectLike(x)) { // event type has sub-selectors
+      type = types[i];
+      token = SYNTHETIC_EVENT_KEYS.get(type) || Symbol(`Synthetic "${type}" event`);
+      val = events[type];
 
-        for (selector in x) {
+      // Bind single self-bubbling event handler per event type.
+      if (!SYNTHETIC_EVENT_KEYS.has(type)) {
+        document.addEventListener(type, e => globalSyntheticEventHandler(e, token));
+        SYNTHETIC_EVENT_KEYS.set(type, token);
+      }
 
-          let normalizedSelector = selector;
-          let subString, scopedSelector;
+      // Create a pseudo-2D Array which contains consecutive pairs of 'selector' + handler.
+      eventHandlers.set(token, isObjectLike(val) ? getScopedSelectorHandlers(val, scopedStyles) : [rootScope, val]);
 
-          // if selector doesnt start with (. # [ * ) and is not html5 tag name, assume omitted leading dot.
-          if (selector[0] !== '.' && selector[0] !== '#' && selector[0] !== '[' && selector[0] !== '*' && !HTML5_TAGNAMES.has(selector)) {
-            normalizedSelector = '.' + selector;
+    }
+
+    // return a map of shape: { eventTypeToken: [...selector + handler(), selector + handler()...] }
+    // we use this map to attach a pointer to the handler array to every new instance of a component under the type token.
+    return eventHandlers;
+
+  }
+
+  function globalSyntheticEventHandler(event, token) {
+
+    let node = event.target,
+      eventStore, handlers, i;
+
+    while (node !== null && event.cancelBubble === false) {
+
+      eventStore = node[token];
+
+      if (eventStore) {
+
+        handlers = eventStore.handlers;
+
+        for (i = 0; i < handlers.length; i += 2) {
+
+          if (event.target.closest(handlers[i])) {
+            handlers[i + 1].call(eventStore.scope, event);
           }
 
-          if (scopedStyles.has(normalizedSelector)) {
-            scopedSelector = '.' + scopedStyles.get(normalizedSelector);
-          } else if (scopedStyles.has((subString = normalizedSelector.substring(1)))) {
-            scopedSelector = '.' + scopedStyles.get(subString);
-          } else {
-            scopedSelector = normalizedSelector;
-          }
-
-          // overwrite in-place
-          if (scopedSelector !== selector) {
-            x[scopedSelector] = x[selector];
-            delete x[selector];
+          if (event.cancelBubble === true) {
+            break;
           }
 
         }
       }
 
+      node = node.parentNode;
+
     }
+
+  }
+
+  function getScopedSelectorHandlers(selectors, scopedStyles) {
+
+    const scopedSelectorFunctionArray = [];
+
+    for (const selector in selectors) {
+
+      let normalizedSelector = selector;
+      let subString, scopedSelector;
+
+      // if selector doesnt start with (. # [ * ) and is not html5 tag name, assume omitted leading dot.
+      if (selector[0] !== '.' && selector[0] !== '#' && selector[0] !== '[' && selector[0] !== '*' && !HTML5_TAGNAMES.has(selector)) {
+        normalizedSelector = '.' + selector;
+      }
+
+      if (scopedStyles.has(normalizedSelector)) {
+        scopedSelector = '.' + scopedStyles.get(normalizedSelector);
+      } else if (scopedStyles.has((subString = normalizedSelector.substring(1)))) {
+        scopedSelector = '.' + scopedStyles.get(subString);
+      } else {
+        scopedSelector = normalizedSelector;
+      }
+
+      scopedSelectorFunctionArray.push(scopedSelector, selectors[selector]);
+
+    }
+
+    return scopedSelectorFunctionArray;
 
   }
 
@@ -2840,59 +2846,6 @@
 
     return seq;
 
-  }
-
-  function installStateReactions(component, reactions) {
-
-    const stateInternals = component.state[__CUE__];
-
-    let prop, boundHandler;
-
-    for (prop in reactions) {
-      boundHandler = stateInternals.addChangeReaction.call(stateInternals, prop, reactions[prop], component, component.autorun);
-    }
-
-  }
-
-  function bindComponentEvents(componentInstance, events) {
-
-    let eventName, value;
-    for (eventName in events) {
-
-      value = events[eventName];
-
-      if (componentInstance.events.has(eventName)) { // base event already registered
-
-        addHandlerToBaseEvent(componentInstance.events.get(eventName), value, componentInstance);
-
-      } else { // register new base event
-
-        const eventStack = [];
-        componentInstance.events.set(eventName, eventStack);
-        addHandlerToBaseEvent(eventStack, value, componentInstance);
-
-        componentInstance.element.addEventListener(eventName, e => {
-          for (let i = 0; i < eventStack.length; i++) eventStack[i].call(componentInstance, e);
-        });
-
-      }
-
-    }
-
-  }
-
-  function addHandlerToBaseEvent(eventStack, handlerOrDelegate, scope) {
-    if (isFunction(handlerOrDelegate)) {
-      eventStack.push(handlerOrDelegate);
-    } else if (isObjectLike(handlerOrDelegate)) {
-      for (const selector in handlerOrDelegate) {
-        eventStack.push(e => {
-          if (e.target.closest(selector)) {
-            handlerOrDelegate[selector].call(scope, e);
-          }
-        });
-      }
-    }
   }
 
   // The base prototype of all Cue UI Components containing DOM related helper methods.
@@ -3266,10 +3219,8 @@
     const styleScope = config.styles['$scope'] || name;
     const styles = scopeStylesToComponent(config.styles, templateElement, styleScope);
 
-    // rewrite delegated event selectors to internally match the scoped classNames
-    if (config.events && styles.size > 0) {
-      translateEventSelectorsToScope(config.events, styles);
-    }
+    // map of (eventTypeToken -> [Array, of, selector + handler pairs]. We attach these arrays to every instance directly under the token prop.
+    const events = isObjectLike(config.events) ? createSyntheticEvents(config.events, styleScope, styles) : EMPTY_MAP;
 
     // Create an object that inherits from ComponentPrototype (DOM helper methods)
     const Component = oCreate(ComponentPrototype);
@@ -3278,13 +3229,13 @@
     Component[__CUE__] = {
       template: templateElement,
       styles: styles,
+      events: events,
       imports: config.imports || null,
-      events: config.events || null,
       render: config.render || null,
       initialize: isFunction(config.initialize) ? config.initialize : NOOP
     };
 
-    // Make imports top-level properties on instances
+    // Make imports top-level properties on instances (we do the same with state modules, via internalGetters)
     if (isObjectLike(config.imports)) {
       oAssign(Component, config.imports);
     }
@@ -3310,7 +3261,10 @@
     return state => {
 
       // lazily initialize the component
-      Component || ((Component = buildUIComponent(name, initializer)) && (Internals = Component[__CUE__]));
+      if (Component === null) {
+        Component = buildUIComponent(name, initializer);
+        Internals = Component[__CUE__];
+      }
 
       // create new UI Component Instance
       const instance = oCreate(Component);
@@ -3321,19 +3275,28 @@
       Internals.initialize.call(instance, state);
 
       // 2. Render State
-      if (Internals.render) {
-        installStateReactions(instance, Internals.render);
+      if (instance.state && Internals.render) {
+
+        for (const prop in Internals.render) {
+          instance.state[__CUE__].addChangeReaction(prop, Internals.render[prop].bind(instance));
+        }
+
       }
 
       // 3. Bind Events
-      if (Internals.events) {
-        bindComponentEvents(instance, Internals.events);
+      if (Internals.events.size > 0) {
+        Internals.events.forEach((handlers, eventTypeToken) => {
+          instance.element[eventTypeToken] = {
+            scope: instance,
+            handlers: handlers
+          };
+        });
       }
 
       // return dom element for compositing
       return instance.element;
 
-    };
+    }
 
   }
 

@@ -2,13 +2,10 @@ Cue.UI('Todo-Editor', Component => ({
 
   element: (`
     <div class="editor">
-    
-      <div class="confirmModal">
-        <div class="message">This is a message from the regime. Are you sure you want to proceed?</div>
-        <div class="buttonGroup">
-          <div class="button button--cancel">Cancel</div>
-          <div class="button button--delete">Delete</div>
-        </div>
+          
+      <div class="buttonGroup">
+        <div class="button add1k">+1k</div>
+        <div class="button save">Save</div>
       </div>
       
       <input type="text" class="todoInput" placeholder="What needs to be done?">
@@ -38,6 +35,25 @@ Cue.UI('Todo-Editor', Component => ({
       flexDirection: 'column'
     },
 
+    buttonGroup: {
+      alignSelf: 'flex-end',
+      position: 'relative',
+      display: 'flex',
+      marginBottom: '1em'
+    },
+
+    button: {
+      borderRadius: '3px',
+      fontSize: '0.85em',
+      padding: '0.5em 1em',
+      borderBottom: '1px solid transparent',
+      cursor: 'pointer',
+      marginLeft: '0.7em',
+      '&.save': {
+        background: 'rgb(0,115,255)'
+      }
+    },
+
     todoInput: {
       width: '100%',
       height: '54px',
@@ -53,7 +69,7 @@ Cue.UI('Todo-Editor', Component => ({
     },
 
     todoList: {
-      maxHeight: '65vh',
+      maxHeight: '60vh',
       overflowY: 'overlay',
       borderTop: '1px solid rgb(62,65,68)',
       marginBottom: '1em',
@@ -67,65 +83,18 @@ Cue.UI('Todo-Editor', Component => ({
       }
     },
 
-    confirmModal: {
-      position: 'absolute',
-      zIndex: 2,
-      width: '100%',
-      height: '100%',
-      background: 'rgba(12,15,18,0)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2em',
-      pointerEvents: 'none',
-      transition: 'background 150ms',
-
-      '.buttonGroup, .message': {
-        opacity: 0,
-        transform: 'translateY(1.25em)',
-        transitionProperty: 'opacity, transform',
-        transitionDuration: '150ms',
-        transitionTimingFunction: 'ease-in-out'
-      },
-      '.buttonGroup': {
-        display: 'flex',
-        marginTop: '1em'
-      },
-      '.button': {
-        textAlign: 'center',
-        borderRadius: '3px',
-        fontSize: '0.85em',
-        padding: '0.5em 1em',
-        cursor: 'pointer',
-        marginLeft: '0.75em'
-      },
-      '.button--cancel': {
-        color: '#ebebeb',
-      },
-      '.button--delete': {
-        color: '#fff',
-        background: '#FF2D28'
-      },
-
-      '&.visible': {
-        background: 'rgba(12,15,18,0.9)',
-        pointerEvents: 'auto',
-
-        '.buttonGroup, .message': {
-          opacity: 1,
-          transform: 'translateY(0)'
-        }
-      }
-
-    },
-
     footer: {
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
       padding: '1em 0',
       borderTop: '1px solid rgb(62,65,68)',
+      transformOrigin: 'top',
+      transform: 'scaleY(1)',
+      transition: 'transform 150ms ease-in-out',
+      '&.hidden': {
+        transform: 'scaleY(0)'
+      }
     },
 
     itemCount: {
@@ -212,19 +181,21 @@ Cue.UI('Todo-Editor', Component => ({
       todoList(e) {
         if (e.which === 46 || e.which === 8) {
           this.state.removeSelected();
+        } else if ((e.ctrlKey || e.metaKey) && (e.which === 65 || e.which === 97) ) {
+          this.state.selectAll();
         }
       }
     },
 
     click: {
       todoList(e) {
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         const el = e.target;
         const item = el.closest('.Todo-Item-item');
         const index = this.index(item);
         if (el.closest('.Todo-Item-checkbox')) {
           this.state.toggleCompletion(index);
-        } else if (!(!!el.closest('.Todo-Item-editButton') || !!el.closest('.Todo-Item-textField.editing'))) {
+        } else if (!el.closest('.editButton') && !el.closest('.textField.editing')) {
           const mode = e.shiftKey ? 'range' : (e.metaKey || e.ctrlKey) ? 'meta' : 'radio';
           this.state.selectTodo({mode, index});
         }
@@ -233,11 +204,18 @@ Cue.UI('Todo-Editor', Component => ({
         this.state.filter = e.target.dataset.type;
       },
       clearButton(e) {
-
-        console.warn('todo - not implemented.')
-
-        //this.state.removeCompleted();
-
+        this.state.removeCompleted();
+      },
+      add1k() {
+        for (let i = 0; i < 1000; i++) {
+          this.state.addTodo({
+            isComplete: false,
+            text: `Random Todo ${Math.random().toFixed(4)}...`
+          });
+        }
+      },
+      save() {
+        Cue.trigger('save-todos', this.state);
       }
     }
 
@@ -275,8 +253,27 @@ Cue.UI('Todo-Editor', Component => ({
       }
     },
 
-    visibleTodos(todoArray) {
+    todos(todoArray) {
       this.setChildren(this.list, todoArray, this.TodoItem);
+
+      if (todoArray.length === 0) {
+        this.addClass(this.footer, 'hidden');
+      } else {
+        this.removeClass(this.footer, 'hidden');
+      }
+
+    },
+
+    visibleTodos(todoArray) {
+      todoArray.forEach(item => {
+        item.visible = true;
+      });
+    },
+
+    hiddenTodos(todoArray) {
+      todoArray.forEach(item => {
+        item.visible = false;
+      });
     }
 
   }

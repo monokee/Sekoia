@@ -1,6 +1,7 @@
 
 let REACTION_BUFFER = null;
 let FLUSHING_BUFFER = false;
+
 /**
  * Runs through the Main Queue to execute each collected reaction with each collected property value as the first and only argument.
  * Calls to react() are automatically buffered and internal flush() is only called on the next available frame after the last call to react().
@@ -12,29 +13,74 @@ let FLUSHING_BUFFER = false;
  * Note that this is done synchronously and outside of buffering.
  */
 function react() {
-
-  if (FLUSHING_BUFFER === false && MAIN_QUEUE.size > 0) {
-    cancelAnimationFrame(REACTION_BUFFER);
+  if (FLUSHING_BUFFER === false) {
+    REACTION_BUFFER !== null && cancelAnimationFrame(REACTION_BUFFER);
     REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
   }
-
-  if (--accumulationDepth === 0) {
-    while(ACCUMULATED_INSTANCES.length) ACCUMULATED_INSTANCES.pop();
-    while(QUEUED_DERIVATIVE_INSTANCES.length) QUEUED_DERIVATIVE_INSTANCES.pop();
-  }
-
 }
 
 function flushReactionBuffer() {
 
   FLUSHING_BUFFER = true;
 
-  for (const rxVAL of MAIN_QUEUE.entries()) {
-    rxVAL[0](rxVAL[1]);
+  let tuple, derivative, scope, result;
+  const resolved = [];
+
+  // DERIVATIVES ------------>
+
+  while (DERIVATIVE_QUEUE.size > 0) {
+
+    for (tuple of DERIVATIVE_QUEUE.entries()) {
+
+      derivative = tuple[0];
+      scope = tuple[1];
+
+      if (resolved.indexOf(derivative) === -1) {
+
+        derivative.needsUpdate = true;
+        result = derivative.value();
+        resolved.push(derivative);
+
+        if (derivative.hasChanged === true) {
+          scope.cueObservers.call(scope, derivative.ownPropertyName, result);
+          SUB_DERIVATIVE_QUEUE.set(derivative, scope);
+        }
+
+      }
+
+    }
+
+    DERIVATIVE_QUEUE.clear();
+
+    for (tuple of SUB_DERIVATIVE_QUEUE.entries()) {
+
+      derivative = tuple[0];
+      scope = tuple[1];
+
+      if (scope.derivativesOf.has(derivative.ownPropertyName)) {
+
+        const subDerivatives = scope.derivativesOf.get(derivative.ownPropertyName);
+
+        for (let i = 0; i < subDerivatives.length; i++) {
+          DERIVATIVE_QUEUE.set(subDerivatives[i], scope);
+        }
+
+      }
+
+    }
+
+    SUB_DERIVATIVE_QUEUE.clear();
+
+  }
+
+  // REACTIONS ----------->
+
+  for (tuple of REACTION_QUEUE.entries()) {
+    tuple[0](tuple[1]);
   }
 
   REACTION_BUFFER = null;
   FLUSHING_BUFFER = false;
-  MAIN_QUEUE.clear();
+  REACTION_QUEUE.clear();
 
 }

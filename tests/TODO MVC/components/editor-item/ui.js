@@ -25,14 +25,14 @@ Cue.UI('Todo-Item', {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '1em',
-      margin: '1em 0 0',
-      background: 'rgba(128,135,142,0.1)',
+      padding: '1.5em',
+      margin: '0.85em 0 0',
+      background: '#13161A',
       opacity: 0.9,
       borderRadius: '5px',
-      borderBottom: '1px solid transparent',
+      boxShadow: '0px 4px 5px 0px rgba(0,0,0,0.25)',
       cursor: 'default',
-      transition: 'background 150ms, opacity 150ms',
+      transition: 'opacity 150ms',
       '&:hover': {
         opacity: 8,
 
@@ -40,14 +40,21 @@ Cue.UI('Todo-Item', {
           opacity: 1
         }
       },
-      '&:nth-child(odd)': {
-        background: 'rgba(128,135,142,0.05)'
-      },
       '&.selected': {
         opacity: 1,
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
-        borderBottom: '1px solid rgb(0,115,255)'
+        '&::after': {
+          position: 'absolute',
+          display: 'block',
+          content: '',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: '1px',
+          background: 'rgb(0,115,255)'
+        }
+      },
+      '&.hidden': {
+        display: 'none'
       },
 
       '.textField': {
@@ -136,10 +143,6 @@ Cue.UI('Todo-Item', {
       '&.checked': {
         opacity: 1,
 
-        '.bullet': {
-          border: '12px solid rgb(0, 115, 255)'
-        },
-
         '.tick': {
           opacity: 1,
           transform: 'scale(0.55)'
@@ -153,7 +156,6 @@ Cue.UI('Todo-Item', {
         height: 'var(--iconSize)',
         borderRadius: '50%',
         border: '3px solid #98a3ac',
-        transition: 'border 150ms',
         boxSizing: 'border-box'
       },
 
@@ -182,7 +184,6 @@ Cue.UI('Todo-Item', {
     this.checkBox = this.select('.checkbox');
     this.textField = this.select('.textField');
     this.text = this.select('.text');
-    this.date = this.select('.date');
     this.editButton = this.select('.editButton');
 
     this.isEditing = false;
@@ -192,7 +193,7 @@ Cue.UI('Todo-Item', {
   events: {
 
     click: {
-      editButton(e) {
+      editButton() {
         if (!this.isEditing) {
           this.enterEditMode();
         } else {
@@ -202,7 +203,7 @@ Cue.UI('Todo-Item', {
     },
 
     focusout: {
-      textField(e) {
+      textField() {
         if (this.isEditing) {
           this.leaveEditMode();
         }
@@ -246,7 +247,14 @@ Cue.UI('Todo-Item', {
 
     text(content) {
       this.text.textContent = content;
-      this.date.textContent = new Date().toLocaleDateString('en-us', { weekday: 'short', year: '2-digit', month: 'short', day: 'numeric' });
+    },
+
+    visible(itIs) {
+      if (itIs) {
+        this.removeClass('hidden');
+      } else {
+        this.addClass('hidden');
+      }
     }
 
   },

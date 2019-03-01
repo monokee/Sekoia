@@ -5,6 +5,7 @@
       <w>clickables</w>
       <w>computeds</w>
       <w>contenteditable</w>
+      <w>drawkit</w>
       <w>gsap</w>
       <w>hndlr</w>
       <w>lerp</w>

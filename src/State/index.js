@@ -18,13 +18,10 @@ const CUE_STATE_MODULES = new Map();
 // Internals of State Modules for internally passing module data around: name -> object
 const CUE_STATE_INTERNALS = new Map();
 
-// Accumulation Stacks used for property tracking during mutation calls
-const QUEUED_DERIVATIVE_INSTANCES = [];
-const ACCUMULATED_INSTANCES = [];
-let accumulationDepth = 0;
-
 // Reaction Queue (cleared after each run)
-const MAIN_QUEUE = new Map();
+const REACTION_QUEUE = new Map();
+const DERIVATIVE_QUEUE = new Map();
+const SUB_DERIVATIVE_QUEUE = new Map();
 
 // Global derivative installer payload
 const DERIVATIVE_INSTALLER = {
@@ -37,9 +34,16 @@ const DERIVATIVE_INSTALLER = {
 const TRAVERSE_DOWN = -1;
 const TRAVERSE_UP = 1;
 
+// State Type Constants
 const STATE_TYPE_ROOT = -1;
 const STATE_TYPE_MODULE = 1;
 const STATE_TYPE_EXTENSION = 2;
+
+// Data Type Constants
+const DATA_TYPE_UNDEFINED = -1;
+const DATA_TYPE_PRIMITIVE = 0;
+const DATA_TYPE_POJO = 1;
+const DATA_TYPE_ARRAY = 2;
 
 // Root State Store
 const CUE_ROOT_STATE = {};

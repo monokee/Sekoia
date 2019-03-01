@@ -30,21 +30,14 @@ class StateInternals {
     let ownProp = this.ownPropertyName;
     let ownValue = this.proxyState;
 
-    let topLevelPropertyUpdated = true;
-
     // (only bubble top-level property changes as they are considered inherent modifications to objects (ie break on noChange)
-    while (topLevelPropertyUpdated && directParent.type === STATE_TYPE_MODULE) {
+    while (directParent.type === STATE_TYPE_MODULE) {
 
-      if (ACCUMULATED_INSTANCES.indexOf(directParent) === -1) {
-        ACCUMULATED_INSTANCES.push(directParent);
+      directParent.cueObservers.call(directParent, ownProp, ownValue);
+      directParent.cueDerivatives.call(directParent, ownProp);
 
-        directParent.cueObservers.call(directParent, ownProp, ownValue);
-        topLevelPropertyUpdated = directParent.cueDerivatives.call(directParent, ownProp);
-
-        if (directParent.consumersOf.has(ownProp)) {
-          directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
-        }
-
+      if (directParent.consumersOf.has(ownProp)) {
+        directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
       }
 
       ownProp = directParent.ownPropertyName;
@@ -64,15 +57,9 @@ class StateInternals {
       let branchPropertyName = directParent.branchPropertyName;
 
       while (nextModuleParent && nextModuleParent.type !== STATE_TYPE_ROOT) {
-
-        if (ACCUMULATED_INSTANCES.indexOf(nextModuleParent) === -1) {
-          ACCUMULATED_INSTANCES.push(nextModuleParent);
-          nextModuleParent.cueDerivatives.call(nextModuleParent, branchPropertyName);
-        }
-
+        nextModuleParent.cueDerivatives.call(nextModuleParent, branchPropertyName);
         branchPropertyName = nextModuleParent.branchPropertyName;
         nextModuleParent = nextModuleParent.closestModuleParent;
-
       }
 
     }
@@ -138,21 +125,15 @@ class StateModuleInternals extends StateInternals {
 
   propertyDidChange(prop, value) {
 
-    if (ACCUMULATED_INSTANCES.indexOf(this) === -1) {
+    // add own dependencies to cue.
+    this.cueObservers(prop, value);
+    this.cueDerivatives(prop);
 
-      ACCUMULATED_INSTANCES.push(this);
-
-      // add own dependencies to cue.
-      this.cueObservers(prop, value);
-      this.cueDerivatives(prop);
-
-      if (this.consumersOf.has(prop)) {
-        this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
-      }
-
-      this.bubble();
-
+    if (this.consumersOf.has(prop)) {
+      this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
     }
+
+    this.bubble();
 
   }
 
@@ -163,7 +144,8 @@ class StateModuleInternals extends StateInternals {
       const observers = this.observersOf.get(prop);
 
       for (let i = 0; i < observers.length; i++) {
-        MAIN_QUEUE.set(observers[i], value);
+        // note that this will overwrite existing reactions with a new value when called multiple times within batch.
+        REACTION_QUEUE.set(observers[i], value);
       }
 
     }
@@ -175,38 +157,13 @@ class StateModuleInternals extends StateInternals {
     if (this.derivativesOf.has(prop)) {
 
       const derivatives = this.derivativesOf.get(prop);
-      const subDerivatives = [];
 
-      let hasChanged = false, i, derivative, result;
-
-      for (i = 0; i < derivatives.length; i++) {
-
+      for (let i = 0, derivative; i < derivatives.length; i++) {
         derivative = derivatives[i];
-
-        if (QUEUED_DERIVATIVE_INSTANCES.indexOf(derivative) === -1) {
-
-          QUEUED_DERIVATIVE_INSTANCES.push(derivative);
-
-          derivative.needsUpdate = true;
-
-          result = derivative.value; // call getter, recompute
-
-          if (derivative.hasChanged === true && subDerivatives.indexOf(derivative) === -1) {
-            subDerivatives.push(derivative);
-            this.cueObservers(derivative.ownPropertyName, result);
-            hasChanged = true;
-          }
-
+        if (!DERIVATIVE_QUEUE.has(derivative)) {
+          DERIVATIVE_QUEUE.set(derivative, this);
         }
-
       }
-
-      for (i = 0; i < subDerivatives.length; i++) {
-        derivative = subDerivatives[i];
-        this.cueDerivatives(derivative.ownPropertyName);
-      }
-
-      return hasChanged; // we return this that bubbling can stop if no top-level property changed.
 
     }
 
@@ -336,35 +293,23 @@ class StateModuleInternals extends StateInternals {
 
   }
 
-  addChangeReaction(property, handler, scope, autorun = true) {
-
-    if (!isFunction(handler)) {
-      throw new TypeError(`Property change reaction for "${property}" is not a function...`);
-    }
-
-    const boundHandler = handler.bind(scope);
+  addChangeReaction(property, handler) {
 
     if (this.observersOf.has(property)) {
-      this.observersOf.get(property).push(boundHandler);
+      this.observersOf.get(property).push(handler);
     } else {
-      this.observersOf.set(property, [boundHandler]);
+      this.observersOf.set(property, [handler]);
     }
 
     if (this.derivedProperties.has(property)) {
       const derivative = this.derivedProperties.get(property);
-      derivative.observers.push(boundHandler);
+      derivative.observers.push(handler);
       setEndOfPropagationInBranchOf(derivative, TRAVERSE_DOWN);
     }
 
-    if (autorun === true) {
-      accumulationDepth++;
-      MAIN_QUEUE.set(boundHandler, this.proxyState[property]);
-      react(); // debounce autorun
-      //const val = this.proxyState[property];
-      //boundHandler(val, property);
-    }
-
-    return boundHandler;
+    // autorun the reaction
+    REACTION_QUEUE.set(handler, this.proxyState[property]);
+    react();
 
   }
 

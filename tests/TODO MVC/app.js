@@ -5,19 +5,17 @@ document.addEventListener('DOMContentLoaded', () => {
     ui: 'Todo-Container'
   });
 
-  let snapshot = JSON.parse(localStorage.getItem('cue-todos')) || {
-    title: '🧿 Cue Todo',
+  app.mount(document.body, {
+    title: 'Cue Todo',
+    logo: 'assets/CueLogo__main.svg',
     author: 'monokee',
-    editor: {
+    footer: 'Illustrations by drawkit.io',
+    editor: JSON.parse(localStorage.getItem('cue-todos')) || {
       filter: 'all',
       todos: []
     }
-  };
-
-  Cue.on('save-todos', todos => {
-    localStorage.setItem('cue-todos', JSON.stringify(todos));
   });
 
-  app.mount(document.body, snapshot);
+  Cue.on('save-todos', todos => localStorage.setItem('cue-todos', JSON.stringify(todos)));
 
 });

@@ -10,8 +10,6 @@ function proxyDeleteHandler(target, prop) {
   
   if (target.hasOwnProperty(prop)) {
 
-    accumulationDepth++;
-
     const internals = target[__CUE__];
     const value = target[prop];
 
