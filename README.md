@@ -1,6 +1,6 @@
 # Cue - Build atomically reactive web apps in pure Javascript.
 
-"No logic in markup." & "Not the front-end framework your dad used." 😢💔
+Another front end framework - Why the fuck not?
 
 <br>
 <img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="270"/>
