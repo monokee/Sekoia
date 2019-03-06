@@ -66,10 +66,6 @@ class StateInternals {
 
   }
 
-  instanceWillUnmount() {
-    //console.log('[todo: instanceWillUnmount]', this);
-  }
-
 }
 
 class StateModuleInternals extends StateInternals {

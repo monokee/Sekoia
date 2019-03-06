@@ -13,10 +13,17 @@ let FLUSHING_BUFFER = false;
  * Note that this is done synchronously and outside of buffering.
  */
 function react() {
+
   if (FLUSHING_BUFFER === false) {
-    REACTION_BUFFER !== null && cancelAnimationFrame(REACTION_BUFFER);
+
+    if (REACTION_BUFFER !== null) {
+      cancelAnimationFrame(REACTION_BUFFER);
+    }
+
     REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
+
   }
+
 }
 
 function flushReactionBuffer() {

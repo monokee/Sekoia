@@ -62,37 +62,4 @@ class Derivative {
 
   }
 
-  dispose(root = true) {
-
-    let i;
-
-    // clear anything that could potentially hold on to strong pointers
-    this.source = undefined;
-    this.observers = undefined;
-    this.intermediate = undefined;
-    this._value = undefined;
-
-    // remove self from any superDerivatives
-    for (i = 0; i < this.superDerivatives.length; i++) {
-      this.superDerivatives[i].subDerivatives = this.superDerivatives[i].subDerivatives.filter(d => d !== this);
-      // reset end of observation
-      flagClosestObservedSuperDerivativesOf(this.superDerivatives[i], true);
-    }
-
-    // dispose all sub-derivatives
-    for (i = 0; i < this.subDerivatives.length; i++) {
-      this.subDerivatives[i].dispose(false); // false -> downwards recursion form root of removal
-    }
-
-    // if root of removal, reset end of propagation downwards from parent node branches.
-    if (root) {
-      for (i = 0; i < this.superDerivatives.length; i++) {
-        setEndOfPropagationInBranchOf(this.superDerivatives[i], TRAVERSE_DOWN);
-      }
-    }
-
-    this.superDerivatives = undefined;
-
-  }
-
 }

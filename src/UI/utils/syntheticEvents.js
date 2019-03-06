@@ -13,7 +13,7 @@ function createSyntheticEvents(events, rootScope, scopedStyles) {
 
     // Bind single self-bubbling event handler per event type.
     if (!SYNTHETIC_EVENT_KEYS.has(type)) {
-      document.addEventListener(type, e => globalSyntheticEventHandler(e, token));
+      DOC.addEventListener(type, e => globalSyntheticEventHandler(e, token));
       SYNTHETIC_EVENT_KEYS.set(type, token);
     }
 
@@ -51,6 +51,7 @@ function globalSyntheticEventHandler(event, token) {
         }
 
       }
+
     }
 
     node = node.parentNode;

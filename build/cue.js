@@ -2,17 +2,18 @@
 
   /*
    *
-   * 🧿 Cue - Reactive Data-Driven Web Apps
+   * ☉ Cue - Atomically Reactive Web Apps
    *
-   * @author Jonathan M. Ochmann for color.io
+   * @author Jonathan M. Ochmann
    * Copyright 2019 Patchflyer GmbH
    *
    */
 
   // Meta Keys used for closure scope lookup && safely extending foreign objects
-  const __CUE__ = Symbol('🧿');
+  const __CUE__ = Symbol('☉');
 
   // Builtins
+  const DOC = document;
   const OBJ = Object;
   const ARR = Array;
   const OBJ_ID = '[object Object]';
@@ -342,9 +343,9 @@
 
         oldValue = array[i];
 
-        if (oldValue && (subState = oldValue[__CUE__])) {
+        /*if (oldValue && (subState = oldValue[__CUE__])) {
           subState.instanceWillUnmount();
-        }
+        }*/
 
         array.splice(i, 1);
 
@@ -399,11 +400,11 @@
     }
 
     const last = array[array.length - 1];
-    const subInternals = last ? last[__CUE__] : undefined;
+    /*const subInternals = last ? last[__CUE__] : undefined;
 
     if (subInternals) {
       subInternals.instanceWillUnmount();
-    }
+    }*/
 
     delete array[array.length - 1];
 
@@ -424,11 +425,11 @@
     }
 
     const last = array[0];
-    const subInternals = last ? last[__CUE__] : undefined;
+    /*const subInternals = last ? last[__CUE__] : undefined;
 
     if (subInternals) {
       subInternals.instanceWillUnmount();
-    }
+    }*/
 
     array.shift();
 
@@ -459,7 +460,7 @@
       direction = 1;
     }
 
-    let value, subState;
+    let value;
     while (count > 0) {
       if (from in array) {
         value = array[from];
@@ -469,10 +470,11 @@
         array[to] = array[from];
 
       } else {
-        value = array[to];
+        /*value = array[to];
+        let subState;
         if (value && (subState = value[__CUE__])) {
           subState.instanceWillUnmount();
-        }
+        }*/
         delete array[to];
       }
       from += direction;
@@ -992,39 +994,6 @@
 
     }
 
-    dispose(root = true) {
-
-      let i;
-
-      // clear anything that could potentially hold on to strong pointers
-      this.source = undefined;
-      this.observers = undefined;
-      this.intermediate = undefined;
-      this._value = undefined;
-
-      // remove self from any superDerivatives
-      for (i = 0; i < this.superDerivatives.length; i++) {
-        this.superDerivatives[i].subDerivatives = this.superDerivatives[i].subDerivatives.filter(d => d !== this);
-        // reset end of observation
-        flagClosestObservedSuperDerivativesOf(this.superDerivatives[i], true);
-      }
-
-      // dispose all sub-derivatives
-      for (i = 0; i < this.subDerivatives.length; i++) {
-        this.subDerivatives[i].dispose(false); // false -> downwards recursion form root of removal
-      }
-
-      // if root of removal, reset end of propagation downwards from parent node branches.
-      if (root) {
-        for (i = 0; i < this.superDerivatives.length; i++) {
-          setEndOfPropagationInBranchOf(this.superDerivatives[i], TRAVERSE_DOWN);
-        }
-      }
-
-      this.superDerivatives = undefined;
-
-    }
-
   }
 
   /**
@@ -1330,12 +1299,12 @@
     if (target.hasOwnProperty(prop)) {
 
       const internals = target[__CUE__];
-      const value = target[prop];
 
+      /*const value = target[prop];
       const subInternals = value ? value[__CUE__] : undefined;
       if (subInternals) {
         subInternals.instanceWillUnmount();
-      }
+      }*/
 
       delete target[prop];
       internals.valueCache.delete(prop);
@@ -1362,10 +1331,17 @@
    * Note that this is done synchronously and outside of buffering.
    */
   function react() {
+
     if (FLUSHING_BUFFER === false) {
-      REACTION_BUFFER !== null && cancelAnimationFrame(REACTION_BUFFER);
+
+      if (REACTION_BUFFER !== null) {
+        cancelAnimationFrame(REACTION_BUFFER);
+      }
+
       REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
+
     }
+
   }
 
   function flushReactionBuffer() {
@@ -1644,10 +1620,6 @@
 
       }
 
-    }
-
-    instanceWillUnmount() {
-      //console.log('[todo: instanceWillUnmount]', this);
     }
 
   }
@@ -2284,9 +2256,9 @@
 
   // Library stylesheet that components can write scoped classes to
   const CUE_UI_STYLESHEET = wrap(() => {
-    const stylesheet = document.createElement('style');
+    const stylesheet = DOC.createElement('style');
     stylesheet.id = 'CUE-STYLES';
-    document.head.appendChild(stylesheet);
+    DOC.head.appendChild(stylesheet);
     return stylesheet.sheet;
   });
 
@@ -2308,8 +2280,6 @@
   function scopeStylesToComponent(styles, template, scope) {
 
     const classMap = new Map();
-
-    if (!styles) return classMap;
 
     scope || (scope = `cue-${CUE_UI_STYLESHEET.cssRules.length.toString(36)}`);
 
@@ -2435,7 +2405,7 @@
 
       // Bind single self-bubbling event handler per event type.
       if (!SYNTHETIC_EVENT_KEYS.has(type)) {
-        document.addEventListener(type, e => globalSyntheticEventHandler(e, token));
+        DOC.addEventListener(type, e => globalSyntheticEventHandler(e, token));
         SYNTHETIC_EVENT_KEYS.set(type, token);
       }
 
@@ -2474,6 +2444,7 @@
           }
 
         }
+
       }
 
       node = node.parentNode;
@@ -2512,31 +2483,53 @@
 
   }
 
-  function createTemplateRootElement(x) {
+  function createTemplateRootElement(domString) {
 
-    if (typeof x === 'string') {
+    domString = domString.trim();
 
-      x = x.trim();
-
-      switch (x[0]) {
-        case '<':
-          return document.createRange().createContextualFragment(x).firstChild;
-        case '.':
-          return document.getElementsByClassName(x.substring(1))[0];
-        case '#':
-          return document.getElementById(x.substring(1));
-        case '[':
-          return document.querySelectorAll(x)[0];
-        default:
-          throw new TypeError(`Can't create template from string because it's not html markup or a valid selector.`);
-      }
-
-    } else if (x instanceof Element) {
-
-      return x;
-
+    switch (domString[0]) {
+      case '<':
+        return DOC.createRange().createContextualFragment(domString).firstChild;
+      case '.':
+        return DOC.getElementsByClassName(domString.substring(1))[0];
+      case '#':
+        return DOC.getElementById(domString.substring(1));
+      case '[':
+        return DOC.querySelectorAll(domString)[0];
+      default:
+        throw new TypeError(`Can't create template from string because it's not html markup or a valid selector.`);
     }
 
+  }
+
+  const CUE_TREEWALKER = DOC.createTreeWalker(DOC, NodeFilter.SHOW_ALL, null, false);
+
+  // generates static paths to nodes with a "ref" attribute in a template element. this dramatically speeds up retrieval of ref-nodes
+  // during instantiation of new ui components... ref-nodes are automatically made available as top-level sub-components
+  function generateRefPaths(el) {
+
+    CUE_TREEWALKER.currentNode = el;
+
+    const indices = [];
+
+    let ref, i = 0;
+
+    do { // run this at least once...
+      if (el.nodeType !== 3 && (ref = el.getAttribute('ref'))) {
+        indices.push(ref, i + 1);
+        i = 1;
+      } else {
+        i++;
+      }
+    } while ((el = CUE_TREEWALKER.nextNode()));
+
+    return indices;
+
+  }
+
+  function getRefByIndex(i) {
+    while (--i) CUE_TREEWALKER.nextNode();
+    return CUE_TREEWALKER.currentNode;
   }
 
   function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
@@ -2848,18 +2841,14 @@
 
   }
 
-  // The base prototype of all Cue UI Components containing DOM related helper methods.
-  const ComponentPrototype = wrap(() => {
+  const CueUIComponent = wrap(() => {
 
-    const doc = document;
     const isNodeListProto = NodeList.prototype.isPrototypeOf;
     const isHTMLCollectionProto = HTMLCollection.prototype.isPrototypeOf;
 
-    const childDataCache = new WeakMap();
+    const transitionEventTypes = wrap(() => {
 
-    const transitionEventTypes = (() => {
-
-      const el = doc.createElement('tst'),
+      const el = DOC.createElement('tst'),
         ts = {
           'transition': {
             run: 'transitionrun',
@@ -2891,316 +2880,257 @@
       for (const t in ts)
         if (el.style[t]) return ts[t];
 
-    })();
+    });
 
-    return {
+    const __STYLES__ = Symbol('ScopedStyles');
+    const __CHILD_DATA__ = Symbol('ChildData');
 
-      select(x, within) {
+    return class CueUIComponent {
+
+      constructor(element, scopedStyles) {
+
+        this.element = element;
+        element[__CUE__] = this;
+
+        this[__STYLES__] = scopedStyles;
+        this[__CHILD_DATA__] = [];
+
+      }
+
+      get(x) {
 
         if (typeof x === 'string') {
 
-          within = within ? this.select(within) : this.element;
-          let node, s;
+          let el, s;
 
           switch (x[0]) {
             case '#':
-              node = doc.getElementById(x.substring(1));
+              el = DOC.getElementById(x.substring(1));
               break;
             case '.':
-              node = within.getElementsByClassName(this[__CUE__].styles.get((s = x.substring(1))) || s);
+              el = this.element.getElementsByClassName(this[__STYLES__].get((s = x.substring(1))) || s);
               break;
             default:
-              node = within.querySelectorAll(x);
+              el = this.element.querySelectorAll(x);
               break;
           }
 
-          if (node.nodeType !== Node.TEXT_NODE && node.length) {
-            return node.length === 1 ? node[0] : toArray(node);
+          if (el.nodeType !== Node.TEXT_NODE && el.length) {
+            return el.length === 1 ? el[0][__CUE__] || new CueUIComponent(el[0], this[__STYLES__]) : toArray(el).map(el => el[__CUE__] || new CueUIComponent(el, this[__STYLES__]));
           }
 
-          return node;
+          return el[__CUE__] || new CueUIComponent(el, this[__STYLES__]);
+
+        } else if (x instanceof Element) {
+
+          return x[__CUE__] || new CueUIComponent(x, this[__STYLES__]);
+
+        } else if (isNodeListProto(x) || isHTMLCollectionProto(x)) {
+
+          return toArray(x).map(el => el[__CUE__] || new CueUIComponent(el, this[__STYLES__]));
+
+        } else if (x && x[__STYLES__]) {
+
+          return x;
 
         }
 
-        if (x instanceof Element) return x;
+      }
 
-        if (Cue.UI.isComponent(x)) return x.element;
+      getSiblings(includeSelf = false) {
 
-        if (isNodeListProto(x) || isHTMLCollectionProto(x)) return toArray(x);
+        const children = this.element.parentNode.childNodes;
+        const siblings = [];
 
-        if (isArray(x)) return x.map(item => this.select(item, within));
-
-        if (isObjectLike(x)) {
-          const o = {};
-          for (const item in x) o[item] = this.select(x[item], within);
-          return o;
-        }
-
-      },
-
-      hasContent(node) {
-        node = node ? this.select(node) : this.element;
-        return !!(node.children.length || node.textContent.trim().length);
-      },
-
-      isIterable(node) {
-        node = node ? this.select(node) : this.element;
-        return node.nodeType !== Node.TEXT_NODE && node.length;
-      },
-
-      hasClass(node, className) {
-
-        if (arguments.length === 1) {
-          className = node;
-          node = this.element;
-        } else {
-          node = this.select(node);
-        }
-
-        return node.classList.contains(this[__CUE__].styles.get(className) || className);
-
-      },
-
-      addClass(node, className) {
-
-        let classNames;
-
-        if (arguments.length === 1) {
-          classNames = node.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
-          node = this.element;
-        } else {
-          node = this.select(node);
-          classNames = className.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
-        }
-
-        node.classList.add(...classNames);
-
-        return this;
-
-      },
-
-      removeClass(node, className) {
-
-        let classNames;
-
-        if (arguments.length === 1) {
-          classNames = node.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
-          node = this.element;
-        } else {
-          node = this.select(node);
-          classNames = className.split(' ').map(token => (this[__CUE__].styles.get(token) || token));
-        }
-
-        node.classList.remove(...classNames);
-
-        return this;
-
-      },
-
-      toggleClass(node, className) {
-
-        if (arguments.length === 1) {
-          className = node;
-          node = this.element;
-        } else {
-          node = this.select(node);
-        }
-
-        node.classList.toggle(this[__CUE__].styles.get(className) || className);
-
-        return this;
-
-      },
-
-      replaceClass(node, oldClass, newClass) {
-
-        if (arguments.length === 2) {
-          oldClass = node;
-          newClass = oldClass;
-          node = this.element;
-        } else {
-          node = this.select(node);
-        }
-
-        node.classList.replace(this[__CUE__].styles.get(oldClass) || oldClass, this[__CUE__].styles.get(newClass) || newClass);
-
-        return this;
-
-      },
-
-      index(node) {
-        node = node ? this.select(node) : this.element;
-        return toArray(node.parentNode.children).indexOf(node);
-      },
-
-      siblings(node, includeSelf) {
-
-        if (arguments.length === 1) {
-          includeSelf = node === true;
-          node = this.element;
-        } else {
-          node = this.select(node);
-        }
-
-        return includeSelf ? toArray(node.parentNode.children) : toArray(node.parentNode.children).filter(sibling => sibling !== node);
-
-      },
-
-      refs(within) {
-
-        // collect children of element that have "ref" attribute
-        // returns object hash that maps refValue to domElement
-        within = within ? this.select(within) : this.element;
-        const tagged = within.querySelectorAll('[ref]');
-
-        if (tagged.length) {
-          const refs = {};
-          for (let i = 0, r; i < tagged.length; i++) {
-            r = tagged[i];
-            refs[r.getAttribute('ref')] = r;
+        if (includeSelf === true) {
+          for (let i = 0, el; i < children.length; i++) {
+            el = children[i];
+            siblings.push(el[__CUE__] || new CueUIComponent(el, this[__STYLES__]));
           }
-          return refs;
+        } else {
+          for (let i = 0, el; i < children.length; i++) {
+            el = children[i];
+            if (el !== this.element) {
+              siblings.push(el[__CUE__] || new CueUIComponent(el, this[__STYLES__]));
+            }
+          }
         }
 
-      },
+        return siblings;
 
-      boundingBox(node) {
-        node = node ? this.select(node) : this.element;
-        // clone and offset in case element is invisible
-        const clone = node.cloneNode(true);
-        clone.style.position = 'absolute';
-        clone.style.left = '-100000px';
-        clone.style.top = '-100000px';
-        clone.style.display = 'block';
-        this.element.parentElement.appendChild(clone);
-        const bb = clone.getBoundingClientRect();
-        clone.parentElement.removeChild(clone);
-        return bb;
-      },
+      }
 
-      position(node) {
-        node = node ? this.select(node) : this.element;
-        return {
-          top: node.offsetTop,
-          left: node.offsetLeft
-        };
-      },
+      getChildren() {
+        const children = toArray(this.element.parentNode.childNodes);
+        for (let i = 0, el; i < children.length; i++) {
+          el = children[i];
+          children[i] = el[__CUE__] || new CueUIComponent(el, this[__STYLES__]);
+        }
+        return children;
+      }
 
-      offset(node) {
-        node = node ? this.select(node) : this.element;
-        const rect = node.getBoundingClientRect();
-        return {
-          top: rect.top + document.body.scrollTop,
-          left: rect.left + document.body.scrollLeft
-        };
-      },
+      setChildren(dataArray, createElement, updateElement = NOOP) {
 
-      awaitTransition(...nodes) {
-        nodes = nodes.length ? nodes.map(node => this.select(node)) : [this.element];
-        return Promise.all(nodes.map(node => {
-          if (transitionEventTypes.end) {
-            return new Promise(resolve => {
-              const _node = this.select(node);
-              const handler = () => {
-                _node.removeEventListener(transitionEventTypes.end, handler);
-                resolve();
-              };
-              _node.addEventListener(transitionEventTypes.end, handler);
-            });
-          } else {
-            return Promise.resolve();
-          }
-        }));
-      },
+        const previousData = this[__CHILD_DATA__];
+        this[__CHILD_DATA__] = dataArray.slice();
 
-      setChildren(parentNode, dataArray, createElement, updateElement = NOOP) {
+        if (dataArray.length === 0) {
 
-        // weak-cache previous child data
-        const previousData = childDataCache.get(parentNode) || [];
-        childDataCache.set(parentNode, dataArray.slice());
+          this.element.textContent = '';
 
-        if (dataArray.length === 0) { // fast path clear all
-          parentNode.textContent = '';
-        } else if (previousData.length === 0) { // fast path add all
+        } else if (previousData.length === 0) {
+
           for (let i = 0; i < dataArray.length; i++) {
-            parentNode.appendChild(createElement(dataArray[i]));
+            this.element.appendChild(createElement(dataArray[i]));
           }
-        } else { // reconcile current/new newData arrays
-          reconcile(parentNode, previousData, dataArray, createElement, updateElement);
+
+        } else {
+
+          reconcile(this.element, previousData, dataArray, createElement, updateElement);
+
         }
 
         return this;
 
-      },
+      }
 
-      insertBefore(node, target) {
-        if (arguments.length === 1) {
-          target = this.select(node);
-          node = this.element;
-        } else {
-          node = this.select(node);
-          target = this.select(target);
+      append(x) {
+        if (x instanceof Element) {
+          this.element.appendChild(x);
+        } else if (x && x[__STYLES__]) {
+          this.element.appendChild(x.element);
         }
-        target.parentNode.insertBefore(node, target);
         return this;
-      },
+      }
 
-      insertAfter(node, target) {
-        if (arguments.length === 1) {
-          target = this.select(node);
-          node = this.element;
-        } else {
-          node = this.select(node);
-          target = this.select(target);
+      appendTo(target) {
+        if (target instanceof Element) {
+          target.appendChild(this.element);
+        } else if (target && target[__STYLES__]) {
+          target.element.appendChild(this.element);
         }
-        target.parentNode.insertBefore(node, target.nextSibling);
         return this;
-      },
+      }
 
-      insertAt(node, index) {
-
-        if (arguments.length === 1) {
-          index = parseInt(node);
-          node = this.element;
-        } else {
-          node = this.select(node);
-          index = parseInt(index);
+      insertBefore(target) {
+        if (target instanceof Element) {
+          target.parentNode.insertBefore(this.element, target);
+        } else if (target && target[__STYLES__] || (target = this.get(target))) {
+          target.element.parentNode.insertBefore(this.element, target.element);
         }
+        return this;
+      }
 
-        const parent = node.parentNode,
-          children = parent.children;
+      insertAfter(target) {
+        if (target instanceof Element) {
+          target.parentNode.insertBefore(this.element, target.nextSibling);
+        } else if (target && target[__STYLES__] || (target = this.get(target))) {
+          target.element.parentNode.insertBefore(this.element, target.element.nextSibling);
+        }
+      }
 
+      moveTo(index, target) {
+        target = target ? this.get(target) : this.element.parentNode;
+        const children = target.children;
         if (index >= children.length) {
-          parent.appendChild(node);
+          target.appendChild(this.element);
         } else if (index <= 0) {
-          parent.insertBefore(node, parent.firstChild);
+          target.insertBefore(this.element, target.firstChild);
         } else {
-          parent.insertBefore(node, children[index >= Array.from(children).indexOf(node) ? index + 1 : index]);
+          target.insertBefore(this.element, children[index >= toArray(children).indexOf(this.element) ? index + 1 : index]);
         }
-
         return this;
+      }
 
-      },
+      getText() {
+        return this.element.textContent;
+      }
 
-      detach(node) {
-        node = node ? this.select(node) : this.element;
-        return node.parentNode.removeChild(node);
-      },
-
-      remove(node) {
-        node = node ? this.select(node) : this.element;
-        node.parentNode.removeChild(node);
+      setText(value) {
+        this.element.textContent = value;
         return this;
+      }
+
+      getAttr(name) {
+        return this.element.getAttribute(name);
+      }
+
+      setAttr(name, value) {
+        this.element.setAttribute(name, value);
+        return this;
+      }
+
+      getIndex(el) {
+        if (el instanceof Element) {
+          return toArray(el.parentNode.children).indexOf(el);
+        } else if (el && el[__STYLES__]) {
+          return toArray(el.element.parentNode.children).indexOf(el.element);
+        } else {
+          return toArray(this.element.parentNode.children).indexOf(this.element);
+        }
+      }
+
+      hasClass(className) {
+        return this.element.classList.contains(this[__STYLES__].get(className) || className);
+      }
+
+      addClass(...className) {
+        for (let i = 0, name; i < className.length; i++) {
+          name = this[__STYLES__].get(className[i]) || className[i];
+          this.element.classList.add(name);
+        }
+        return this;
+      }
+
+      removeClass(...className) {
+        for (let i = 0, name; i < className.length; i++) {
+          name = this[__STYLES__].get(className[i]) || className[i];
+          this.element.classList.remove(name);
+        }
+        return this;
+      }
+
+      toggleClass(...className) {
+        for (let i = 0, name; i < className.length; i++) {
+          name = this[__STYLES__].get(className[i]) || className[i];
+          this.element.classList.toggle(name);
+        }
+        return this;
+      }
+
+      replaceClass(oldClass, newClass) {
+        this.element.classList.replace(
+          this[__STYLES__].get(oldClass) || oldClass,
+          this[__STYLES__].get(newClass) || newClass
+        );
+        return this;
+      }
+
+      useClass(className, bool = true) {
+        if (bool === true) {
+          this.element.classList.add(this[__STYLES__].get(className) || className);
+        } else {
+          this.element.classList.remove(this[__STYLES__].get(className) || className);
+        }
+        return this;
+      }
+
+      awaitTransition() {
+        return new Promise(resolve => {
+          this.element.addEventListener(transitionEventTypes.end, e => resolve(e), {
+            once: true
+          });
+        });
       }
 
     }
 
   });
 
-  function buildUIComponent(name, initializer) { // runs only once per component
+  function buildUIModule(name, initializer) { // runs only once per component
 
     // componentInitializer can be function or plain config object (pre-checked for object condition in "registerUIModule")
-    const config = typeof initializer === 'function' ? initializer.call(null, UI_COMPONENT) : initializer;
+    const config = isFunction(initializer) ? initializer.call(null, UI_COMPONENT) : initializer;
 
     if (!isPlainObject(config)) {
       throw new TypeError(`Can't create UI Module because the configuration function did not return a plain object.`);
@@ -3211,90 +3141,81 @@
     }
 
     const templateElement = createTemplateRootElement(config.element);
-
-    // Automatically scope classNames to the component by replacing their names with unique names.
-    // Scope prefix can be specified via '$scope' property on styles object. By default we use 'name' as prefix.
-    // Output looks like: Scope-className for classes.
-    // Function returns a map of the original name to the unique name or an empty map if no component-level styles exist.
+    const refPaths = generateRefPaths(templateElement);
     const styleScope = config.styles['$scope'] || name;
-    const styles = scopeStylesToComponent(config.styles, templateElement, styleScope);
+    const scopedStyles = isObjectLike(config.styles) ? scopeStylesToComponent(config.styles, templateElement, styleScope) : EMPTY_MAP;
+    const reactions = isObjectLike(config.render) ? config.render : null;
+    const events = isObjectLike(config.events) ? createSyntheticEvents(config.events, styleScope, scopedStyles) : EMPTY_MAP;
+    const initialize = isFunction(config.initialize) ? config.initialize : NOOP;
 
-    // map of (eventTypeToken -> [Array, of, selector + handler pairs]. We attach these arrays to every instance directly under the token prop.
-    const events = isObjectLike(config.events) ? createSyntheticEvents(config.events, styleScope, styles) : EMPTY_MAP;
+    class Module extends CueUIComponent {
 
-    // Create an object that inherits from ComponentPrototype (DOM helper methods)
-    const Component = oCreate(ComponentPrototype);
+      constructor(state) {
 
-    // Add internal __CUE__ object to Component
-    Component[__CUE__] = {
-      template: templateElement,
-      styles: styles,
-      events: events,
-      imports: config.imports || null,
-      render: config.render || null,
-      initialize: isFunction(config.initialize) ? config.initialize : NOOP
-    };
+        // 1. Create instance Element by cloning template
+        const element = templateElement.cloneNode(true);
 
-    // Make imports top-level properties on instances (we do the same with state modules, via internalGetters)
-    if (isObjectLike(config.imports)) {
-      oAssign(Component, config.imports);
+        // 2. Create instance
+        super(element, scopedStyles);
+
+        // 3. Assign refs to "this"
+        if (refPaths.length) {
+          CUE_TREEWALKER.currentNode = element;
+          for (let i = 0; i < refPaths.length; i += 2) { // i = name of ref, i+1 = nodeIndex in tree
+            this[refPaths[i]] = new CueUIComponent(getRefByIndex(refPaths[i + 1]), scopedStyles);
+          }
+        }
+
+        // 4. Initialize lifecycle method
+        initialize.call(this, state);
+
+        // 5. Install state reactions (if state has been assigned via initialize)
+        if (reactions !== null && this.state) {
+          for (const prop in reactions) {
+            this.state[__CUE__].addChangeReaction(prop, reactions[prop].bind(this));
+          }
+        }
+
+        // 6. Assign synthetic Events
+        if (events.size > 0) {
+          events.forEach((handlers, eventTypeToken) => {
+            element[eventTypeToken] = {
+              scope: this,
+              handlers: handlers
+            }
+          });
+        }
+
+      }
+
     }
 
-    // Make custom methods top-level props on instances
-    let key, val;
-    for (key in config) {
-      val = config[key];
-      if (isFunction(val)) {
-        Component[key] = val;
+    // Module Prototype
+    if (isObjectLike(config.imports)) { // raise imports to top-level
+      oAssign(Module.prototype, config.imports);
+    }
+
+    for (const key in config) { // raise methods to top-level
+      if (key !== 'initialize' && isFunction(config[key])) {
+        Module.prototype[key] = config[key];
       }
     }
 
-    return Component;
+    return Module;
 
   }
 
   function createComponentFactory(name, initializer) {
 
-    let Component = null;
-    let Internals = null;
+    let UIModule = null;
 
     return state => {
 
-      // lazily initialize the component
-      if (Component === null) {
-        Component = buildUIComponent(name, initializer);
-        Internals = Component[__CUE__];
+      if (UIModule === null) {
+        UIModule = buildUIModule(name, initializer);
       }
 
-      // create new UI Component Instance
-      const instance = oCreate(Component);
-      instance.element = Internals.template.cloneNode(true);
-      instance.events = new Map();
-
-      // 1. Initialize or NOOP
-      Internals.initialize.call(instance, state);
-
-      // 2. Render State
-      if (instance.state && Internals.render) {
-
-        for (const prop in Internals.render) {
-          instance.state[__CUE__].addChangeReaction(prop, Internals.render[prop].bind(instance));
-        }
-
-      }
-
-      // 3. Bind Events
-      if (Internals.events.size > 0) {
-        Internals.events.forEach((handlers, eventTypeToken) => {
-          instance.element[eventTypeToken] = {
-            scope: instance,
-            handlers: handlers
-          };
-        });
-      }
-
-      // return dom element for compositing
-      return instance.element;
+      return new UIModule(state).element;
 
     }
 
@@ -3483,7 +3404,7 @@
       const uiFactory = UI_COMPONENT.import(uiComponentName);
 
       // Parse the Target UI Element
-      target = typeof target === 'string' ? document.querySelector(target) : target instanceof Element ? target : undefined;
+      target = typeof target === 'string' ? DOC.querySelector(target) : target instanceof Element ? target : undefined;
       if (!target) throw new TypeError(`Target must be a valid DOM Element or DOM Selector String.`);
 
       // Create State Instance (this returns a proxy)
@@ -3594,545 +3515,4 @@
     }
 
   });
-
-  Cue.Plugin('cue-math', Library => {
-
-    // Math Helpers
-    const MTH = Math;
-    const MAX = MTH.max;
-    const MIN = MTH.min;
-    const RANDOM = MTH.random;
-    const ABS = MTH.abs;
-    const POW = MTH.pow;
-    const ROUND = MTH.round;
-    const FLOOR = MTH.floor;
-    const CEIL = MTH.ceil;
-    const PI = MTH.PI;
-    const DEG2RAD = PI / 180;
-    const RAD2DEG = 180 / PI;
-
-    return Library.core.Math = {
-
-      clamp(min, max, val) {
-        return MAX(min, MIN(max, val));
-      },
-
-      lerp(from, to, x) {
-        return (1 - x) * from + x * to;
-      },
-
-      smoothStep(min, max, val) {
-        if (val <= min) return 0;
-        if (val >= max) return 1;
-        val = (val - min) / (max - min);
-        return val * val * (3 - 2 * val);
-      },
-
-      translate(sourceMin, sourceMax, targetMin, targetMax, x) {
-        return targetMin + (x - sourceMin) * (targetMax - targetMin) / (sourceMax - sourceMin);
-      },
-
-      createTranslator(sourceMin, sourceMax, targetMin, targetMax) {
-        // creates runtime optimized linear range interpolation functions for static ranges
-        if (sourceMin === 0 && targetMin > 0) return val => ((val * (targetMax - targetMin)) / sourceMax) + targetMin;
-        if (targetMin === 0 && sourceMin > 0) return val => (((val - sourceMin) * targetMax) / (sourceMax - sourceMin));
-        if (sourceMin === 0 === targetMin) return val => (val * targetMax) / targetMax;
-        return this.translate;
-      },
-
-      convertBits(sourceBits, targetBits, val) {
-        if (sourceBits < 32) {
-          if (targetBits < 32) {
-            return val * POW(2, targetBits) / POW(2, sourceBits);
-          } else {
-            return val / POW(2, sourceBits);
-          }
-        } else {
-          if (targetBits < 32) {
-            return ROUND(val * POW(2, targetBits));
-          } else {
-            return val;
-          }
-        }
-      },
-
-      randomIntBetween(min, max) {
-        return FLOOR(RANDOM() * (max - min + 1) + min);
-      },
-
-      randomFloatBetween(min, max) {
-        return RANDOM() * (max - min) + min;
-      },
-
-      isOdd(val) {
-        return val & 1;
-      },
-
-      isEven(val) {
-        return !(val & 1);
-      },
-
-      degreesToRadians(degrees) {
-        return degrees * DEG2RAD;
-      },
-
-      radiansToDegrees(radians) {
-        return radians * RAD2DEG;
-      },
-
-      scale(numericArray, targetLength) {
-
-        // 1D Linear Interpolation
-        const il = numericArray.length - 1,
-          ol = targetLength - 1,
-          s = il / ol;
-
-        let i, a = 0,
-          b = 0,
-          c = 0,
-          d = 0;
-
-        for (i = 1; i < ol; i++) {
-          a = i * s;
-          b = FLOOR(a);
-          c = CEIL(a);
-          d = a - b;
-          numericArray[i] = numericArray[b] + (numericArray[c] - numericArray[b]) * d;
-        }
-
-        numericArray[ol] = numericArray[il];
-
-        return this;
-
-      },
-
-      closest(numericArray, val) {
-        return numericArray.reduce((prev, cur) => (ABS(cur - val) < ABS(prev - val) ? cur : prev));
-      },
-
-      smallest(numericArray) {
-        let min = Infinity;
-        for (let i = 0; i < numericArray.length; i++) {
-          if (numericArray[i] < min) min = numericArray[i];
-        }
-        return min === Infinity ? void 0 : min;
-      },
-
-      largest(numericArray) {
-        let max = -Infinity;
-        for (let i = 0; i < numericArray.length; i++) {
-          if (numericArray[i] > max) max = numericArray[i];
-        }
-        return max === -Infinity ? void 0 : max;
-      }
-
-    };
-
-  }, true);
-
-  Cue.Plugin('cue-string', Library => {
-
-    return Library.core.String = {
-
-      createUID() {
-
-        const letters = 'abcdefghijklmnopqrstuvwxyz';
-
-        let sessionCounter = 0;
-
-        return ((this.createUID = function createUID() {
-
-          let n, o = '';
-          const alphaHex = sessionCounter.toString(26).split('');
-          while ((n = alphaHex.shift())) o += letters[parseInt(n, 26)];
-          sessionCounter++;
-          return o;
-
-        }).call(this));
-
-      },
-
-      toCamelCase(dashed_string) {
-        const c = document.createElement('div');
-        c.setAttribute(`data-${dashed_string}`, '');
-        return oKeys(c.dataset)[0];
-      },
-
-      toDashedCase(camelString) {
-        const c = document.createElement('div');
-        c.dataset[camelString] = '';
-        return c.attributes[0].name.substr(5);
-      }
-
-    };
-
-  }, true);
-
-  Cue.Plugin('cue-array', Library => {
-
-    const isArray = Array.isArray;
-
-    return Library.core.Array = {
-
-      flatten(nDimArray) {
-        return nDimArray.reduce((x, y) => x.concat(isArray(y) ? this.flatten(y) : y), []);
-      },
-
-      insertEveryNth(array, item, n) {
-        let i = array.length;
-        while (--i > 0)
-          if (i % n === 0) array.splice(i, 0, item);
-        return this;
-      },
-
-      removeEveryNth(array, n) {
-        let i = array.length;
-        while (--i)
-          if (i % n === 0) array.splice(i, 1);
-        return this;
-      },
-
-      removeRange(array, from, to) {
-        array.splice(from, to - from);
-        return this;
-      },
-
-      merge(target, ...sources) {
-
-        let i, k, s;
-        for (i = 0; i < sources.length; i++) {
-          s = sources[i];
-          for (k = 0; k < s.length; k++) {
-            target.push(s[k]);
-          }
-        }
-
-        return this;
-
-      }
-
-    };
-
-  }, true);
-
-  Cue.Plugin('cue-equality', Library => {
-
-    const Obj = Object;
-    const isArray = Array.isArray;
-
-    return Obj.assign(Library.core, {
-
-      isEqual(a, b, deep = false) {
-
-        if (a === b) return true;
-
-        if (a && b && typeof a === 'object' && typeof b === 'object') {
-
-          // Plain Objects (ordered) [fast-path]
-          const objA = a.constructor === Obj;
-          const objB = b.constructor === Obj;
-          if (objA !== objB) return false;
-          if (objA && objB) return this.arePlainObjectsEqual(a, b, deep);
-
-          // Arrays (ordered)
-          const arrayA = isArray(a);
-          const arrayB = isArray(b);
-          if (arrayA !== arrayB) return false;
-          if (arrayA && arrayB) return this.areArraysEqual(a, b, deep);
-
-          // Maps (ordered)
-          const mapA = a instanceof Map;
-          const mapB = b instanceof Map;
-          if (mapA !== mapB) return false;
-          if (mapA && mapB) return this.areMapsEqual(a, b, deep);
-
-          // Sets (ordered)
-          const setA = a instanceof Set;
-          const setB = b instanceof Set;
-          if (setA !== setB) return false;
-          if (setA && setB) return this.areSetsEqual(a, b, deep);
-
-          // Dates
-          const dateA = a instanceof Date;
-          const dateB = b instanceof Date;
-          if (dateA !== dateB) return false;
-          if (dateA && dateB) return a.getTime() === b.getTime();
-
-          // Regexp
-          const regexpA = a instanceof RegExp;
-          const regexpB = b instanceof RegExp;
-          if (regexpA !== regexpB) return false;
-          if (regexpA && regexpB) return a.toString() === b.toString();
-
-          // Other Objects [deferred]
-          return this.arePlainObjectsEqual(a, b, deep);
-
-        }
-
-        // Primitives strictly compared
-        return a !== a && b !== b;
-
-      },
-
-      areArraysEqual(a, b, deep = false) {
-
-        if (a.length !== b.length) return false;
-
-        for (let i = 0; i < a.length; i++) {
-          if (!this.isEqual(a[i], b[i], deep)) {
-            return false;
-          }
-        }
-
-        return true;
-
-      },
-
-      arePlainObjectsEqual(a, b, deep = false) {
-
-        const keysA = oKeys(a);
-        const keysB = oKeys(b);
-
-        if (keysA.length !== keysB.length) return false;
-
-        for (let i = 0, k; i < keysA.length; i++) {
-          k = keysA[i];
-          if (keysB.indexOf(k) === -1 || !this.isEqual(a[k], b[keysB[i]], deep)) {
-            return false;
-          }
-        }
-
-        return true;
-
-      },
-
-      areMapsEqual(a, b, deep = false) {
-
-        if (a.size !== b.size) return false;
-
-        const arrA = Array.from(a);
-        const arrB = Array.from(b);
-
-        for (let i = 0, iA, iB; i < arrA.length; i++) {
-          iA = arrA[i];
-          iB = arrB[i];
-          if (iA[0] !== iB[0] || !this.isEqual(iA[1], iB[1], deep)) {
-            return false;
-          }
-        }
-
-        return true;
-
-      },
-
-      areSetsEqual(a, b, deep = false) {
-
-        if (a.size !== b.size) return false;
-
-        const arrA = Array.from(a);
-        const arrB = Array.from(b);
-
-        for (let i = 0; i < arrA.length; i++) {
-          if (!this.isEqual(arrA[i], arrB[i], deep)) {
-            return false;
-          }
-        }
-
-        return true;
-
-      }
-
-    });
-
-  }, true);
-
-  Cue.Plugin('cue-clone', Library => {
-
-    const Obj = Object;
-    const ObjToString = Obj.prototype.toString;
-    const ObjID = '[object Object]';
-    const isObjectLike = o => typeof o === 'object' && o !== null;
-
-    const isArray = Array.isArray;
-    const getProto = Object.getPrototypeOf;
-
-    return Obj.assign(Library.core, {
-
-      clone(o, deep = false) {
-
-        if (isArray(o)) return this.cloneArray(o, deep);
-
-        if (isObjectLike(o)) {
-
-          if (ObjToString.call(o) === ObjID || getProto(o) === null) return this.clonePlainObject(o, deep);
-          if (o instanceof Map) return this.cloneMap(o, deep);
-          if (o instanceof Set) return this.cloneSet(o, deep);
-          if (o instanceof Date) return new Date(o.getTime());
-          if (o instanceof RegExp) return RegExp(o.source, o.flags);
-
-        }
-
-        throw new TypeError(`Can't clone non-object, null or undefined."`);
-
-      },
-
-      cloneArray(a, deep = false) {
-
-        if (deep) {
-
-          const clone = [];
-
-          for (let i = 0, v; i < a.length; i++) {
-            v = a[i];
-            clone.push(isObjectLike(v) ? this.clone(v, deep) : v);
-          }
-
-          return clone;
-
-        } else {
-
-          return a.slice();
-
-        }
-
-      },
-
-      clonePlainObject(o, deep = false) {
-
-        if (deep) {
-
-          const clone = {};
-
-          let k, v;
-          for (k in o) {
-            v = o[k];
-            clone[k] = isObjectLike(v) ? this.clone(v, deep) : v;
-          }
-
-          return clone;
-
-        } else {
-
-          return Obj.assign({}, o);
-
-        }
-
-      },
-
-      cloneMap(m, deep = false) {
-
-        const clone = new Map();
-
-        if (deep) {
-          m.forEach((val, key) => clone.set(isObjectLike(key) ? this.clone(key, deep) : key, isObjectLike(val) ? this.clone(val, deep) : val));
-        } else {
-          m.forEach((val, key) => clone.set(key, val));
-        }
-
-        return clone;
-
-      },
-
-      cloneSet(s, deep = false) {
-
-        const clone = new Set();
-        s.forEach(entry => clone.add(deep && isObjectLike(entry) ? this.clone(entry, deep) : entry));
-        return clone;
-
-      }
-
-    });
-
-  }, true);
-
-  Cue.Plugin('cue-fn', Library => {
-
-    return Library.core.Function = {
-
-      throttle(func, rate = 250, scope = null) {
-
-        // returns a function that will only be called every "rate" milliseconds
-
-        let now = 0.00,
-          last = 0.00;
-
-        return function(...rest) {
-          now = Date.now();
-          if (now > last + rate) {
-            func.apply(scope, rest);
-            last = now;
-          }
-        };
-
-      },
-
-      defer(func, delay = 250, scope = null) {
-
-        // returns a function that is only called "delay" milliseconds after its last invocation
-
-        let pending = null;
-
-        return function(...rest) {
-          clearTimeout(pending);
-          pending = setTimeout(() => {
-            func.apply(scope, rest);
-            pending = null;
-          }, delay);
-        };
-
-      },
-
-      createTaskWorker(handler) {
-
-        // Run processes in a different thread. Use postMessage interface in handler to call back to main thread.
-        // handler = function || object: {process: worker.onmessage fn, response: how the workers response is handled on the main thread, onError: ...}
-        //
-        // Example:
-        // const worker = createTaskWorker({
-        //   process: function({data}) { <- useful convention to destructure the event object as we're mainly interested in the data
-        //     this computation runs in worker thread. can work with data provided by main thread.
-        //     postMessage(data.toString()); <- this is passed to the response handler on the main thread via event.data
-        //   },
-        //   response: function({data}) {
-        //     runs on main thread in response to postMessage call from worker thread.
-        //     log(typeof data);
-        //   }
-        // });
-        //
-        // Start the worker:
-        // worker.process(1.234); // -> logs 'string'
-
-        const process = typeof handler === 'function' ? handler : handler.process ? handler.process : undefined;
-
-        const worker = new Worker(window.URL.createObjectURL(new Blob([
-        `(function() { onmessage = ${process.toString()} })()`
-      ], {
-          type: 'application/javascript'
-        })));
-
-        if (handler.response) worker.onmessage = handler.response;
-        if (handler.onError) worker.onerror = handler.onError;
-
-        return {
-          process: worker.postMessage.bind(worker), // starts the worker process
-          terminate: worker.terminate.bind(worker), // terminates the worker
-          set response(fn) { // defines main-thread response handler for worker
-            worker.onmessage = fn;
-          },
-          get response() {
-            return worker.onmessage;
-          },
-          set onError(fn) { // defines main-thread error handler for worker
-            worker.onerror = fn;
-          },
-          get onError() {
-            return worker.onerror;
-          }
-        };
-
-      }
-
-    };
-
-  }, true);
 }(window || this));

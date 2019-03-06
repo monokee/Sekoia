@@ -3,6 +3,7 @@
     <words>
       <w>checkmark</w>
       <w>clickables</w>
+      <w>clss</w>
       <w>computeds</w>
       <w>contenteditable</w>
       <w>drawkit</w>
@@ -15,6 +16,7 @@
       <w>performant</w>
       <w>todos</w>
       <w>transductions</w>
+      <w>treewalker</w>
     </words>
   </dictionary>
 </component>

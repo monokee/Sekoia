@@ -42,7 +42,7 @@ class CueComposite {
     const uiFactory = UI_COMPONENT.import(uiComponentName);
 
     // Parse the Target UI Element
-    target = typeof target === 'string' ? document.querySelector(target) : target instanceof Element ? target : undefined;
+    target = typeof target === 'string' ? DOC.querySelector(target) : target instanceof Element ? target : undefined;
     if (!target) throw new TypeError(`Target must be a valid DOM Element or DOM Selector String.`);
 
     // Create State Instance (this returns a proxy)

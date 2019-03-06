@@ -11,12 +11,12 @@ function proxyDeleteHandler(target, prop) {
   if (target.hasOwnProperty(prop)) {
 
     const internals = target[__CUE__];
-    const value = target[prop];
 
+    /*const value = target[prop];
     const subInternals = value ? value[__CUE__] : undefined;
     if (subInternals) {
       subInternals.instanceWillUnmount();
-    }
+    }*/
 
     delete target[prop];
     internals.valueCache.delete(prop);

@@ -139,9 +139,9 @@ function intercepted_array_splice(start, deleteCount, ...items) {
 
       oldValue = array[i];
 
-      if (oldValue && (subState = oldValue[__CUE__])) {
+      /*if (oldValue && (subState = oldValue[__CUE__])) {
         subState.instanceWillUnmount();
-      }
+      }*/
 
       array.splice(i, 1);
 
@@ -196,11 +196,11 @@ function intercepted_array_pop() {
   }
 
   const last = array[array.length - 1];
-  const subInternals = last ? last[__CUE__] : undefined;
+  /*const subInternals = last ? last[__CUE__] : undefined;
 
   if (subInternals) {
     subInternals.instanceWillUnmount();
-  }
+  }*/
 
   delete array[array.length - 1];
 
@@ -221,11 +221,11 @@ function intercepted_array_shift() {
   }
 
   const last = array[0];
-  const subInternals = last ? last[__CUE__] : undefined;
+  /*const subInternals = last ? last[__CUE__] : undefined;
 
   if (subInternals) {
     subInternals.instanceWillUnmount();
-  }
+  }*/
 
   array.shift();
 
@@ -256,7 +256,7 @@ function intercepted_array_copyWithin(target, start = 0, end = this.length) {
     direction = 1;
   }
 
-  let value, subState;
+  let value;
   while (count > 0) {
     if (from in array) {
       value = array[from];
@@ -266,10 +266,11 @@ function intercepted_array_copyWithin(target, start = 0, end = this.length) {
       array[to] = array[from];
 
     } else {
-      value = array[to];
+      /*value = array[to];
+      let subState;
       if (value && (subState = value[__CUE__])) {
         subState.instanceWillUnmount();
-      }
+      }*/
       delete array[to];
     }
     from += direction;

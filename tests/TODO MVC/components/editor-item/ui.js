@@ -9,7 +9,6 @@ Cue.UI('Todo-Item', {
         </div>
         <div class="textField">
             <div class="text" contenteditable="false"></div>
-            <div class="date"></div>
         </div>
         <div class="editButton">edit</div>
      </div>`
@@ -25,7 +24,7 @@ Cue.UI('Todo-Item', {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '1.5em',
+      padding: '2.5em',
       margin: '0.85em 0 0',
       background: '#13161A',
       opacity: 0.9,
@@ -33,7 +32,7 @@ Cue.UI('Todo-Item', {
       boxShadow: '0px 4px 5px 0px rgba(0,0,0,0.25)',
       cursor: 'default',
       transition: 'opacity 150ms',
-      '&:hover': {
+      '&:hover:not(.complete)': {
         opacity: 8,
 
         '.editButton': {
@@ -59,37 +58,17 @@ Cue.UI('Todo-Item', {
 
       '.textField': {
         position: 'relative',
-        padding: '0, 1em',
+        padding: '0 2em',
         textAlign: 'center',
-
-        div: {
-          transition: 'opacity 150ms'
-        },
 
         '.text': {
           position: 'relative',
-          height: '100%'
-        },
-
-        '.text::after': {
-          position: 'absolute',
-          content: '',
-          display: 'block',
-          width: '120%',
-          height: '2px',
-          left: '-10%',
-          top: '50%',
-          backgroundColor: 'rgb(0,115,255)',
-          transformOrigin: 'left',
-          transform: 'scaleX(0)',
-          transition: 'transform 250ms ease-in-out'
+          height: '100%',
+          transform: 'scale(1)',
+          opacity: 1,
+          transition: 'transform 150ms ease-in-out, opacity 150ms'
         }
 
-      },
-
-      '.date': {
-        fontSize: '0.7em',
-        opacity: 0.65
       },
 
       '.editButton': {
@@ -112,12 +91,9 @@ Cue.UI('Todo-Item', {
           pointerEvents: 'none'
         },
 
-        '.textField div': {
+        '.text': {
+          transform: 'scale(0.9)',
           opacity: 0.5
-        },
-
-        '.text::after': {
-          transform: 'scaleX(1)'
         },
 
       }
@@ -143,9 +119,12 @@ Cue.UI('Todo-Item', {
       '&.checked': {
         opacity: 1,
 
+        '.bullet': {
+          transform: 'scale(0)'
+        },
+
         '.tick': {
-          opacity: 1,
-          transform: 'scale(0.55)'
+          transform: 'scale(2)'
         }
 
       },
@@ -156,7 +135,9 @@ Cue.UI('Todo-Item', {
         height: 'var(--iconSize)',
         borderRadius: '50%',
         border: '3px solid #98a3ac',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        transform: 'scale(1)',
+        transition: 'transform 200ms ease-in-out'
       },
 
       '.tick': {
@@ -164,10 +145,9 @@ Cue.UI('Todo-Item', {
         width: 'var(--iconSize)',
         height: 'var(--iconSize)',
         borderRadius: '50%',
-        background: '#fff',
-        opacity: 0,
-        transform: 'scale(0.33)',
-        transition: 'opacity 150ms, transform 150ms'
+        background: 'url(assets/check.svg)',
+        transform: 'scale(0)',
+        transition: 'transform 150ms ease-in-out'
       },
 
       '.label': {
@@ -181,10 +161,10 @@ Cue.UI('Todo-Item', {
   initialize(state) {
 
     this.state = state;
-    this.checkBox = this.select('.checkbox');
-    this.textField = this.select('.textField');
-    this.text = this.select('.text');
-    this.editButton = this.select('.editButton');
+    this.checkBox = this.get('.checkbox');
+    this.textField = this.get('.textField');
+    this.text = this.get('.text');
+    this.editButton = this.get('.editButton');
 
     this.isEditing = false;
 
@@ -194,11 +174,7 @@ Cue.UI('Todo-Item', {
 
     click: {
       editButton() {
-        if (!this.isEditing) {
-          this.enterEditMode();
-        } else {
-          this.leaveEditMode();
-        }
+        this.toggleEditMode();
       }
     },
 
@@ -223,52 +199,44 @@ Cue.UI('Todo-Item', {
 
   render: {
 
-    isComplete(itIs) {
-      if (itIs) {
-        this.addClass('complete');
-        this.addClass(this.checkBox, 'checked');
-        this.addClass(this.editButton, 'disabled');
-        this.element.dataset.complete = 'true';
-      } else {
-        this.removeClass('complete');
-        this.removeClass(this.checkBox, 'checked');
-        this.removeClass(this.editButton, 'disabled');
-        this.element.dataset.complete = 'false';
-      }
+    isComplete(bool) {
+      this.useClass('complete', bool);
+      this.checkBox.useClass('checked', bool);
+      this.editButton.useClass('disabled', bool);
+      this.element.dataset.complete = bool;
     },
 
-    selected(itIs) {
-      if (itIs) {
-        this.addClass('selected');
-      } else {
-        this.removeClass('selected');
-      }
+    selected(bool) {
+      this.useClass('selected', bool);
     },
 
     text(content) {
-      this.text.textContent = content;
+      this.text.setText(content);
     },
 
-    visible(itIs) {
-      if (itIs) {
-        this.removeClass('hidden');
-      } else {
-        this.addClass('hidden');
-      }
+    visible(bool) {
+      this.useClass('hidden', !bool);
     }
 
+  },
+
+  toggleEditMode() {
+    if (!this.isEditing) {
+      this.enterEditMode();
+    } else {
+      this.leaveEditMode();
+    }
   },
 
   enterEditMode() {
 
     this.isEditing = true;
-    this.text.setAttribute('contenteditable', 'true');
-    this.editButton.textContent = 'ok';
-
-    this.addClass(this.textField, 'editing');
+    this.text.setAttr('contenteditable', 'true');
+    this.editButton.setText('ok');
+    this.textField.addClass('editing');
 
     const range = document.createRange();
-    range.selectNodeContents(this.text);
+    range.selectNodeContents(this.text.element);
 
     const selection = window.getSelection();
     selection.removeAllRanges();
@@ -278,12 +246,11 @@ Cue.UI('Todo-Item', {
 
   leaveEditMode() {
 
-    this.text.setAttribute('contenteditable', 'false');
-    this.editButton.textContent = 'edit';
+    this.text.setAttr('contenteditable', 'false');
+    this.editButton.setText('edit');
+    this.textField.removeClass('editing');
 
-    this.removeClass(this.textField, 'editing');
-
-    this.state.text = this.text.textContent;
+    this.state.text = this.text.getText();
 
     window.getSelection().removeAllRanges();
 

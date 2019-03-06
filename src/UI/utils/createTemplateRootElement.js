@@ -1,22 +1,14 @@
 
-function createTemplateRootElement(x) {
+function createTemplateRootElement(domString) {
 
-  if (typeof x === 'string') {
+  domString = domString.trim();
 
-    x = x.trim();
-
-    switch (x[0]) {
-      case '<': return document.createRange().createContextualFragment(x).firstChild;
-      case '.': return document.getElementsByClassName(x.substring(1))[0];
-      case '#': return document.getElementById(x.substring(1));
-      case '[': return document.querySelectorAll(x)[0];
-      default:  throw new TypeError(`Can't create template from string because it's not html markup or a valid selector.`);
-    }
-
-  } else if (x instanceof Element) {
-
-    return x;
-
+  switch (domString[0]) {
+    case '<': return DOC.createRange().createContextualFragment(domString).firstChild;
+    case '.': return DOC.getElementsByClassName(domString.substring(1))[0];
+    case '#': return DOC.getElementById(domString.substring(1));
+    case '[': return DOC.querySelectorAll(domString)[0];
+    default:  throw new TypeError(`Can't create template from string because it's not html markup or a valid selector.`);
   }
 
 }

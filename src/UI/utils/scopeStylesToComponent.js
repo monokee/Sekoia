@@ -18,8 +18,6 @@ function scopeStylesToComponent(styles, template, scope) {
 
   const classMap = new Map();
 
-  if (!styles) return classMap;
-
   scope || (scope = `cue-${CUE_UI_STYLESHEET.cssRules.length.toString(36)}`);
 
   for (const key in styles) {

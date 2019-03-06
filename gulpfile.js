@@ -64,10 +64,11 @@ const FILES = {
     `${MODULES.ui}/utils/scopeStylesToComponent.js`,
     `${MODULES.ui}/utils/syntheticEvents.js`,
     `${MODULES.ui}/utils/createTemplateRootElement.js`,
+    `${MODULES.ui}/utils/generateRefPaths.js`,
     `${MODULES.ui}/utils/reconcile.js`,
 
-    `${MODULES.ui}/module/ComponentPrototype.js`,
-    `${MODULES.ui}/module/buildUIComponent.js`,
+    `${MODULES.ui}/module/CueUIComponent.js`,
+    `${MODULES.ui}/module/buildUIModule.js`,
     `${MODULES.ui}/module/createComponentFactory.js`,
 
     `${MODULES.ui}/public-api.js`
@@ -84,12 +85,12 @@ const FILES = {
     `${SOURCE_DIR}/public-api.js`
   ],
   library: [
-    `${MODULES.library}/cue-math.js`,
+    /*`${MODULES.library}/cue-math.js`,
     `${MODULES.library}/cue-string.js`,
     `${MODULES.library}/cue-array.js`,
     `${MODULES.library}/cue-equality.js`,
     `${MODULES.library}/cue-clone.js`,
-    `${MODULES.library}/cue-function.js`
+    `${MODULES.library}/cue-function.js`*/
   ]
 };
 

@@ -3,13 +3,13 @@ Cue.UI('Todo-Container', Component => ({
   element: (
     `<div class="container">
         <div class="header">
-          <img class="logo" src="" alt="logo">
-          <h1 class="headline"></h1>
+          <img ref="logo" class="logo" src="" alt="logo">
+          <h1 ref="title" class="headline"></h1>
         </div>
-        <div class="editorContainer"></div>
+        <div ref="editor" class="editorContainer"></div>
         <div class="footer">
-          <p class="author"></p>
-          <p class="info"></p>
+          <p ref ="author" class="author"></p>
+          <p ref ="info" class="info"></p>
         </div>
      </div>`
   ),
@@ -65,7 +65,7 @@ Cue.UI('Todo-Container', Component => ({
         transition: 'opacity 250ms',
         backgroundImage: 'url(assets/todo_empty.svg)',
         backgroundRepeat: 'no-repeat',
-        backgroundSize: '500px',
+        backgroundSize: '25vmax',
         backgroundPosition: '55% 50%'
       },
       '&.empty': {
@@ -125,21 +125,17 @@ Cue.UI('Todo-Container', Component => ({
 
     this.state = state;
 
-    this.select('.logo').src = state.logo;
-    this.select('.headline').textContent = state.title;
-    this.select('.author').textContent = `Written by ${state.author}`;
-    this.select('.info').textContent = state.footer;
-    this.select('.editorContainer').appendChild(this.Editor(state.editor));
+    this.logo.setAttr('src', state.logo);
+    this.title.setText(state.title);
+    this.author.setText(`Written by ${state.author}`);
+    this.info.setText(state.footer);
+    this.editor.append(this.Editor(state.editor));
 
   },
 
   render: {
-    hasTodos(itDoes) {
-      if (itDoes) {
-        this.removeClass('empty');
-      } else {
-        this.addClass('empty');
-      }
+    hasTodos(bool) {
+      this.useClass('empty', !bool);
     }
   }
 

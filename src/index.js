@@ -1,17 +1,18 @@
 
 /*
  *
- * 🧿 Cue - Reactive Data-Driven Web Apps
+ * ☉ Cue - Atomically Reactive Web Apps
  *
- * @author Jonathan M. Ochmann for color.io
+ * @author Jonathan M. Ochmann
  * Copyright 2019 Patchflyer GmbH
  *
  */
 
 // Meta Keys used for closure scope lookup && safely extending foreign objects
-const __CUE__ = Symbol('🧿');
+const __CUE__ = Symbol('☉');
 
 // Builtins
+const DOC = document;
 const OBJ = Object;
 const ARR = Array;
 const OBJ_ID = '[object Object]';
