@@ -217,6 +217,15 @@ const CueUIComponent = wrap(() => {
       return this;
     }
 
+    getData(name) {
+      return this.element.dataset[name];
+    }
+
+    setData(name, value) {
+      this.element.dataset[name] = value;
+      return this;
+    }
+
     getIndex(el) {
       if (el instanceof Element) {
         return toArray(el.parentNode.children).indexOf(el);
@@ -264,12 +273,8 @@ const CueUIComponent = wrap(() => {
     }
 
     useClass(className, bool = true) {
-      if (bool === true) {
-        this.element.classList.add(this[__STYLES__].get(className) || className);
-      } else {
-        this.element.classList.remove(this[__STYLES__].get(className) || className);
-      }
-     return this;
+      this.element.classList.toggle(this[__STYLES__].get(className) || className, bool);
+      return this;
     }
 
     awaitTransition() {

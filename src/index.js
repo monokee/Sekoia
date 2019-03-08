@@ -17,6 +17,8 @@ const OBJ = Object;
 const ARR = Array;
 const OBJ_ID = '[object Object]';
 const EMPTY_MAP = new Map();
+const EMPTY_STRING = '';
+const EMPTY_ARRAY = [];
 
 // Static Object/Array Helpers
 const oAssign = OBJ.assign;

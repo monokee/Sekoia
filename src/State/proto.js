@@ -25,12 +25,12 @@ oAssign(STATE_MODULE, {
    * @param   {object} [options = {readOnly: false}]      - optional options object that can indicate whether an injected property has both read-write (default) or read-only capabilities.
    * @returns {ProviderDescription}                       - Object describing the relationship between consumers and providers. Reused and enhanced throughout module instantiation cycle.
    */
-  inject: (sourcePath, options = { readOnly: false }) => {
+  /*inject: (sourcePath, options = { readOnly: false }) => {
     const fragments = sourcePath.split('.');
     const sourceModule = fragments.slice(0, -1).join('.');
     const sourceProperty = fragments[fragments.length - 1];
     if (!CUE_STATE_MODULES.has(sourceModule)) throw new ReferenceError(`Can't inject "${sourceProperty}" from undefined State Module "${sourceModule}".`);
     return new ProviderDescription(sourceModule, sourceProperty, options.readOnly);
-  }
+  }*/
 
 });

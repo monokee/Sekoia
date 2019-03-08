@@ -13,21 +13,17 @@ function createState(data, module, type, props) {
   // 1. Attach Internals to "data" under private __CUE__ symbol.
   const internals = data[__CUE__] = type === STATE_TYPE_MODULE ? new StateModuleInternals(module, type) : new StateExtensionInternals(module, type);
 
-  // 2. Wrap "data" into a reactive proxy
-  const proxyState = new Proxy(data, {
+  // 2. Give Internals explicit reference to both the plain "data" and the wrapped proxy
+  internals.plainState = data;
+  internals.proxyState = new Proxy(data, {
     get: proxyGetHandler,
     set: proxySetHandler,
     deleteProperty: proxyDeleteHandler
   });
 
-  // 3. Give Internals explicit reference to both the plain "data" and the wrapped proxy
-  internals.plainState = data;
-  internals.proxyState = proxyState;
-
-  // 4. When called from a StateFactory, pass initial props to Internals
+  // 3. When called from a StateFactory, pass initial props to Internals
   if (props) internals.initialProps = props;
 
-  // 5. Return
   return internals;
 
 }

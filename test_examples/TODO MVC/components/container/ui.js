@@ -1,15 +1,15 @@
 Cue.UI('Todo-Container', Component => ({
 
   element: (
-    `<div class="container">
+    `<div $container class="container">
         <div class="header">
-          <img ref="logo" class="logo" src="" alt="logo">
-          <h1 ref="title" class="headline"></h1>
+          <img $logo class="logo" src="" alt="logo">
+          <h1 $title class="headline"></h1>
         </div>
-        <div ref="editor" class="editorContainer"></div>
+        <div $editor class="editorContainer"></div>
         <div class="footer">
-          <p ref ="author" class="author"></p>
-          <p ref ="info" class="info"></p>
+          <p $author class="author"></p>
+          <p $info class="info"></p>
         </div>
      </div>`
   ),
@@ -125,17 +125,19 @@ Cue.UI('Todo-Container', Component => ({
 
     this.state = state;
 
-    this.logo.setAttr('src', state.logo);
-    this.title.setText(state.title);
-    this.author.setText(`Written by ${state.author}`);
-    this.info.setText(state.footer);
-    this.editor.append(this.Editor(state.editor));
+    this.$logo.setAttr('src', state.logo);
+    this.$title.setText(state.title);
+    this.$author.setText(`Written by ${state.author}`);
+    this.$info.setText(state.footer);
+    this.$editor.append(this.Editor(state.editor));
 
   },
 
   render: {
-    hasTodos(bool) {
-      this.useClass('empty', !bool);
+    $container: {
+      hasTodos(el, bool) {
+        el.useClass('empty', !bool);
+      }
     }
   }
 

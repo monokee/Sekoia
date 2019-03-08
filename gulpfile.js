@@ -31,7 +31,7 @@ const FILES = {
 
     `${MODULES.state}/utils/*.js`,
 
-    `${MODULES.state}/transductions/*.js`,
+    //`${MODULES.state}/transductions/*.js`,
 
     `${MODULES.state}/derivatives/Derivative.js`,
     `${MODULES.state}/derivatives/OrderedDerivatives.js`,
@@ -65,6 +65,7 @@ const FILES = {
     `${MODULES.ui}/utils/syntheticEvents.js`,
     `${MODULES.ui}/utils/createTemplateRootElement.js`,
     `${MODULES.ui}/utils/generateRefPaths.js`,
+    `${MODULES.ui}/utils/preCompileReactions.js`,
     `${MODULES.ui}/utils/reconcile.js`,
 
     `${MODULES.ui}/module/CueUIComponent.js`,

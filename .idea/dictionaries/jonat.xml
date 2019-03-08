@@ -2,13 +2,16 @@
   <dictionary name="jonat">
     <words>
       <w>checkmark</w>
+      <w>clearbutton</w>
       <w>clickables</w>
       <w>clss</w>
       <w>computeds</w>
       <w>contenteditable</w>
       <w>drawkit</w>
+      <w>editbutton</w>
       <w>gsap</w>
       <w>hndlr</w>
+      <w>itemcount</w>
       <w>lerp</w>
       <w>monokee</w>
       <w>ochmann</w>

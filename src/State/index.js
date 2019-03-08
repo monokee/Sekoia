@@ -55,9 +55,9 @@ oDefineProperty(CUE_ROOT_STATE, __CUE__, {
     proxyState: CUE_ROOT_STATE,
     observersOf: EMPTY_MAP,
     derivativesOf: EMPTY_MAP,
-    consumersOf: EMPTY_MAP,
-    providersToInstall: EMPTY_MAP,
-    derivativesToInstall: EMPTY_MAP,
+    //consumersOf: EMPTY_MAP,
+    //providersToInstall: EMPTY_MAP,
+    //derivativesToInstall: EMPTY_MAP,
     internalGetters: EMPTY_MAP,
     internalSetters: EMPTY_MAP,
     propertyDidChange: NOOP

@@ -1,3 +1,4 @@
+
 /**
  * Attaches itself to a reactive state instance under private [__CUE__] symbol.
  * Properties and methods are required for reactivity engine embedded into every Cue State Instance
@@ -36,9 +37,9 @@ class StateInternals {
       directParent.cueObservers.call(directParent, ownProp, ownValue);
       directParent.cueDerivatives.call(directParent, ownProp);
 
-      if (directParent.consumersOf.has(ownProp)) {
+      /*if (directParent.consumersOf.has(ownProp)) {
         directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
-      }
+      }*/
 
       ownProp = directParent.ownPropertyName;
       ownValue = directParent.proxyState;
@@ -96,16 +97,16 @@ class StateModuleInternals extends StateInternals {
     this.name = this.module.name;
     this.internalGetters = this.module.internalGetters;
     this.internalSetters = this.module.internalSetters;
-    this.consumersOf = this.module.consumersOf;
+    //this.consumersOf = this.module.consumersOf;
 
     this.observersOf = new Map();       // 1D map [propertyName -> handler]
     this.derivativesOf = new Map();     // 2D map [propertyName -> 1D array[...Derivatives]]
     this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
-    this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
+    //this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-    if (this.module.providersToInstall.size) {
+    /*if (this.module.providersToInstall.size) {
       this.injectProviders();
-    }
+    }*/
 
     if (this.module.derivativesToInstall.size) {
       this.installDerivatives();
@@ -125,9 +126,9 @@ class StateModuleInternals extends StateInternals {
     this.cueObservers(prop, value);
     this.cueDerivatives(prop);
 
-    if (this.consumersOf.has(prop)) {
+    /*if (this.consumersOf.has(prop)) {
       this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
-    }
+    }*/
 
     this.bubble();
 
@@ -165,7 +166,7 @@ class StateModuleInternals extends StateInternals {
 
   }
 
-  cueConsumers(providerInstance, consumers, prop, value) {
+  /*cueConsumers(providerInstance, consumers, prop, value) {
 
     // Find consumer instances and recurse into each branch
 
@@ -200,7 +201,7 @@ class StateModuleInternals extends StateInternals {
 
     }
 
-  }
+  }*/
 
   injectProviders() {
 

@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     title: 'Cue Todo',
     logo: 'assets/CueLogo__main.svg',
     author: 'monokee',
-    footer: 'Illustrations by drawkit.io',
+    footer: 'Character illustration by drawkit.io',
     editor: JSON.parse(localStorage.getItem('cue-todos')) || {
       filter: 'all',
       todos: []

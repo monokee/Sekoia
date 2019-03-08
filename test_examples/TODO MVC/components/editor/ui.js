@@ -6,16 +6,16 @@ Cue.UI('Todo-Editor', Component => ({
         <div class="button add1k">+1k</div>
         <div class="button save">Save</div>
       </div>
-      <input type="text" class="todoInput" placeholder="What needs to be done?">
-      <div class="todoList" tabindex="0"></div>
-      <div class="footer">
-        <div class="itemCount"></div>
+      <input $input type="text" class="todoInput" placeholder="What needs to be done?">
+      <div $list class="todoList" tabindex="0"></div>
+      <div $footer class="footer">
+        <div $itemcount class="itemCount"></div>
         <div class="filterButtons">
-           <div class="filterButton filterButton--all" data-type="all">All</div>
-           <div class="filterButton filterButton--active" data-type="active">Active</div>
-           <div class="filterButton filterButton--completed" data-type="completed">Completed</div>
+           <div $filter_all class="filterButton" data-type="all">All</div>
+           <div $filter_active class="filterButton" data-type="active">Active</div>
+           <div $filter_completed class="filterButton" data-type="completed">Completed</div>
         </div>
-        <div class="clearButton">Clear Completed</div>
+        <div $clearbutton class="clearButton">Clear Completed</div>
       </div>
     </div>
   `),
@@ -144,33 +144,19 @@ Cue.UI('Todo-Editor', Component => ({
   },
 
   initialize(state) {
-
     this.state = state;
-
-    this.input = this.get('.todoInput');
-    this.list = this.get('.todoList');
-    this.itemCount = this.get('.itemCount');
-    this.footer = this.get('.footer');
-    this.clearButton = this.get('.clearButton');
-
-    this.filterButtons = {
-      all: this.get('.filterButton--all'),
-      active: this.get('.filterButton--active'),
-      completed: this.get('.filterButton--completed')
-    };
-
   },
 
   events: {
 
     keydown: {
       todoInput(e) {
-        if (e.which === 13 && this.input.value) {
+        if (e.which === 13 && this.$input.element.value) {
           this.state.addTodo({
             isComplete: false,
-            text: this.input.getAttr('value')
+            text: this.$input.element.value
           });
-          this.input.setAttr('value', '');
+          this.$input.element.value = '';
         }
       },
       todoList(e) {
@@ -223,38 +209,41 @@ Cue.UI('Todo-Editor', Component => ({
   },
 
   render: {
-
-    filter(type) {
-      for (const button in this.filterButtons) {
-        this.filterButtons[button].useClass('active', button === type);
+    $filter_all: {
+      filter(ref, type) {
+        ref.useClass('active', type === 'all');
       }
     },
-
-    activeCount(number) {
-      this.itemCount.setText(`${number} ${number === 1 ? 'item' : 'items'} left`);
+    $filter_active: {
+      filter(ref, type) {
+        ref.useClass('active', type === 'active');
+      }
     },
-
-    completedCount(number) {
-      this.clearButton.useClass('visible', number > 0);
+    $filter_completed: {
+      filter(ref, type) {
+        ref.useClass('active', type === 'completed');
+      }
     },
-
-    todos(todoArray) {
-      this.list.setChildren(todoArray, this.TodoItem);
-      this.footer.useClass('hidden', todoArray.length === 0);
+    $itemcount: {
+      activeCount(ref, number) {
+        ref.setText(`${number} ${number === 1 ? 'item' : 'items'} left`);
+      }
     },
-
-    visibleTodos(todoArray) {
-      todoArray.forEach(item => {
-        item.visible = true;
-      });
+    $clearbutton: {
+      completedCount(ref, number) {
+        ref.useClass('visible', number > 0);
+      }
     },
-
-    hiddenTodos(todoArray) {
-      todoArray.forEach(item => {
-        item.visible = false;
-      });
+    $list: {
+      todos(ref, todoArray) {
+        ref.setChildren(todoArray, this.TodoItem);
+      }
+    },
+    $footer: {
+      todos(ref, todoArray) {
+        ref.useClass('hidden', todoArray.length === 0);
+      }
     }
-
   }
 
 }));

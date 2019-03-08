@@ -18,6 +18,8 @@
   const ARR = Array;
   const OBJ_ID = '[object Object]';
   const EMPTY_MAP = new Map();
+  const EMPTY_STRING = '';
+  const EMPTY_ARRAY = [];
 
   // Static Object/Array Helpers
   const oAssign = OBJ.assign;
@@ -192,9 +194,9 @@
       proxyState: CUE_ROOT_STATE,
       observersOf: EMPTY_MAP,
       derivativesOf: EMPTY_MAP,
-      consumersOf: EMPTY_MAP,
-      providersToInstall: EMPTY_MAP,
-      derivativesToInstall: EMPTY_MAP,
+      //consumersOf: EMPTY_MAP,
+      //providersToInstall: EMPTY_MAP,
+      //derivativesToInstall: EMPTY_MAP,
       internalGetters: EMPTY_MAP,
       internalSetters: EMPTY_MAP,
       propertyDidChange: NOOP
@@ -848,90 +850,6 @@
   }
 
   /**
-   * Find the first state instance that has only consumers but no further providers of a provided property.
-   * @param {object} provider - The provider of a property value. If the value has been provided to the provider, recurse until provider has no more providers.
-   * @return {object}         - The root provider of the initially passed provider. Might be the initially passed provider if it doesn't have superProviders.
-   */
-  function getRootProvider(provider) {
-    const superProvider = provider.sourceInternals.providersOf.get(provider.sourceProperty);
-    return superProvider ? getRootProvider(superProvider) : provider;
-  }
-
-  /**
-   * This is a blueprint that is created during module registration. It will be used at instantiation time
-   * to create a real Provider interfaces for the actual instances. ProviderDescription is a class so we can easily use instanceof.
-   */
-  class ProviderDescription {
-
-    /**
-     * Creates an object that describes a property transduction that we store on modules that have injected properties. It is the return value of Module.inject().
-     * @param {string}  sourceModule    - The name of the module that provides a piece of data
-     * @param {string}  sourceProperty  - The name of the provided property as defined on the provider module
-     * @param {boolean} readOnly        - Whether the consumers of the provider have read-write or read-only capabilities
-     */
-    constructor(sourceModule, sourceProperty, readOnly) {
-
-      this.sourceModule = sourceModule;
-      this.sourceProperty = sourceProperty;
-      this.readOnly = readOnly === true;
-
-      // will be added after construction, just here for clarity.
-      this.targetModule = undefined;
-      this.targetProperty = undefined;
-
-    }
-
-  }
-
-  /**
-   * Installs a weak link to a consuming child module on a parent module that will provide data to it.
-   * @param targetModule    {string}          - The name of the module that is consuming data from a provider.
-   * @param targetProperty  {(string|number)} - The name of the property on the targetModule that is consuming the sourceProperty on the sourceModule.
-   * @param sourceModule    {string}          - The name of the module that is providing data to the targetModule.
-   * @param sourceProperty  {(string|number)} - The name of the property on the sourceModule that is providing data to the targetProperty on the targetModule.
-   */
-  function referenceConsumer(targetModule, targetProperty, sourceModule, sourceProperty) {
-
-    // TODO: as an optimization, we should count the number of instances that consume a property.
-    //  that way we can stop the dynamic lookup when all instances have been notified at runtime!
-
-    const ConsumerReference = {
-      targetModule,
-      targetProperty,
-      sourceModule,
-      sourceProperty
-    };
-
-    const source = CUE_STATE_INTERNALS.get(sourceModule);
-
-    if (source.consumersOf.has(sourceProperty)) {
-
-      const consumers = source.consumersOf.get(sourceProperty);
-
-      let exists = false,
-        i = -1;
-      while (++i < consumers.length && exists === false) {
-        if (
-          consumers[i].targetModule === targetModule &&
-          consumers[i].targetProperty === targetProperty &&
-          consumers[i].sourceModule === sourceModule &&
-          consumers[i].sourceProperty === sourceProperty
-        ) exists = true;
-      }
-
-      if (exists === false) {
-        source.consumersOf.get(sourceProperty).push(ConsumerReference);
-      }
-
-    } else {
-
-      source.consumersOf.set(sourceProperty, [ConsumerReference]);
-
-    }
-
-  }
-
-  /**
    * Creates a new computed property instance.
    * @class Derivative
    */
@@ -1332,14 +1250,8 @@
    */
   function react() {
 
-    if (FLUSHING_BUFFER === false) {
-
-      if (REACTION_BUFFER !== null) {
-        cancelAnimationFrame(REACTION_BUFFER);
-      }
-
+    if (REACTION_BUFFER === null && FLUSHING_BUFFER === false) {
       REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
-
     }
 
   }
@@ -1435,7 +1347,7 @@
     module.imports = config.imports;
     module.defaults = {};
     module.initialize = NOOP;
-    module.consumersOf = new Map();
+    //module.consumersOf = new Map();
 
     // All internal getters (extended below)
     module.internalGetters = new Map([
@@ -1448,7 +1360,7 @@
 
     // these have to be installed by each instance of the module on mount.
     module.derivativesToInstall = new Map();
-    module.providersToInstall = new Map();
+    //module.providersToInstall = new Map();
 
     // 1. Split props into defaults, computed properties and injected properties.
     // Computeds and injected props are being pre-configured here as much as possible to reduce the amount of work we have to do when we're creating instances from this module.
@@ -1471,38 +1383,40 @@
           return internals.derivedProperties.get(prop).value();
         });
 
-      } else if (val instanceof ProviderDescription) {
-        // We found a property that wants to inject data from a parent state. The source of the requested data is described in the ProviderDescription that was created when the property called Module.inject(...).
+      }
+      /*else if (val instanceof ProviderDescription) {
+           // We found a property that wants to inject data from a parent state. The source of the requested data is described in the ProviderDescription that was created when the property called Module.inject(...).
 
-        // 1. Extend the providerDescription with the source (we can use this later to avoid an extra loop)
-        val.targetModule = module.name;
-        val.targetProperty = prop;
+           // 1. Extend the providerDescription with the source (we can use this later to avoid an extra loop)
+           val.targetModule = module.name;
+           val.targetProperty = prop;
 
-        // 2. map the name of the requesting property to the ProviderDescription:
-        module.providersToInstall.set(prop, val);
-        // We will use this mapping when this module gets instantiated: If this module has write-access to the provider (readOnly = false) we will install a strong pointer to the parent state into the consuming child instance.
+           // 2. map the name of the requesting property to the ProviderDescription:
+           module.providersToInstall.set(prop, val);
+           // We will use this mapping when this module gets instantiated: If this module has write-access to the provider (readOnly = false) we will install a strong pointer to the parent state into the consuming child instance.
 
-        // Now we also have to create the inverse relationship ie. install this module as a consumer of the providing module under the respectively mapped property names.
-        // To avoid memory leaks and the need for manual disposing, the approach for the inverse is different: We will not install strong pointers of consuming child instances into providing parent instances.
-        // Instead, we create a consumer that has the string name of the module that is consuming from it. At mutation-time a stateInstance will query its underlying module for any consumers and traverse down
-        // its object-children and update any instances that match the consumer module description along the way to the furthest leaves.
-        referenceConsumer(module.name, prop, val.sourceModule, val.sourceProperty);
+           // Now we also have to create the inverse relationship ie. install this module as a consumer of the providing module under the respectively mapped property names.
+           // To avoid memory leaks and the need for manual disposing, the approach for the inverse is different: We will not install strong pointers of consuming child instances into providing parent instances.
+           // Instead, we create a consumer that has the string name of the module that is consuming from it. At mutation-time a stateInstance will query its underlying module for any consumers and traverse down
+           // its object-children and update any instances that match the consumer module description along the way to the furthest leaves.
+           referenceConsumer(module.name, prop, val.sourceModule, val.sourceProperty);
 
-        module.internalGetters.set(prop, internals => {
-          const rootProvider = internals.providersOf.get(prop);
-          return rootProvider.sourceInternals.plainState[rootProvider.sourceProperty];
-        });
+           module.internalGetters.set(prop, internals => {
+             const rootProvider = internals.providersOf.get(prop);
+             return rootProvider.sourceInternals.plainState[rootProvider.sourceProperty];
+           });
 
-        if (val.readOnly === false) {
+           if (val.readOnly === false) {
 
-          module.internalSetters.set(prop, (internals, value) => {
-            const rootProvider = internals.providersOf.get(prop);
-            rootProvider.sourceInternals.proxyState[rootProvider.sourceProperty] = value;
-          });
+             module.internalSetters.set(prop, (internals, value) => {
+               const rootProvider = internals.providersOf.get(prop);
+               rootProvider.sourceInternals.proxyState[rootProvider.sourceProperty] = value;
+             });
 
-        }
+           }
 
-      } else {
+         }*/
+      else {
 
         module.defaults[prop] = val;
 
@@ -1554,6 +1468,7 @@
     return module;
 
   }
+
   /**
    * Attaches itself to a reactive state instance under private [__CUE__] symbol.
    * Properties and methods are required for reactivity engine embedded into every Cue State Instance
@@ -1592,9 +1507,9 @@
         directParent.cueObservers.call(directParent, ownProp, ownValue);
         directParent.cueDerivatives.call(directParent, ownProp);
 
-        if (directParent.consumersOf.has(ownProp)) {
+        /*if (directParent.consumersOf.has(ownProp)) {
           directParent.cueConsumers.call(directParent, directParent, directParent.consumersOf.get(ownProp), ownProp);
-        }
+        }*/
 
         ownProp = directParent.ownPropertyName;
         ownValue = directParent.proxyState;
@@ -1652,16 +1567,16 @@
       this.name = this.module.name;
       this.internalGetters = this.module.internalGetters;
       this.internalSetters = this.module.internalSetters;
-      this.consumersOf = this.module.consumersOf;
+      //this.consumersOf = this.module.consumersOf;
 
       this.observersOf = new Map(); // 1D map [propertyName -> handler]
       this.derivativesOf = new Map(); // 2D map [propertyName -> 1D array[...Derivatives]]
       this.derivedProperties = new Map(); // 1D map [propertyName -> Derivative]
-      this.providersOf = new Map(); // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
+      //this.providersOf = new Map();       // 1D map [ownPropertyName -> provider{sourceInstance: instance of this very class on an ancestor state, sourceProperty: name of prop on source}]
 
-      if (this.module.providersToInstall.size) {
+      /*if (this.module.providersToInstall.size) {
         this.injectProviders();
-      }
+      }*/
 
       if (this.module.derivativesToInstall.size) {
         this.installDerivatives();
@@ -1681,9 +1596,9 @@
       this.cueObservers(prop, value);
       this.cueDerivatives(prop);
 
-      if (this.consumersOf.has(prop)) {
+      /*if (this.consumersOf.has(prop)) {
         this.cueConsumers(this, this.consumersOf.get(prop), prop, value);
-      }
+      }*/
 
       this.bubble();
 
@@ -1721,7 +1636,7 @@
 
     }
 
-    cueConsumers(providerInstance, consumers, prop, value) {
+    /*cueConsumers(providerInstance, consumers, prop, value) {
 
       // Find consumer instances and recurse into each branch
 
@@ -1756,7 +1671,7 @@
 
       }
 
-    }
+    }*/
 
     injectProviders() {
 
@@ -1973,21 +1888,17 @@
     // 1. Attach Internals to "data" under private __CUE__ symbol.
     const internals = data[__CUE__] = type === STATE_TYPE_MODULE ? new StateModuleInternals(module, type) : new StateExtensionInternals(module, type);
 
-    // 2. Wrap "data" into a reactive proxy
-    const proxyState = new Proxy(data, {
+    // 2. Give Internals explicit reference to both the plain "data" and the wrapped proxy
+    internals.plainState = data;
+    internals.proxyState = new Proxy(data, {
       get: proxyGetHandler,
       set: proxySetHandler,
       deleteProperty: proxyDeleteHandler
     });
 
-    // 3. Give Internals explicit reference to both the plain "data" and the wrapped proxy
-    internals.plainState = data;
-    internals.proxyState = proxyState;
-
-    // 4. When called from a StateFactory, pass initial props to Internals
+    // 3. When called from a StateFactory, pass initial props to Internals
     if (props) internals.initialProps = props;
 
-    // 5. Return
     return internals;
 
   }
@@ -2097,15 +2008,13 @@
      * @param   {object} [options = {readOnly: false}]      - optional options object that can indicate whether an injected property has both read-write (default) or read-only capabilities.
      * @returns {ProviderDescription}                       - Object describing the relationship between consumers and providers. Reused and enhanced throughout module instantiation cycle.
      */
-    inject: (sourcePath, options = {
-      readOnly: false
-    }) => {
+    /*inject: (sourcePath, options = { readOnly: false }) => {
       const fragments = sourcePath.split('.');
       const sourceModule = fragments.slice(0, -1).join('.');
       const sourceProperty = fragments[fragments.length - 1];
       if (!CUE_STATE_MODULES.has(sourceModule)) throw new ReferenceError(`Can't inject "${sourceProperty}" from undefined State Module "${sourceModule}".`);
       return new ProviderDescription(sourceModule, sourceProperty, options.readOnly);
-    }
+    }*/
 
   });
 
@@ -2139,6 +2048,12 @@
   const CUE_UI_MODULES = new Map();
 
   const SYNTHETIC_EVENT_KEYS = new Map();
+
+  const CUE_TREEWALKER = DOC.createTreeWalker(DOC, NodeFilter.SHOW_ALL, null, false);
+
+  const CUE_REF_ID = '$';
+
+  const TAGNAME_TEMPLATE = 'TEMPLATE';
 
   // The helper object available to public component registration closure as "Component".
   // inherits methods and properties from main LIB object and thus has access to plugins and generic utilities
@@ -2395,7 +2310,7 @@
 
     const types = oKeys(events);
 
-    const eventHandlers = new Map();
+    const eventHandlers = [];
 
     for (let i = 0, type, token, val; i < types.length; i++) {
 
@@ -2410,12 +2325,12 @@
       }
 
       // Create a pseudo-2D Array which contains consecutive pairs of 'selector' + handler.
-      eventHandlers.set(token, isObjectLike(val) ? getScopedSelectorHandlers(val, scopedStyles) : [rootScope, val]);
+      eventHandlers.push(token, isObjectLike(val) ? getScopedSelectorHandlers(val, scopedStyles) : [rootScope, val]);
 
     }
 
-    // return a map of shape: { eventTypeToken: [...selector + handler(), selector + handler()...] }
-    // we use this map to attach a pointer to the handler array to every new instance of a component under the type token.
+    // return a pseudo-2D Array of shape: [ eventTypeToken: [...selector + handler(), selector + handler()...] ]
+    // we use this array to attach a pointer to the handler array to every new instance of a component under the type token.
     return eventHandlers;
 
   }
@@ -2502,34 +2417,97 @@
 
   }
 
-  const CUE_TREEWALKER = DOC.createTreeWalker(DOC, NodeFilter.SHOW_ALL, null, false);
-
-  // generates static paths to nodes with a "ref" attribute in a template element. this dramatically speeds up retrieval of ref-nodes
-  // during instantiation of new ui components... ref-nodes are automatically made available as top-level sub-components
+  // generates static paths to nodes with a "$" attribute in a template element. this dramatically speeds up retrieval of ref-nodes
+  // during instantiation of new ui components... ref-nodes are automatically made available as top-level sub-components as this.$xyz
   function generateRefPaths(el) {
 
     CUE_TREEWALKER.currentNode = el;
 
-    const indices = [];
+    const refPaths = [];
 
     let ref, i = 0;
 
     do { // run this at least once...
-      if (el.nodeType !== 3 && (ref = el.getAttribute('ref'))) {
-        indices.push(ref, i + 1);
+      if (el.nodeType !== 3 && (ref = extractRefFromTemplate(el))) { // skip text nodes
+        refPaths.push(ref, i + 1);
         i = 1;
       } else {
         i++;
       }
     } while ((el = CUE_TREEWALKER.nextNode()));
 
-    return indices;
+    return refPaths;
 
+  }
+
+  function extractRefFromTemplate(el) {
+    if (el.attributes !== void 0) {
+      for (let i = 0, name; i < el.attributes.length; i++) {
+        name = el.attributes[i].name;
+        if (name[0] === CUE_REF_ID) {
+          el.removeAttribute(name);
+          return name; // we keep the "$" refID
+        }
+      }
+    }
+    return EMPTY_STRING;
   }
 
   function getRefByIndex(i) {
     while (--i) CUE_TREEWALKER.nextNode();
     return CUE_TREEWALKER.currentNode;
+  }
+
+  function preCompileReactions(reactions) {
+
+    // This function exists to allow for an inversion of the public api design from the internal observable implementation:
+    // Observables fire change reactions when a property of a state object has changed. We want to subscribe to these changes
+    // with specific ui component nodes ($ / refs). Publicly the programmer will declare reactions for $component_nodes
+    // explicitly for every state property. Here we simply re-group these reactions into a single function per state property which
+    // internally calls the individual handlers for every $component_node that should react.
+    // This function has to be called or pre-bound to the scope of each instance of a component.
+
+    const compiled = new Map();
+
+    let ref, stateProp;
+
+    for (ref in reactions) {
+
+      if (ref[0] !== CUE_REF_ID) throw new ReferenceError(`Reactions must be grouped by refs. Refs are sub-elements of a component that are denoted with "${CUE_REF_ID}name_of_the_ref" in the markup.`);
+      if (!isObjectLike(reactions[ref])) throw new TypeError(`Reactions of refs must be grouped into objects which map the name of the reactive state property to a reaction handler which modifies the ref element.`);
+
+      for (stateProp in reactions[ref]) {
+
+        const reactionInstaller = {
+          reaction: reactions[ref][stateProp],
+          ref: ref
+        };
+
+        if (compiled.has(stateProp)) {
+          compiled.get(stateProp).push(reactionInstaller);
+        } else {
+          compiled.set(stateProp, [reactionInstaller]);
+        }
+
+      }
+
+    }
+
+    // we use a pseudo 2d-array here for faster iteration at instantiation time...
+    const reactionHandlers = [];
+
+    compiled.forEach((reactionInstallers, stateProp) => {
+
+      reactionHandlers.push(stateProp, function(value) {
+        for (let i = 0, r; i < reactionInstallers.length; i++) {
+          (r = reactionInstallers[i]).reaction.call(this, this[r.ref], value);
+        }
+      });
+
+    });
+
+    return reactionHandlers;
+
   }
 
   function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
@@ -3060,6 +3038,15 @@
         return this;
       }
 
+      getData(name) {
+        return this.element.dataset[name];
+      }
+
+      setData(name, value) {
+        this.element.dataset[name] = value;
+        return this;
+      }
+
       getIndex(el) {
         if (el instanceof Element) {
           return toArray(el.parentNode.children).indexOf(el);
@@ -3107,11 +3094,7 @@
       }
 
       useClass(className, bool = true) {
-        if (bool === true) {
-          this.element.classList.add(this[__STYLES__].get(className) || className);
-        } else {
-          this.element.classList.remove(this[__STYLES__].get(className) || className);
-        }
+        this.element.classList.toggle(this[__STYLES__].get(className) || className, bool);
         return this;
       }
 
@@ -3140,12 +3123,14 @@
       throw new TypeError(`UI Module requires "element" property that specifies a DOM Element. // expect(element).toEqual(HTMLString || Selector || DOMNode).`);
     }
 
-    const templateElement = createTemplateRootElement(config.element);
+    let tmp;
+    const templateElement = (tmp = createTemplateRootElement(config.element)).tagName === TAGNAME_TEMPLATE ? DOC.importNode(tmp, true).content.children[0] : tmp;
     const refPaths = generateRefPaths(templateElement);
-    const styleScope = config.styles['$scope'] || name;
-    const scopedStyles = isObjectLike(config.styles) ? scopeStylesToComponent(config.styles, templateElement, styleScope) : EMPTY_MAP;
-    const reactions = isObjectLike(config.render) ? config.render : null;
-    const events = isObjectLike(config.events) ? createSyntheticEvents(config.events, styleScope, scopedStyles) : EMPTY_MAP;
+    const hasStyles = isObjectLike(config.styles);
+    const styleScope = hasStyles ? (config.styles['$scope'] || name) : name;
+    const scopedStyles = hasStyles ? scopeStylesToComponent(config.styles, templateElement, styleScope) : EMPTY_MAP;
+    const reactions = isObjectLike(config.render) ? preCompileReactions(config.render) : EMPTY_ARRAY;
+    const events = isObjectLike(config.events) ? createSyntheticEvents(config.events, styleScope, scopedStyles) : EMPTY_ARRAY;
     const initialize = isFunction(config.initialize) ? config.initialize : NOOP;
 
     class Module extends CueUIComponent {
@@ -3158,32 +3143,31 @@
         // 2. Create instance
         super(element, scopedStyles);
 
-        // 3. Assign refs to "this"
-        if (refPaths.length) {
-          CUE_TREEWALKER.currentNode = element;
-          for (let i = 0; i < refPaths.length; i += 2) { // i = name of ref, i+1 = nodeIndex in tree
-            this[refPaths[i]] = new CueUIComponent(getRefByIndex(refPaths[i + 1]), scopedStyles);
-          }
+        let i;
+
+        // 3. Assign $refs to "this"
+        CUE_TREEWALKER.currentNode = element;
+        for (i = 0; i < refPaths.length; i += 2) { // i = name of ref, i+1 = nodeIndex in tree
+          this[refPaths[i]] = new CueUIComponent(getRefByIndex(refPaths[i + 1]), scopedStyles);
         }
 
         // 4. Initialize lifecycle method
         initialize.call(this, state);
+        if (state && state !== this.state) { // auto-assign state
+          this.state = state;
+        }
 
-        // 5. Install state reactions (if state has been assigned via initialize)
-        if (reactions !== null && this.state) {
-          for (const prop in reactions) {
-            this.state[__CUE__].addChangeReaction(prop, reactions[prop].bind(this));
-          }
+        // 5. Install state reactions (will throw if state has not been assigned via initialize but there are reactions...)
+        for (i = 0; i < reactions.length; i += 2) {
+          this.state[__CUE__].addChangeReaction(reactions[i], reactions[i + 1].bind(this));
         }
 
         // 6. Assign synthetic Events
-        if (events.size > 0) {
-          events.forEach((handlers, eventTypeToken) => {
-            element[eventTypeToken] = {
-              scope: this,
-              handlers: handlers
-            }
-          });
+        for (i = 0; i < events.length; i += 2) {
+          element[events[i]] = {
+            scope: this,
+            handlers: events[i + 1]
+          };
         }
 
       }

@@ -1,16 +1,16 @@
 Cue.UI('Todo-Item', {
 
   element: (
-    `<div class="item" data-complete="false">
-        <div class="checkbox">
+    `<div $item class="item" data-complete="false">
+        <div $checkbox class="checkbox">
             <div class="bullet"></div>
             <div class="tick"></div>
             <div class="label"></div>
         </div>
-        <div class="textField">
-            <div class="text" contenteditable="false"></div>
+        <div $textfield class="textField">
+            <div $text class="text" contenteditable="false"></div>
         </div>
-        <div class="editButton">edit</div>
+        <div $editbutton class="editButton">edit</div>
      </div>`
   ),
 
@@ -159,15 +159,8 @@ Cue.UI('Todo-Item', {
   },
 
   initialize(state) {
-
     this.state = state;
-    this.checkBox = this.get('.checkbox');
-    this.textField = this.get('.textField');
-    this.text = this.get('.text');
-    this.editButton = this.get('.editButton');
-
     this.isEditing = false;
-
   },
 
   events: {
@@ -199,23 +192,34 @@ Cue.UI('Todo-Item', {
 
   render: {
 
-    isComplete(bool) {
-      this.useClass('complete', bool);
-      this.checkBox.useClass('checked', bool);
-      this.editButton.useClass('disabled', bool);
-      this.element.dataset.complete = bool;
+    $item: {
+      isComplete(ref, value) {
+        ref.useClass('complete', value).setData('complete', value);
+      },
+      selected(ref, value) {
+        ref.useClass('selected', value);
+      },
+      visible(ref, value) {
+        ref.useClass('hidden', !value);
+      }
     },
 
-    selected(bool) {
-      this.useClass('selected', bool);
+    $checkbox: {
+      isComplete(ref, value) {
+        ref.useClass('checked', value);
+      }
     },
 
-    text(content) {
-      this.text.setText(content);
+    $editbutton: {
+      isComplete(ref, value) {
+        ref.useClass('disabled', value);
+      }
     },
 
-    visible(bool) {
-      this.useClass('hidden', !bool);
+    $text: {
+      text(ref, value) {
+        ref.setText(value);
+      }
     }
 
   },
@@ -231,12 +235,12 @@ Cue.UI('Todo-Item', {
   enterEditMode() {
 
     this.isEditing = true;
-    this.text.setAttr('contenteditable', 'true');
-    this.editButton.setText('ok');
-    this.textField.addClass('editing');
+    this.$text.setAttr('contenteditable', 'true');
+    this.$editbutton.setText('ok');
+    this.$textfield.addClass('editing');
 
     const range = document.createRange();
-    range.selectNodeContents(this.text.element);
+    range.selectNodeContents(this.$text.element);
 
     const selection = window.getSelection();
     selection.removeAllRanges();
@@ -246,11 +250,11 @@ Cue.UI('Todo-Item', {
 
   leaveEditMode() {
 
-    this.text.setAttr('contenteditable', 'false');
-    this.editButton.setText('edit');
-    this.textField.removeClass('editing');
+    this.$text.setAttr('contenteditable', 'false');
+    this.$editbutton.setText('edit');
+    this.$textfield.removeClass('editing');
 
-    this.state.text = this.text.getText();
+    this.state.text = this.$text.getText();
 
     window.getSelection().removeAllRanges();
 

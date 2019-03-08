@@ -24,7 +24,7 @@ function buildStateModule(module, moduleInitializer) {
   module.imports = config.imports;
   module.defaults = {};
   module.initialize = NOOP;
-  module.consumersOf = new Map();
+  //module.consumersOf = new Map();
 
   // All internal getters (extended below)
   module.internalGetters = new Map([
@@ -37,7 +37,7 @@ function buildStateModule(module, moduleInitializer) {
 
   // these have to be installed by each instance of the module on mount.
   module.derivativesToInstall = new Map();
-  module.providersToInstall = new Map();
+  //module.providersToInstall = new Map();
 
 
   // 1. Split props into defaults, computed properties and injected properties.
@@ -61,7 +61,7 @@ function buildStateModule(module, moduleInitializer) {
         return internals.derivedProperties.get(prop).value();
       });
 
-    } else if (val instanceof ProviderDescription) {
+    } /*else if (val instanceof ProviderDescription) {
       // We found a property that wants to inject data from a parent state. The source of the requested data is described in the ProviderDescription that was created when the property called Module.inject(...).
 
       // 1. Extend the providerDescription with the source (we can use this later to avoid an extra loop)
@@ -92,7 +92,7 @@ function buildStateModule(module, moduleInitializer) {
 
       }
 
-    } else {
+    }*/ else {
 
       module.defaults[prop] = val;
 

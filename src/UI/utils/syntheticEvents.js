@@ -3,7 +3,7 @@ function createSyntheticEvents(events, rootScope, scopedStyles) {
 
   const types = oKeys(events);
 
-  const eventHandlers = new Map();
+  const eventHandlers = [];
 
   for (let i = 0, type, token, val; i < types.length; i++) {
 
@@ -18,12 +18,12 @@ function createSyntheticEvents(events, rootScope, scopedStyles) {
     }
 
     // Create a pseudo-2D Array which contains consecutive pairs of 'selector' + handler.
-    eventHandlers.set(token, isObjectLike(val) ? getScopedSelectorHandlers(val, scopedStyles) : [rootScope, val]);
+    eventHandlers.push(token, isObjectLike(val) ? getScopedSelectorHandlers(val, scopedStyles) : [rootScope, val]);
 
   }
 
-  // return a map of shape: { eventTypeToken: [...selector + handler(), selector + handler()...] }
-  // we use this map to attach a pointer to the handler array to every new instance of a component under the type token.
+  // return a pseudo-2D Array of shape: [ eventTypeToken: [...selector + handler(), selector + handler()...] ]
+  // we use this array to attach a pointer to the handler array to every new instance of a component under the type token.
   return eventHandlers;
 
 }

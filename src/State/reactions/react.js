@@ -14,14 +14,8 @@ let FLUSHING_BUFFER = false;
  */
 function react() {
 
-  if (FLUSHING_BUFFER === false) {
-
-    if (REACTION_BUFFER !== null) {
-      cancelAnimationFrame(REACTION_BUFFER);
-    }
-
+  if (REACTION_BUFFER === null && FLUSHING_BUFFER === false) {
     REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
-
   }
 
 }
