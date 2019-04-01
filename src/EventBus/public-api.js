@@ -1,4 +1,3 @@
-
 CUE_API.EventBus = wrap(() => {
 
   const eventStore = new Map();
@@ -9,8 +8,8 @@ CUE_API.EventBus = wrap(() => {
   const addEvent = (type, handler, scope, once) => {
     const event = {
       handler: handler,
-      scope  : scope,
-      once   : once
+      scope: scope,
+      once: once
     };
     if (eventStore.has(type)) {
       eventStore.get(type).push(event);
@@ -29,7 +28,7 @@ CUE_API.EventBus = wrap(() => {
       }
     }
   };
-  
+
   return {
 
     on: (type, handler, scope) => {
@@ -74,7 +73,7 @@ CUE_API.EventBus = wrap(() => {
         _events = null;
       }
     }
-    
+
   }
-  
+
 });

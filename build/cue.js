@@ -1548,7 +1548,6 @@
     instanceDidMount(parent, ownPropertyName) {
 
       // ------------------INLINE "SUPER" CALL----------------------
-
       this.directParent = parent[__CUE__];
       this.ownPropertyName = ownPropertyName;
 

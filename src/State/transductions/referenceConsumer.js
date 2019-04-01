@@ -6,10 +6,8 @@
  * @param sourceModule    {string}          - The name of the module that is providing data to the targetModule.
  * @param sourceProperty  {(string|number)} - The name of the property on the sourceModule that is providing data to the targetProperty on the targetModule.
  */
+/*
 function referenceConsumer(targetModule, targetProperty, sourceModule, sourceProperty) {
-
-  // TODO: as an optimization, we should count the number of instances that consume a property.
-  //  that way we can stop the dynamic lookup when all instances have been notified at runtime!
 
   const ConsumerReference = {targetModule, targetProperty, sourceModule, sourceProperty};
 
@@ -40,3 +38,4 @@ function referenceConsumer(targetModule, targetProperty, sourceModule, sourcePro
   }
 
 }
+*/
