@@ -37,7 +37,7 @@ const MyComposite = Cue({
   ui: 'MainView'
 });
 
-MyCue.mount(document.body, {
+MyComposite.mount(document.body, {
   title: 'Cue.js Demo',
   author: 'monokee',
   version: 1.00420
@@ -53,6 +53,11 @@ Cue.State('AppData', Module => ({
     fullContent({title, author, version}) {
       return `${title} written by ${author}. v${version}`;
     }
+  },
+  initialize(props) {
+    this.title = props.title;
+    this.author = props.author;
+    this.version = props.version;
   }
 }));
 ```
