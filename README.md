@@ -71,7 +71,7 @@ Cue.UI('MainView', Component => ({
     // granular, reactive render functions which run whenever the connected state changes.
     $title: { // the the anchor element defined in the markup above.
       title(element, value) { // "title" is the name of the data property that the $title anchor element reacts to.
-        element.setText(value); // "element" is a wrapper around a real dom node that comes helper methods which simplify DOM ops.
+        element.setText(value); // "element" is a wrapper around a real dom node with helper methods to simplify DOM ops.
       }
     },
     $content: {
@@ -83,4 +83,4 @@ Cue.UI('MainView', Component => ({
   
 }));
 ```
-Obviously this composite is a bit contrived and far from a complete building block required in a real application so be sure to read through the official docs to explore more advanced concepts like built-in CSS-in-JS, Synthetic Events, Lifecycle hooks and more.
+Obviously this composite is contrived and far from a complete building block required in any real application so be sure to check out the examples and read through the official docs to explore more advanced concepts like built-in CSS-in-JS, Synthetic Events, Lifecycle hooks and more.
