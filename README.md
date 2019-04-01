@@ -1,4 +1,12 @@
-# <img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="24"/> Cue - Build atomically reactive web apps in pure Javascript.
+# Cue - Build atomically reactive web apps in pure Javascript.
+
+<p>
+<img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="100" height="100"/>
+Cue is still under development and not quite ready for production.
+```
+Version: Beta 1.0
+```
+</p>
 
 Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
 domain data. Cue lets you write pure javascript, does not require any build process and works in all modern browsers.
