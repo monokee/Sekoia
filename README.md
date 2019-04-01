@@ -1,4 +1,4 @@
-# Cue - Build atomically reactive web apps in pure Javascript.
+# <img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="32"/> Cue - Build atomically reactive web apps in pure Javascript.
 
 Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
 domain data. Cue lets you write pure javascript, does not require any build process and works in all modern browsers.
@@ -8,9 +8,8 @@ in a single framework. The following ideas are at the heart of Cue:
 - The state tree can be declared as a single object or broken down into logical state modules
 - These sub-states are created from State Factories which stamp out instances of the state modules
 
-
+<div style="padding: 4px 8px; background: hsla(108, 100%, 100%, 0.2); border: 1px solid hsl(108, 100%, 50%); color: hsl(108, 100%, 50%); border-radius: 4px;">Stage: Public Beta</div>
 <br>
-<img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="270"/>
 
 ### Reactive module-driven state
 ```javascript
