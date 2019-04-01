@@ -2,7 +2,7 @@
 
 Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
 domain data. Cue lets you write pure javascript, does not require any build process and works in all modern browsers.
-It combines a lot of modern architectural and philosophical approaches to scalable, domain-driven application development
+It combines a lot of modern architectural approaches to scalable, domain-driven application development
 in a single framework. The following ideas are at the heart of Cue:
 - Everything is driven by data and derivations of data that live in a single, composable state tree
 - The state tree can be declared as a single object or broken down into logical state modules
