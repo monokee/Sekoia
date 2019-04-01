@@ -2,16 +2,17 @@
 
 <img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="100" height="100"/>
 <p>Cue is still under development and not quite ready for production.</p>
-´´´Version: Beta 1.0´´´
-<hr>
+<pre><code>Version: Beta 1.0</code></pre>
+***
 
 ### Install Cue
 
 Getting started couldn't be easier. Just include the minified build:
 
-´´´html
-<script src="https://raw.githubusercontent.com/monokee/Cue/master/build/cue.min.js?token=AVAhUMc8PlPWABeo_anjEDlOj53wyeEtks5cojGewA%3D%3D"</script>
-´´´
+```html
+<script src=".../build/cue.min.js"</script>
+```
+***
 
 Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
 domain data. Cue lets you write pure javascript, does not require any build process and works in all modern browsers.
