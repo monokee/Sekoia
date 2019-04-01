@@ -30,7 +30,7 @@ A proven approach to creating scalable, easy-to-maintain applications is to brea
 
 This separation of domain data and logic from ui-related code is more than just clean semantics: It ensures that the UI updates whenever the underlying data model changes - no matter who or what is responsible for the update. It could be the server, the user or the system. Any change to the data model is agnostically rendered by the UI Component.
 
-<b>A Composite is the building block which encapsulates these 2 pieces of code. </b>
+<b>A Composite is the building block which encapsulates these 2 pieces of code:</b>
 ```javascript
 const MyComposite = Cue({
   state: 'AppData',
@@ -43,42 +43,44 @@ MyCue.mount(document.body, {
   version: 1.00420
 });
 ```
-<b>A State Module declares domain data and logic.</b>
+<b>A State Module declares domain data and logic:</b>
 ```javascript
 Cue.State('AppData', Module => ({
   data: {
     title: 'My App',
     author: 'unknown',
     version: 0,
-    isAuthorKnown({author}) {
-      return author && author !== 'unknown';
-    }    
+    fullContent({title, author, version}) {
+      return `${title} written by ${author}. v${version}`;
+    }
   }
 }));
 ```
-<b>A UI Component formats the data from a State Module into a renderable user interface.</b>
+<b>A UI Component formats the data from a State Module into a renderable user interface:</b>
 ```javascript
 Cue.UI('MainView', Component => ({
 
   element: (`
     <div $container class="main">
       <h1 $title></h1>
-      <p $content class="paragraph" tabindex="0"></p>
+      <p $content></p>
     </div>
   `),
   
   render: {
-    $title: {
-      title(el, val) {
-        el.setText(val);
+    // granular, reactive render functions which run whenever the connected state changes.
+    $title: { // the the anchor element defined in the markup above.
+      title(element, value) { // "title" is the name of the data property that the $title anchor element reacts to.
+        element.setText(value); // "element" is a wrapper around a real dom node that comes helper methods which simplify DOM ops.
       }
     },
     $content: {
-      contentColor(el, val) {
-        el.element.style.color = val;
+      fullContent(element, value) {
+        element.setText(value);
       }
     }
   }
   
 }));
 ```
+Obviously this composite is a bit contrived and far from a complete building block required in a real application so be sure to read through the official docs to explore more advanced concepts like built-in CSS-in-JS, Synthetic Events, Lifecycle hooks and more.
