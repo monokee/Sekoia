@@ -1,32 +1,31 @@
-# Cue.js - Data driven Web Components.
-
+# Cue.js - Data driven Web Components
+<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/main-desktop-browser-logos.png" width="200" alt="All major browsers">
+<br>
 Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
 domain data. Cue extends <b>native WebComponents</b> with flux-like data binding and reactivity.
 Cue lets you write vanilla javascript, does not require any build process and works in all modern browsers.
-It combines a lot of modern architectural approaches to scalable, domain-driven application development
-in a single lightweight library (16kb minified). 
 
 <img align="left" src="https://github.com/monokee/Cue/raw/master/logo.png" alt="Cue Logo" width="100" height="100"/>
 <br>
-<pre><code>Version: Nightly 1.0 / ES6 - All major browsers</code></pre>
+<pre><code>Cue Nightly 1.0 // ES6 - All major browsers</code></pre>
 
-<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/main-desktop-browser-logos.png" width="200" alt="All major browsers">
-
-## Core Concepts
-Cue offers structure and reactivity while providing clean low-level access to the DOM.
-
+#### A modern UI Library for the web of tomorrow.
+Cue offers structure and high-performance reactivity while providing clean low-level access to the DOM.
+It combines a lot of modern architectural approaches to scalable, domain-driven application development
+in a single lightweight library for creating complex user interfaces. (only 16kb minified). 
 <ul>
   <li>🚀 Works with the real DOM</li>
   <li>🤯 No extra template language</li>
   <li>💩 No procedural logic in markup ever (c-for, c-if directives etc)</li>
   <li>😍 Comprehensible structure by facilitating one-way data flow</li>
-  <li>🛰 Fully reactive data models with computations and side-effects</li>
+  <li>🛰 Fully observable data models with computations and side-effects</li>
 </ul>
 
 Cue creates native custom elements under the hood. Custom elements usually require the use of the class syntax and
 provide no native data binding or reactivity. Cue extends custom elements with first class low-level reactivity, computed properties, one-way-data-flow,
 blazingly fast list rendering (faster than any Virtual DOM alternatives), a familiar configuration object syntax and better lifecycle methods.
 ***
+### Getting Started
 <p style="font-weight:bold;">Let's take a look at a really simple Component written with Cue:</p>
 
 ```javascript
