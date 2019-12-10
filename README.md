@@ -6,7 +6,7 @@ Cue lets you write vanilla javascript, does not require any build process and wo
 It combines a lot of modern architectural approaches to scalable, domain-driven application development
 in a single lightweight library. 
 
-<img align="left" src="https://github.com/monokee/Cue/raw/master/CueLogo.png" alt="Cue Logo" width="100" height="100"/>
+<img align="left" src="https://github.com/monokee/Cue/raw/master/logo.png" alt="Cue Logo" width="100" height="100"/>
 <br>
 <pre><code>Version: Nightly 1.0</code></pre>
 
