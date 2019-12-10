@@ -1,10 +1,9 @@
 import { Store } from './store.js';
-import { ifFn, deepEqual, deepClone } from './utils.js';
+import { NOOP, ifFn, deepEqual, deepClone } from './utils.js';
 import { ComputedProperty, setupComputedProperties, buildDependencyGraph } from "./computed.js";
 import { Reactor } from "./reactor.js";
 
 const REF_ID = 'ref';
-const NOOP = (()=>{});
 const INTERNAL = Symbol('Component Internals');
 const CUE_STYLESHEET = (() => {
   const stylesheet = document.createElement('style');
