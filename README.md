@@ -1,9 +1,11 @@
 # Cue.js - Data driven Web Components
 <img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/main-desktop-browser-logos.png" width="200" alt="All major browsers">
-<br>
-Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
+
+<i>"Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
 domain data. Cue extends <b>native WebComponents</b> with flux-like data binding and reactivity.
-Cue lets you write vanilla javascript, does not require any build process and works in all modern browsers.
+Cue lets you write vanilla javascript, does not require any build process and works in all modern browsers."</i>
+
+<br>
 
 <img align="left" src="https://github.com/monokee/Cue/raw/master/logo.png" alt="Cue Logo" width="100" height="100"/>
 <br>
