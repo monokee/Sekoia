@@ -3,13 +3,14 @@
 
 <i>"Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
 domain data. Cue extends <b>native WebComponents</b> with flux-like data binding and reactivity.
-Cue lets you write vanilla javascript, does not require any build process and works in all modern browsers."</i>
+It lets you write vanilla javascript, does not require any build process and works in all modern browsers."</i>
 
 <br>
 
 <img align="left" src="https://github.com/monokee/Cue/raw/master/logo.png" alt="Cue Logo" width="100" height="100"/>
 <br>
 <pre><code>Cue Nightly 1.0 // ES6 - All major browsers</code></pre>
+<br>
 
 #### A modern UI Library for the web of tomorrow.
 Cue offers structure and high-performance reactivity while providing clean low-level access to the DOM.
