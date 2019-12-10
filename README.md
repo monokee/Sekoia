@@ -1,30 +1,32 @@
 # Cue.js - Data driven Web Components.
 
 Build blazingly fast, reactive web applications from reusable components that are fully driven by declarative
-domain data. Cue extends native WebComponents with flux-like data binding and reactivity.
+domain data. Cue extends <b>native WebComponents</b> with flux-like data binding and reactivity.
 Cue lets you write vanilla javascript, does not require any build process and works in all modern browsers.
 It combines a lot of modern architectural approaches to scalable, domain-driven application development
-in a single lightweight library. 
+in a single lightweight library (16kb minified). 
 
 <img align="left" src="https://github.com/monokee/Cue/raw/master/logo.png" alt="Cue Logo" width="100" height="100"/>
 <br>
-<pre><code>Version: Nightly 1.0</code></pre>
+<pre><code>Version: Nightly 1.0 / ES6 - All major browsers</code></pre>
 
-***
+<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/main-desktop-browser-logos.png" width="200" alt="All major browsers">
 
-## Cue Concepts
-Cue offers structure and reactivity while providing clean and safe low-level access to the DOM.
+## Core Concepts
+Cue offers structure and reactivity while providing clean low-level access to the DOM.
 
 <ul>
-  <li>No virtual DOM abstraction required</li>
-  <li>No template engine required</li>
-  <li>No procedural logic in markup required or desired (c-for, c-if directives etc)</li>
+  <li>🚀 Works with the real DOM</li>
+  <li>🤯 No extra template language</li>
+  <li>💩 No procedural logic in markup ever (c-for, c-if directives etc)</li>
+  <li>😍 Comprehensible structure by facilitating one-way data flow</li>
+  <li>🛰 Fully reactive data models with computations and side-effects</li>
 </ul>
 
-Cue creates native web components - specifically custom elements - under the hood. Custom elements usually required the use of the class syntax and
+Cue creates native custom elements under the hood. Custom elements usually require the use of the class syntax and
 provide no native data binding or reactivity. Cue extends custom elements with first class low-level reactivity, computed properties, one-way-data-flow,
-blazingly fast list rendering (faster than any Virtual DOM alternatives), a familiar configuration object syntax instead of classes and better lifecycle methods.
-
+blazingly fast list rendering (faster than any Virtual DOM alternatives), a familiar configuration object syntax and better lifecycle methods.
+***
 <p style="font-weight:bold;">Let's take a look at a really simple Component written with Cue:</p>
 
 ```javascript
@@ -40,9 +42,7 @@ Component.define('my-component', {
 
   styles: (`
     self {
-      display: block;
       position: absolute;
-      padding: 1em;
     }
     self:hover {
       opacity: 0.75;
@@ -110,9 +110,7 @@ Refs can be used as style selectors as is.
 With that in mind Cue will internally convert:
 ```css
   self {
-    display: block;
     position: absolute;
-    padding: 1em;
   }
   self:hover {
     opacity: 0.75;
@@ -125,9 +123,7 @@ into:
 
 ```css
   my-component {
-    display: block;
     position: absolute;
-    padding: 1em;
   }
   my-component:hover {
     opacity: 0.75;
@@ -234,7 +230,6 @@ When you work with refs you directly target <b>real DOM nodes</b> - there is no 
 And because these reactions are only running in response to changes of the data model, even complex Cue Components never become 
 hard to predict or maintain. Another benefit of working with the real DOM is that you can use pretty much all libraries anywhere. Just like that.
 
-***
 #### List rendering and reconciliation
 Cue enhances all components and ref elements with a special ```renderEach``` method. This method accepts a data array and a 
 "createElement" function which turns each entry in the data array into a DOM Node. 
@@ -253,4 +248,7 @@ The Lifecycle methods of Cue Components are largely equivalent to those of Custo
   <li>disconnected - equivalent to "disconnectedCallback" from CustomElements. Called every time component is removed from the DOM.</li> 
   <li>adopted - equivalent to "adoptedCallback" from CustomElements.</li>
 </ol>
+
+***
+<i>Cue.js - created by Jonathan Ochmann // Released under MIT License</i>
 
