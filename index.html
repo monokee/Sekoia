@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cue.js</title>
+</head>
+<body>
+<my-component></my-component>
+<script type="module">
+  import {Component, Store} from './build/cue.min.js';
+  Component.define('my-component', {
+    element: `<input type="range">`
+  });
+</script>
+</body>
+</html>
