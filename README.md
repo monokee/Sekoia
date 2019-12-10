@@ -12,7 +12,7 @@ in a single lightweight library.
 
 ***
 
-##Cue Concepts
+## Cue Concepts
 Cue offers structure and reactivity while providing clean and safe low-level access to the DOM.
 
 <ul>
@@ -85,7 +85,7 @@ Component.define('my-component', {
 
 Let's break down the Component piece by piece:
 
-###Component.element
+### Component.element
 Plain old static HTML - your components skeleton. 
 Your markup should be truly static. Don't include anything that should dynamically change here. We'll take care of dynamic parts later.
 ```javascript
@@ -101,7 +101,7 @@ Your markup should be truly static. Don't include anything that should dynamical
 <b>Note</b> the special "ref" attribute. Cue automatically parses your component and passes these "refs" to all reactions and lifecycle methods
 for programmatic access.
 ***
-###Component.styles
+### Component.styles
 Plain old CSS - with a twist.
 The CSS written here will be "softly" scoped to your component. Soft scoping means that outside, global CSS can still reach into the
 component for global theming etc via classes. Cue simply prepends all selectors (except component-name and "self") with the name of the component. 
@@ -142,12 +142,12 @@ and append these rules to a global stylesheet.
 This will append all styles and element content to the components shadow dom (see official shadow dom specs for details).
 ***
 
-###Component.data
+### Component.data
 
 Think of a data model as a simple, high-level description of the moving parts of your component. 
 This is the data that the component needs to somehow display to the user. This is how a basic data model is created in Cue:
 
-####Simple Properties
+#### Simple Properties
 ```javascript
 data: {
   simple: {
@@ -169,7 +169,7 @@ Cue automatically determines if the value has actually changed (deep comparison 
 queues up the reaction. And if for whatever reason the value changes one million times before the next frame is rendered,
 the reaction will still only be fired once with the most recent value - thanks to Cue's powerful auto-buffering renderer.
 
-####Computed Properties
+#### Computed Properties
 You can specify <b>computed properties</b> simply by adding a function as the value:
 ```javascript
 data: {
@@ -187,7 +187,7 @@ The computation should return its result.
 Computed properties can be derived from other computed properties, a mix of computed and non-computed properties etc. 
 Circular dependencies are not supported and Cue will throw as soon as circularity is detected.
 
-####Store Bindings
+#### Store Bindings
 You can directly bind any property in your components data model to the global ```Store```.
 This allows different components to share and access the exact same data. When the data in the store changes, 
 all Components which bind to the changed property in the store are automatically updated. 
@@ -208,7 +208,7 @@ data: {
 by directly calling ```Store.set('thePropertyInTheStore', value)``` or via any Component which is bound to the Store via
 ```Component.set('storeBound', value)```
 ***
-###Component.reactions
+### Component.reactions
 
 Reactions are callbacks that are fired in response to data changes and update fragments of DOM.
 ```javascript
@@ -235,7 +235,7 @@ And because these reactions are only running in response to changes of the data 
 hard to predict or maintain. Another benefit of working with the real DOM is that you can use pretty much all libraries anywhere. Just like that.
 
 ***
-####List rendering and reconciliation
+#### List rendering and reconciliation
 Cue enhances all components and ref elements with a special ```renderEach``` method. This method accepts a data array and a 
 "createElement" function which turns each entry in the data array into a DOM Node. 
 Node.renderEach uses an optimized, ultra-fast reconciliation algorithm under the hood to update only the parts of the DOM that
@@ -243,7 +243,7 @@ are affected by the changes in data. You can optionally speed up the reconciliat
 as a third parameter to renderEach which will attempt to update the element instead of replacing it. This is normally not needed.
 ***
 
-###Component Lifecycle
+### Component Lifecycle
 The Lifecycle methods of Cue Components are largely equivalent to those of CustomElements.
 <ol>
   <li>initialize - called only once per component instance, after the component has been inserted into the DOM but before "connected" fires.
