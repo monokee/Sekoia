@@ -931,7 +931,6 @@ function flushReactionBuffer() {
 }
 
 const REF_ID = 'ref';
-const NOOP$1 = (()=>{});
 const INTERNAL = Symbol('Component Internals');
 const CUE_STYLESHEET = (() => {
   const stylesheet = document.createElement('style');
@@ -1349,7 +1348,7 @@ function assignElementReferences(parentElement, refs, names) {
 
 }
 
-function renderEach(dataArray, createElement, updateElement = NOOP$1) {
+function renderEach(dataArray, createElement, updateElement = NOOP) {
 
   // guard against undefined
   dataArray || (dataArray = []);
