@@ -170,7 +170,7 @@ export const Component = {
 
         }
 
-        Module.connected.call(this); // runs whenever instance is (re-) inserted into DOM
+        Module.connected.call(this, internal.refs); // runs whenever instance is (re-) inserted into DOM
 
       }
 
@@ -181,12 +181,12 @@ export const Component = {
           subscriptions.pop().unsubscribe();
         }
 
-        Module.disconnected.call(this);
+        Module.disconnected.call(this, this[INTERNAL].refs);
 
       }
 
       adoptedCallback() {
-        Module.adopted.call(this);
+        Module.adopted.call(this, this[INTERNAL].refs);
       }
 
       get(key) {

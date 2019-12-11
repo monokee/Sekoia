@@ -79,8 +79,13 @@ Component.define('my-component', {
   initialize({deleteButton}) {
     deleteButton.addEventListener('click', () => {
       this.set('users', []);
+      this.logMyCustomMessage('Delete Button was clicked 😱😱😱');
     });
-  }  
+  },
+
+  logMyCustomMessage(message) {
+    console.log('I am a custom method and this is my message:', message);
+  }
 
 });
 ```
@@ -205,6 +210,9 @@ data: {
 <b>Note</b> that any computations and reactions will be fired when the data in the store changes. The data can change 
 by directly calling ```Store.set('thePropertyInTheStore', value)``` or via any Component which is bound to the Store via
 ```Component.set('storeBound', value)```
+
+Oh and btw: You never need to manually unsubscribe from your Store bindings in lifecycle methods - Cue automatically protects you
+from manual work and potential memory leaks. You're welcome.
 ***
 ### Component.reactions
 
@@ -242,21 +250,131 @@ as a third parameter to renderEach which will attempt to update the element inst
 
 ### Component Lifecycle
 The Lifecycle methods of Cue Components are largely equivalent to those of CustomElements.
+All lifecycle methods have access to the underlying CustomElement via "this" and receive "refs" 
+object as the first and only argument.
 <ol>
   <li>initialize - called only once per component instance, after the component has been inserted into the DOM but before "connected" fires.
-  Receives "refs" as first and only argument. Typically this is where you would bind input events, retrieve server data etc.
+  Typically this is where you would bind input events, retrieve server data etc.
   </li>
-  <li>connected - equivalent to "connectedCallback" from CustomElements. Called every time component is inserted or re-inserted ino the DOM.</li>
+  <li>connected - equivalent to "connectedCallback" from CustomElements. Called every time component is inserted or re-inserted into the DOM.</li>
   <li>disconnected - equivalent to "disconnectedCallback" from CustomElements. Called every time component is removed from the DOM.</li> 
   <li>adopted - equivalent to "adoptedCallback" from CustomElements.</li>
 </ol>
+<b>Note</b> that "connected" and "disconnected" are firing each time a component is added/removed from the DOM as per the CustomElements specification.
+For example: Moving an element from the first position to the last by doing something like:
+
+```javascript
+parent.appendChild(parent.firstChild);
+```
+will trigger "disconnected" then "connected" - each time the element is moved. Cue therefore provides the
+"initialize" method which is only called the first time an element is added to the DOM.
+***
+
+### Custom Methods
+Any top-level methods added to the Component configuration object are available
+directly via "this". If you're already used to creating custom elements with the default class syntax you're in luck - 
+Cue behaves pretty much how you would expect. You can simply call a custom method via "this.myCustomMethod", pass any
+arguments to it and call it a day. 🍩
+
+***
+
+## The Store
+We already covered the Store briefly in our introduction to components. We learned that the global store can be used
+to provide reactive data to multiple independent components. But why is this useful or even required?
+
+#### When do I need to use the Store?
+It all comes down to complexity. For a really simple application it's probably fine to have all state localized to the
+components' data models. But what if multiple components need to access the same data? What if this data has to be fetched
+from the Server and update multiple components when it becomes available? 
+This is where the Store comes in. The Store unifies multiple concepts from classical software architecture:
+<ul>
+  <li>A global data container. A single source of truth.</li>
+  <li>Some kind of Event Bus. But without events. Components simply bind to Store properties and react when the properties' values change. Automagically.</li>
+  <li>Some kind of mediator. When Component "A" wants to change sibling Component "B", "A" changes a property in the Store which "B" is bound to. "B" reacts.</li>  
+</ul>
+Unlike most other state management libraries, the Store is deeply integrated into Cue and doesn't involve a lot of extra
+concepts and pretty much no boilerplate. 
+You can start out with local component state and simply refactor to use the Store with a single line of code later:
+
+```javascript
+data: {
+  localProp: {
+    //value: 'I am a piece of state localized to the Component...'
+    value: Store.bind('aPropertyInTheStoreInstead', 'a default value')
+  }     
+}
+```
+Now when your component calls ```this.set('localProp', 'Hello there!')```
+any other component(s) which have a property bound via ```Store.bind('aPropertyInTheStoreInstead')``` will be updated 
+with the value "Hello there!". Pretty cool, aye? 👽
+
+#### Scoping the Store
+The Store is implemented to work with a familiar path syntax to access sub-properties of objects and arrays. For example:
+
+```javascript
+Store.set('orders', {
+  completed: [
+    {id: 'oiasdfa8fkjasfi88f8asf', isn: 'WX9B4'},
+    {id: 'aifw9sf29fasfdjf92f9fj', isn: 'VWP73'},
+    {id: 'asjdf8fjkaef383f3jfi3f', isn: 'JJ9B0'}
+  ]
+});
+```
+
+Let's say we want to retrieve the first completed order from the Store. We'd simply use a path syntax to reach
+into the object tree like so:
+
+```javascript
+const firstOrder = Store.get('orders/completed/0');
+```
+
+Setting and binding the Store also work with paths. Simply "slash" into the object tree to get/set the exact data
+points your components require.
+
+You can wipe the Store clean by calling ```Store.clear(silent = false)```
+If you want to clear the Store silently i.e without firing reaction callbacks with lots of undefined values, 
+simply pass "true" as the first and only argument.
+
+Individual items are removed by calling ```Store.remove('prop')```
+
+If you want to check whether the Store has a specific property call ```Store.has('prop')```
+
+#### Manually subscribing to the Store
+You will come a long way only by using the built-in "Store.bind()" functionality to bind local component data to 
+the global Store singleton. But for complex applications and architectures, or when integrating with other technologies,
+manual store subscriptions can become incredibly useful. 
+
+```javascript
+const subscription = Store.subscribe('orders/completed/0', value => {
+  console.log(value);
+}, {bubbles: true, once: false});
+```
+
+Store.subscribe() returns a "subscription" object. You can unsubscribe simply by calling ```subscription.unsubscribe();```
+You can optionally pass an "options" object as the third parameter to Store.subscribe. It accepts the following properties:
+<ul>
+  <li>bubbles: [default: false] - whether or not the change event should bubble up the path. In the above example with 
+  "bubbles" set to "true", the Store will fire all reactions registered for 'orders/completed/0', 'orders/completed' and 'orders'.
+  The reactions will receive the respective node graph value after the change. This feature is useful to listen to "deep" changes within objects.
+  For performance reasons it is disabled by default. Reactions registered via Store.bind() NEVER bubble.
+  </li>
+  <li>once: [default: false] - whether the change event should only be executed once and then be unsubscribed automatically.</li>
+</ul>
+
+#### Persisting the Store
+This is simple. Because the Store is implemented as a wrapper over localStorage, anything you add to the 
+Store is <b>automatically persisted on the client</b>. No extra work necessary.
+
+The Store automatically stringifies objects and arrays and parses them when it returns them to you. When you save JSON data
+in the Store it will return the unparsed JSON data. Just how you would expect.
+Entries to localStorage are internally namespaced so you don't have to worry about prop-clashing.
 
 ***
 ### License
 ```
 The MIT License
 
-Copyright (c) 2010-2019 Jonathan M. Ochmann / Patchflyer GmbH
+Copyright (c) 2014-2049 Jonathan M. Ochmann / Patchflyer GmbH
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
