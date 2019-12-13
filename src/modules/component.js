@@ -172,6 +172,14 @@ export const Component = {
           // ---------------- Trigger First Render + Initialize
           Reactor.react();
           internal.initialized = true;
+
+          // ---------------- Assign any default attributes in case the element doesn't have them (after internal.initialized === true or reaction wont fire)
+          for (key in Module.defaultAttributeValues) {
+            if (!this.hasAttribute(key)) {
+              this.setAttribute(key, Module.defaultAttributeValues[key]);
+            }
+          }
+
           Module.initialize.call(this, internal.refs);
 
         }
@@ -240,11 +248,17 @@ export const Component = {
 
       attributeChangedCallback(name, oldValue_omitted, newValue) {
 
-        const reaction = this[INTERNAL].attributeChangedCallbacks[name];
+        const internal = this[INTERNAL];
 
-        if (reaction) {
-          Reactor.cueCallback(reaction, newValue);
-          Reactor.react();
+        if (internal.initialized === true) { // only on initialized elements
+
+          const reaction = internal.attributeChangedCallbacks[name];
+
+          if (reaction) {
+            Reactor.cueCallback(reaction, newValue);
+            Reactor.react();
+          }
+
         }
 
       }
