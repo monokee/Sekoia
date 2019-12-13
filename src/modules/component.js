@@ -4,7 +4,7 @@ import { ComputedProperty, setupComputedProperties, buildDependencyGraph } from 
 import { Reactor } from "./reactor.js";
 
 const REF_ID = 'ref';
-const INTERNAL = Symbol('Component Internals');
+const INTERNAL = Symbol('Component Data');
 const CUE_STYLESHEET = (() => {
   const stylesheet = document.createElement('style');
   stylesheet.id = 'cue::components';
@@ -22,7 +22,7 @@ export const Component = {
 
     // ---------------------- ATTRIBUTES (PRE-MODULE) ----------------------
     const observedAttributes = config.attributes ? Object.keys(config.attributes) : [];
-    const attributeChangedCallbacks = observedAttributes.map(name => config.attributes[name]);
+    //const attributeChangedCallbacks = observedAttributes.map(name => config.attributes[name]);
 
     // ---------------------- CUSTOM ELEMENT INSTANCE ----------------------
     const component = class extends HTMLElement {
@@ -66,6 +66,7 @@ export const Component = {
           }),
           computedProperties: _computedProperties,
           reactions: {},
+          attributeChangedCallbacks: {},
           subscriptions: [],
           refs: {},
           initialized: false
@@ -82,6 +83,11 @@ export const Component = {
         // Bind reactions with first argument as "refs" object ("this" is explicitly null to discourage impurity)
         for (key in Module.reactions) {
           internal.reactions[key] = Module.reactions[key].bind(null, internal.refs);
+        }
+
+        // Same for Attribute Reactions
+        for (key in Module.attributeChangedCallbacks) {
+          internal.attributeChangedCallbacks[key] = Module.attributeChangedCallbacks[key].bind(null, internal.refs);
         }
 
       }
@@ -233,17 +239,27 @@ export const Component = {
       }
 
       attributeChangedCallback(name, oldValue_omitted, newValue) {
-        const i = observedAttributes.indexOf(name);
-        if (i !== -1) {
-          Reactor.cueCallback(attributeChangedCallbacks[i], newValue, this);
+
+        const reaction = this[INTERNAL].attributeChangedCallbacks[name];
+
+        if (reaction) {
+          Reactor.cueCallback(reaction, newValue);
           Reactor.react();
         }
+
       }
 
     };
 
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
     customElements.define(name, component);
+
+    // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
+    return (attributes = {}) => {
+      let htmlString = '<' + name;
+      for (const att in attributes) htmlString += ` ${att}="${attributes[att]}"`;
+      return htmlString += `></${name}>`;
+    };
 
   },
 
@@ -400,6 +416,35 @@ function createModule(name, config) {
 
   }
 
+  // --------------------- ATTRIBUTES ---------------------
+  Module.defaultAttributeValues = {};
+  Module.attributeChangedCallbacks = {};
+
+  if (config.attributes) {
+
+    for (k in config.attributes) {
+
+      v = config.attributes[k];
+
+      if (typeof v.value !== 'undefined') {
+        if (typeof v.value !== 'string') {
+          throw new Error(`Attribute value for ${k} is not a String.`);
+        } else {
+          Module.defaultAttributeValues[k] = v.value;
+        }
+      }
+
+      if (typeof v.reaction === 'string') {
+        if (!reactions[v.reaction]) throw new Error(`No Reaction with name "${v.reaction}" exists.`);
+        Module.attributeChangedCallbacks[k] = reactions[v.reaction];
+      } else if (typeof v.reaction === 'function') {
+        Module.attributeChangedCallbacks[k] = v.reaction;
+      }
+
+    }
+
+  }
+
   // ---------------------- COMPUTED PROPERTIES ----------------------
   Module.computedProperties = setupComputedProperties(_allProperties, _computedProperties);
 
@@ -412,8 +457,10 @@ function assignElementReferences(parentElement, refs, names) {
   let tuple, el; //tuple[0] === refName, tuple[1] === selector
   for (tuple of names.entries()) {
     el = parentElement.querySelector(tuple[1]);
-    el[INTERNAL] = {};
-    el.renderEach = renderEach;
+    if (!el[INTERNAL]) {
+      el[INTERNAL] = {};
+      el.renderEach = renderEach;
+    }
     refs[tuple[0]] = el;
   }
 
