@@ -90,6 +90,9 @@ export const Component = {
           internal.attributeChangedCallbacks[key] = Module.attributeChangedCallbacks[key].bind(null, internal.refs);
         }
 
+        // Construct Lifecycle
+        Module.construct.call(this, this); // only ref that is available is self...
+
       }
 
       connectedCallback() {
@@ -394,6 +397,7 @@ function createModule(name, config) {
   }
 
   // ---------------------- LIFECYCLE ----------------------
+  Module.construct = ifFn(config.construct);
   Module.initialize = ifFn(config.initialize);
   Module.connected = ifFn(config.connectedCallback);
   Module.disconnected = ifFn(config.disconnectedCallback);
