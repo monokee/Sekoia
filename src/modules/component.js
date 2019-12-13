@@ -152,6 +152,9 @@ export const Component = {
           // ---------------- Create Refs
           assignElementReferences(Module.encapsulated ? internal.shadowDom : this, internal.refs, Module.refNames);
 
+          // ---------------- Consider Element Initialized
+          internal.initialized = true;
+
           // ----------------- Bind / Cue Store
           for (key in Module.storeBindings) {
             path = Module.storeBindings[key].path;
@@ -160,7 +163,7 @@ export const Component = {
             } else if (Module.storeBindings[key].hasOwnProperty('defaultValue')) { // if default value has been provided and store has no value yet, component writes to store
               Store.set(path, Module.storeBindings[key].defaultValue); // will trigger Reactor
             } else {
-              console.warn(`<${name}>.data["${key}"] is bound to Store["${path}"] but Store has no value and component specifies no default.`);
+              throw new Error(`Component data of "${name}" has property "${key}" bound to Store["${path}"] but Store has no value and component specifies no default.`);
             }
           }
 
@@ -169,16 +172,20 @@ export const Component = {
             Reactor.cueCallback(internal.reactions[key], internal.data[key]);
           }
 
-          // ---------------- Trigger First Render + Initialize
-          Reactor.react();
-          internal.initialized = true;
+          // ----------------- Run Attribute Changed Callbacks
+          for (key in internal.attributeChangedCallbacks) {
+            Reactor.cueCallback(internal.attributeChangedCallbacks[key], this.getAttribute(key));
+          }
 
-          // ---------------- Assign any default attributes in case the element doesn't have them (after internal.initialized === true or reaction wont fire)
+          // ---------------- Assign default attributes in case the element doesn't have them
           for (key in Module.defaultAttributeValues) {
             if (!this.hasAttribute(key)) {
               this.setAttribute(key, Module.defaultAttributeValues[key]);
             }
           }
+
+          // ---------------- Trigger First Render
+          Reactor.react();
 
           Module.initialize.call(this, internal.refs);
 
