@@ -1283,12 +1283,14 @@ function createModule(name, config) {
 
       for (i = 0; i < tmpSheet.rules.length; i++) {
         k = tmpSheet.rules[i].selectorText;
-        if (k.lastIndexOf(name, 0) === 0) { // do not scope self...
-          CUE_STYLESHEET.insertRule(tmpSheet.rules[i].cssText);
-        } else if (k.lastIndexOf('self', 0) === 0) { // replace "self" with name
-          CUE_STYLESHEET.insertRule(tmpSheet.rules[i].cssText.split('self').join(name));
-        } else { // prefix with element tag to create scoping
-          CUE_STYLESHEET.insertRule(`${name} ${tmpSheet.rules[i].cssText}`);
+        if (k) {
+          if (k.lastIndexOf(name, 0) === 0) { // do not scope self...
+            CUE_STYLESHEET.insertRule(tmpSheet.rules[i].cssText);
+          } else if (k.lastIndexOf('self', 0) === 0) { // replace "self" with name
+            CUE_STYLESHEET.insertRule(tmpSheet.rules[i].cssText.split('self').join(name));
+          } else { // prefix with element tag to create scoping
+            CUE_STYLESHEET.insertRule(`${name} ${tmpSheet.rules[i].cssText}`);
+          }
         }
       }
 
