@@ -488,8 +488,6 @@ function scopeStylesToComponent(name, styles) {
 
   }
 
-  console.log(CUE_STYLESHEET.rules);
-
   TMP_STYLESHEET.innerHTML = '';
   document.head.removeChild(TMP_STYLESHEET);
 
