@@ -349,27 +349,7 @@ function createModule(name, config) {
 
     // not encapsulated in shadowDOM, scope all styles to name-tag
     if (Module.encapsulated === false) {
-
-      TMP_STYLESHEET.innerHTML = Module.styles;
-      document.head.appendChild(TMP_STYLESHEET);
-      const tmpSheet = TMP_STYLESHEET.sheet;
-
-      for (i = 0; i < tmpSheet.rules.length; i++) {
-        k = tmpSheet.rules[i].selectorText;
-        if (k) {
-          if (k.lastIndexOf(name, 0) === 0) { // do not scope self...
-            CUE_STYLESHEET.insertRule(tmpSheet.rules[i].cssText);
-          } else if (k.lastIndexOf('self', 0) === 0) { // replace "self" with name
-            CUE_STYLESHEET.insertRule(tmpSheet.rules[i].cssText.split('self').join(name));
-          } else { // prefix with element tag to create scoping
-            CUE_STYLESHEET.insertRule(`${name} ${tmpSheet.rules[i].cssText}`);
-          }
-        }
-      }
-
-      TMP_STYLESHEET.innerHTML = '';
-      document.head.removeChild(TMP_STYLESHEET);
-
+      scopeStylesToComponent(name, Module.styles);
     }
 
   }
@@ -476,6 +456,72 @@ function createModule(name, config) {
   Module.computedProperties = setupComputedProperties(_allProperties, _computedProperties);
 
   return Module;
+
+}
+
+function scopeStylesToComponent(name, styles) {
+
+  TMP_STYLESHEET.innerHTML = styles;
+  document.head.appendChild(TMP_STYLESHEET);
+  const tmpSheet = TMP_STYLESHEET.sheet;
+
+  for (let i = 0, rule, text; i < tmpSheet.rules.length; i++) {
+
+    rule = tmpSheet.rules[i];
+
+    if (rule.type === 1) { // style
+      text = rule.selectorText;
+      if (text.lastIndexOf(name, 0) === 0) { // do not scope self...
+        CUE_STYLESHEET.insertRule(rule.cssText);
+      } else if (text.lastIndexOf('self', 0) === 0) { // replace "self" with name
+        CUE_STYLESHEET.insertRule(rule.cssText.split('self').join(name));
+      } else { // prefix with element tag to create scoping
+        CUE_STYLESHEET.insertRule(`${name} ${rule.cssText}`);
+      }
+    } else if (rule.type === 7 || rule.type === 8) { // @keyframe(s)
+      CUE_STYLESHEET.insertRule(rule.cssText);
+    } else if (rule.type === 4 || rule.type === 12) { // @media OR @supports
+      CUE_STYLESHEET.insertRule(constructScopedCSSText(name, rule));
+    } else {
+      console.warn(`CSS Rule of type "${rule.type}" is not currently supported by Components.`);
+    }
+
+  }
+
+  console.log(CUE_STYLESHEET.rules);
+
+  TMP_STYLESHEET.innerHTML = '';
+  document.head.removeChild(TMP_STYLESHEET);
+
+}
+
+function constructScopedCSSText(name, rule, cssText = '') {
+
+  cssText += `${rule.type === 4 ? '@media' : '@supports'} ${rule.conditionText} {`;
+
+  for (let i = 0, r; i < rule.cssRules.length; i++) {
+
+    r = rule.cssRules[i];
+
+    if (r.type === 1) {
+      if (r.selectorText.lastIndexOf(name, 0) === 0) {
+        cssText += r.cssText
+      } else if (r.selectorText.lastIndexOf('self', 0) === 0) {
+        cssText += r.cssText.split('self').join(name);
+      } else {
+        cssText += `${name} ${r.cssText}`;
+      }
+    } else if (r.type === 7 || r.type === 8) {
+      cssText += r.cssText;
+    } else if (r.type === 4 || r.type === 12) {
+      cssText += constructScopedCSSText(name, r, cssText);
+    } else {
+      console.warn(`CSS Rule of type "${r.type}" is not currently supported by Components.`);
+    }
+
+  }
+
+  return `${cssText} }`;
 
 }
 

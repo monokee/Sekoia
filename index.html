@@ -9,7 +9,17 @@
 <script type="module">
   import {Component, Store} from './build/cue.min.js';
   Component.define('my-component', {
-    element: `<input type="range">`
+    element: `<input type="range">`,
+    styles: `
+      my-component {
+        animation: spin 1.1s infinite linear;
+      }
+      @keyframes spin {
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    `,
   });
 </script>
 </body>
