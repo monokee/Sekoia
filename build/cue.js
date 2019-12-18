@@ -87,9 +87,7 @@ function makeCall(url, method, token, data = {}) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const call = new Promise((resolve, reject) => {
-
-      pendingCalls.set(url, call);
+    pendingCalls.set(url, new Promise((resolve, reject) => {
 
       const response = fetch(url, {
         method: method,
@@ -109,9 +107,9 @@ function makeCall(url, method, token, data = {}) {
         pendingCalls.delete(url);
         reject(error);
       });
-    });
+    }));
 
-    return call;
+    return pendingCalls.get(url);
 
   }
 
