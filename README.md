@@ -9,7 +9,7 @@ It lets you write vanilla javascript, does not require any build process and wor
 
 <img align="left" src="https://github.com/monokee/Cue/raw/master/logo.png" alt="Cue Logo" width="100" height="100"/>
 <br>
-<pre><code>Cue Nightly 1.0 // ES6 - All major browsers</code></pre>
+<pre><code>Cue // Vanilla ES6 - All major browsers</code></pre>
 <br>
 
 #### A modern UI Library for the web of tomorrow.
