@@ -390,11 +390,10 @@ const Store = {
   },
 
   bind(path, defaultValue) {
-    return {
-      id: this.id, // included for integrity check by internal modules
-      path: path,
-      defaultValue: defaultValue
-    }
+    const storeBinding = {id: this.id, path};
+    return arguments.length === 1
+      ? storeBinding
+      : Object.assign(storeBinding, {defaultValue});
   },
 
   subscribe(path, handler, options = {}) {
@@ -998,15 +997,24 @@ const Component = {
           internal.initialized = true;
 
           // ----------------- Bind / Cue Store
+          let storeBinding;
           for (key in Module.storeBindings) {
-            path = Module.storeBindings[key].path;
-            if (Store.has(path) && internal.reactions[key]) { // store has value, run local handler with store value (local handler === store subscription handler)
-              Reactor.cueCallback(internal.reactions[key], Store.get(path));
-            } else if (Module.storeBindings[key].hasOwnProperty('defaultValue')) { // if default value has been provided and store has no value yet, component writes to store
-              Store.set(path, Module.storeBindings[key].defaultValue); // will trigger Reactor
+
+            storeBinding = Module.storeBindings[key];
+            path = storeBinding.path;
+
+            if (Store.has(path)) {
+              if (internal.reactions[key]) {
+                Reactor.cueCallback(internal.reactions[key], Store.get(path));
+              }
             } else {
-              throw new Error(`Component data of "${name}" has property "${key}" bound to Store["${path}"] but Store has no value and component specifies no default.`);
+              if (storeBinding.hasOwnProperty('defaultValue')) {
+                Store.set(path, storeBinding.defaultValue);
+              } else {
+                throw new Error(`Component data of "${name}" has property "${key}" bound to Store["${path}"] but Store has no value and component specifies no default.`);
+              }
             }
+
           }
 
           // ---------------- Run reactions

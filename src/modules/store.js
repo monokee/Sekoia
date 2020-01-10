@@ -157,11 +157,10 @@ export const Store = {
   },
 
   bind(path, defaultValue) {
-    return {
-      id: this.id, // included for integrity check by internal modules
-      path: path,
-      defaultValue: defaultValue
-    }
+    const storeBinding = {id: this.id, path};
+    return arguments.length === 1
+      ? storeBinding
+      : Object.assign(storeBinding, {defaultValue});
   },
 
   subscribe(path, handler, options = {}) {
