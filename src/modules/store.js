@@ -1,12 +1,7 @@
 import {deepEqual} from "./utils.js";
 
+const STORE = new Map();
 const EVENTS = new Map();
-
-const LocalStorage = window.localStorage;
-const KEY_ID = 'VCS::';
-const DO_PARSE = `${KEY_ID}PARSE::`;
-const DO_PARSE_LENGTH = DO_PARSE.length;
-const ALL_KEYS = `${KEY_ID}ALL_KEYS`;
 
 export const Store = {
 
@@ -16,17 +11,8 @@ export const Store = {
 
       const entireStore = {};
 
-      const keys = LocalStorage.getItem(ALL_KEYS);
-
-      if (keys !== null) {
-
-        const allKeys = keys.split(',');
-
-        for (let i = 0; i < allKeys.length; i++) {
-          const str = LocalStorage.getItem(`${KEY_ID}${allKeys[i]}`);
-          entireStore[allKeys[i]] = isParsable(str) ? JSON.parse(str.substring(DO_PARSE_LENGTH)) : str;
-        }
-
+      for (const tuple of STORE.entries()) {
+        entireStore[tuple[0]] = tuple[1];
       }
 
       return entireStore;
@@ -34,20 +20,18 @@ export const Store = {
     }
 
     const keys = path.split('/');
-    const str = LocalStorage.getItem(`${KEY_ID}${keys[0]}`);
+    const root = STORE.get(keys[0]);
 
-    if (str === null) return null;
-
-    if (!isParsable(str)) return str;
-
-    const data = JSON.parse(str.substring(DO_PARSE_LENGTH));
+    if (root === void 0) {
+      return void 0;
+    }
 
     if (keys.length > 1) { // slash into object tree
-      const [targetNode, targetKey] = getNode(data, keys);
+      const [targetNode, targetKey] = getNode(root, keys);
       return targetNode[targetKey];
     }
 
-    return data;
+    return root;
 
   },
 
@@ -55,83 +39,40 @@ export const Store = {
 
     if (arguments.length === 1) {
 
-      // assume "path" to be store singleton object
       if (typeof path !== 'object' || path === null) {
         throw new Error('Invalid arguments provided to Store.set...');
       }
 
-      this.clear(true);
-      for (const key in path) this.set(key, path[key]);
-      return true;
+      let didChange = false;
+
+      for (const key in path) {
+        const changed = this.set(key, path[key]);
+        if (changed === true) didChange = true;
+      }
+
+      return didChange;
 
     }
 
     const keys = path.split('/');
-    const keyLocal = `${KEY_ID}${keys[0]}`;
-    const str = LocalStorage.getItem(keyLocal);
+    const root = STORE.get(keys[0]);
 
-    if (keys.length > 1) { // setting a sub-level prop
+    if (keys.length > 1) { // sub-property
 
-      if (isParsable(str)) {
+      const [targetNode, targetKey] = getNode(root, keys);
 
-        const root = JSON.parse(str.substring(DO_PARSE_LENGTH));
-        const [node, key] = getNode(root, keys);
-
-        if (!deepEqual(node[key], value)) {
-          node[key] = value;
-          LocalStorage.setItem(keyLocal, `${DO_PARSE}${JSON.stringify(root, jsonReplacer)}`);
-          bubbleEvent(path, value, keys, root);
-          return true;
-        } else {
-          return false;
-        }
-
-      } else {
-        throw new Error(`Cannot set property at path: "${path}" because the current value is stored as a string.`);
+      if (deepEqual(targetNode[targetKey], value)) {
+        return false;
       }
 
-    }
-
-    // setting top-level prop
-
-    if (str === null) { // first write
-
-      if (typeof value === 'string') { // simple write
-        LocalStorage.setItem(keyLocal, value);
-      } else {
-        LocalStorage.setItem(keyLocal, `${DO_PARSE}${JSON.stringify(value)}`);
-      }
-
-      // when setting new top-level property, collect its (unique) storage key
-      let allKeys = LocalStorage.getItem(ALL_KEYS);
-      if (allKeys === null) {
-        allKeys = `${keyLocal},`;
-      } else if (allKeys.indexOf(`${keyLocal},`) === -1) {
-        allKeys = `${allKeys}${keyLocal},`;
-      }
-
-      LocalStorage.setItem(ALL_KEYS, allKeys);
-      dispatchEvent(path, value);
+      targetNode[targetKey] = value;
+      bubbleEvent(path, value, keys, root);
       return true;
 
     }
 
-    if (isParsable(str)) {
-
-      const root = JSON.parse(str.substring(DO_PARSE_LENGTH));
-
-      if (!deepEqual(root, value)) {
-        LocalStorage.setItem(keyLocal, `${DO_PARSE}${JSON.stringify(value, jsonReplacer)}`);
-        dispatchEvent(path, value);
-        return true;
-      } else {
-        return false;
-      }
-
-    }
-
-    if (str !== value) {
-      LocalStorage.setItem(keyLocal, `${JSON.stringify(value, jsonReplacer)}`);
+    if (root === void 0 || !deepEqual(root, value)) { // first write or full replace
+      STORE.set(path, value);
       dispatchEvent(path, value);
       return true;
     }
@@ -143,90 +84,74 @@ export const Store = {
   has(path) {
 
     const keys = path.split('/');
-    const str = LocalStorage.getItem(`${KEY_ID}${keys[0]}`);
+    const root = STORE.get(keys[0]);
 
-    if (keys.length > 1) {
+    if (STORE.has(keys[0])) {
 
-      if (isParsable(str) === false) {
-
-        return false;
-
-      } else {
-
+      if (keys.length > 1) {
         try {
-          getNode(JSON.parse(str.substring(DO_PARSE_LENGTH)), keys);
+          getNode(root, keys);
           return true;
-        } catch (e) {
+        } catch(e) {
           return false;
         }
-
       }
 
-    } else {
-
-      return str !== null;
+      return true;
 
     }
+
+    return false;
 
   },
 
   remove(path) {
 
     const keys = path.split('/');
-    const keyLocal = `${KEY_ID}${keys[0]}`;
-    const str = LocalStorage.getItem(keyLocal);
+    const root = STORE.get(keys[0]);
 
-    if (str === null) return;
+    if (root === void 0) {
+      console.warn(`Can't remove Store entry "${path}" because it doesn't exist.`);
+      return;
+    }
 
     if (keys.length > 1) {
 
-      if (isParsable(str) === true) {
+      const [targetNode, targetKey] = getNode(root, keys);
 
-        const root = JSON.parse(str.substring(DO_PARSE_LENGTH));
-        const [targetNode, targetKey] = getNode(root, keys);
-
-        if (Array.isArray(targetNode)) {
-          targetNode.splice(parseInt(targetKey), 1);
-        } else {
-          delete targetNode[targetKey];
-        }
-
-        LocalStorage.setItem(keyLocal, `${DO_PARSE}${JSON.stringify(root, jsonReplacer)}`);
-        bubbleEvent(path, undefined, keys, root);
-
+      if (Array.isArray(targetNode)) {
+        targetNode.splice(parseInt(targetKey), 1);
       } else {
-        throw new Error(`Cannot delete property at path: "${path}" because the current value is stored as a string.`);
+        delete targetNode[targetKey];
       }
 
-    } else {
-
-      LocalStorage.removeItem(keyLocal);
-
-      const allKeys = LocalStorage.getItem(ALL_KEYS).split(',');
-      allKeys.splice(allKeys.indexOf(keyLocal), 1);
-      LocalStorage.setItem(ALL_KEYS, `${allKeys.join(',')},`);
-
-      dispatchEvent(path, undefined);
+      bubbleEvent(path, void 0, keys, root);
+      return;
 
     }
 
+    STORE.delete(keys[0]);
+    dispatchEvent(path, void 0);
+
   },
 
-  clear(silently = false) {
+  clear(options = {silently: false}) {
 
-    const keys = LocalStorage.getItem(ALL_KEYS);
+    if (STORE.size === 0) {
+      return;
+    }
 
-    if (keys !== null) {
+    if (options.silently === true) {
+      STORE.clear();
+      return;
+    }
 
-      const allKeys = keys.split(',');
+    const keys = STORE.keys();
 
-      for (let i = 0; i < allKeys.length; i++) {
-        LocalStorage.removeItem(allKeys[i]);
-        silently === false && dispatchEvent(allKeys[i], undefined);
-      }
+    STORE.clear();
 
-      LocalStorage.removeItem(ALL_KEYS);
-
+    for (const key of keys) {
+      dispatchEvent(key, void 0);
     }
 
   },
@@ -276,18 +201,7 @@ Object.defineProperty(Store, 'id', {
   value: Symbol('Store ID')
 });
 
-// ----------------------------------
-
-function isParsable(str) {
-  for (let i = 0; i < DO_PARSE_LENGTH; i++) {
-    if (str[i] !== DO_PARSE[i]) return false;
-  }
-  return true;
-}
-
-function jsonReplacer(key, value) {
-  return value === undefined ? null : value;
-}
+// -------------------------------------
 
 function getNode(root, keys) {
 
@@ -310,6 +224,16 @@ function getNode(root, keys) {
     throw new Error(`Can not access store path: "${keys.join('/')}". The value stored at: "${keys[0]}" is not object or array.`);
   }
 
+}
+
+function dispatchEvent(path, payload) {
+  const event = EVENTS.get(path);
+  if (event && event.length) {
+    for (let i = 0, e; i < event.length; i++) {
+      e = event[i];
+      e.handler.call(e.scope, payload);
+    }
+  }
 }
 
 function bubbleEvent(path, value, keys, root) {
@@ -369,14 +293,4 @@ function bubbleEvent(path, value, keys, root) {
 
   }
 
-}
-
-function dispatchEvent(key, payload) {
-  const event = EVENTS.get(key);
-  if (event && event.length) {
-    for (let i = 0, e; i < event.length; i++) {
-      e = event[i];
-      e.handler.call(e.scope, payload);
-    }
-  }
 }

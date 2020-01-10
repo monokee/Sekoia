@@ -219,6 +219,11 @@ export const Component = {
 
       set(key, value) {
 
+        if (arguments.length === 1 && typeof key === 'object' && key !== null) {
+          for (const prop in key) this.set(prop, key[prop]);
+          return;
+        }
+
         if (Module.storeBindings[key]) {
 
           Store.set(Module.storeBindings[key].path, value);
