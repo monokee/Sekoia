@@ -1,5 +1,5 @@
 import { Store } from './store.js';
-import { NOOP, ifFn, deepEqual, deepClone } from './utils.js';
+import { NOOP, RESOLVED_PROMISE, ifFn, deepEqual, deepClone } from './utils.js';
 import { ComputedProperty, setupComputedProperties, buildDependencyGraph } from "./computed.js";
 import { Reactor } from "./reactor.js";
 
@@ -229,40 +229,59 @@ export const Component = {
       set(key, value) {
 
         if (arguments.length === 1 && typeof key === 'object' && key !== null) {
-          for (const prop in key) this.set(prop, key[prop]);
-          return;
-        }
-
-        if (Module.storeBindings[key]) {
-
-          Store.set(Module.storeBindings[key].path, value);
-
-        } else if (Module.computedProperties.has(key)) {
-
-          throw new Error(`You can not set property "${key}" because it is a computed property.`);
-
-        } else {
 
           const internal = this[INTERNAL];
-          const oldValue = internal._data[key]; // skip proxy
+          let didChange = false;
 
-          if (!deepEqual(oldValue, value)) {
+          for (const prop in key) {
 
-            internal._data[key] = value; // skip proxy
+            const oldValue = internal._data[prop];
+            const newValue = key[prop];
 
-            if (internal.reactions[key]) {
-              Reactor.cueCallback(internal.reactions[key], value);
+            if (Module.computedProperties.has(prop)) {
+              throw new Error(`You can not set property "${prop}" because it is a computed property.`);
+            } else if (Module.storeBindings[prop]) {
+              didChange = true;
+              Store.set(Module.storeBindings[prop].path, newValue);
+            } else if (!deepEqual(oldValue, newValue)) {
+              didChange = true;
+              internal._data[prop] = newValue;
+              internal.reactions[prop] && Reactor.cueCallback(internal.reactions[prop], newValue);
+              internal.dependencyGraph.has(prop) && Reactor.cueComputations(internal.dependencyGraph, internal.reactions, prop, internal.data);
             }
-
-            if (internal.dependencyGraph.has(key)) {
-              Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
-            }
-
-            Reactor.react();
 
           }
 
+          return didChange ? Reactor.react() : RESOLVED_PROMISE;
+
         }
+
+        if (Module.storeBindings[key]) {
+          return Store.set(Module.storeBindings[key].path, value);
+        }
+
+        if (Module.computedProperties.has(key)) {
+          throw new Error(`You can not set property "${key}" because it is a computed property.`);
+        }
+
+        const internal = this[INTERNAL];
+        const oldValue = internal._data[key]; // skip proxy
+
+        if (deepEqual(oldValue, value)) {
+          return RESOLVED_PROMISE;
+        }
+
+        internal._data[key] = value; // skip proxy
+
+        if (internal.reactions[key]) {
+          Reactor.cueCallback(internal.reactions[key], value);
+        }
+
+        if (internal.dependencyGraph.has(key)) {
+          Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
+        }
+
+        return Reactor.react();
 
       }
 
@@ -337,7 +356,7 @@ function createModule(name, config) {
   Module.encapsulated = config.encapsulated === true;
 
   Module.template = document.createRange().createContextualFragment(
-    `<cue-template>${config.element.trim()}</cue-template>`
+    `<cue-template>${config.element ? config.element.trim() : ''}</cue-template>`
   ).firstChild;
 
   // ---------------------- REFS ----------------------

@@ -10,6 +10,40 @@
 
 <script type="module">
   import {Component, Store} from './build/cue.js';
+
+  Store.subscribe('something/deep', value => {
+    console.log('Store reaction', value);
+  });
+
+  Store.set({
+    something: {
+      deep: 1234
+    }
+  });
+
+  Component.define('my-component', {
+    element: '<input ref="counter" type="number"><span ref="readout"></span>',
+    data: {
+      count: {
+        value: Store.bind('something/deep'),
+        reaction({counter, readout}, value) {
+          counter.value = value;
+          readout.textContent = `The current count is "${value}"`;
+        }
+      }
+    },
+    initialize({counter}) {
+      counter.addEventListener('input', e => {
+        const promises = [];
+        for (let i = 0; i < 2048; i++) {
+          const p = this.set({count: counter.value + i});
+          promises.push(p);
+          p.then(() => console.log('promise resolved aye', i));
+        }
+        console.log(new Set(promises).size);
+      });
+    }
+  });
 </script>
 
 </body>

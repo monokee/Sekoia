@@ -1,4 +1,5 @@
-let REACTION_BUFFER = null;
+let PENDING_PROMISE = null;
+let CURRENT_RESOLVE = null;
 let FLUSHING_BUFFER = false;
 
 const CALLBACKS = new Map();
@@ -21,14 +22,19 @@ export const Reactor = {
   },
 
   react() {
-    if (REACTION_BUFFER === null && FLUSHING_BUFFER === false) {
-      REACTION_BUFFER = requestAnimationFrame(flushReactionBuffer);
-    }
+    return PENDING_PROMISE || (PENDING_PROMISE = new Promise(reactionResolver));
   }
 
 };
 
 // ----------------------------------------
+
+function reactionResolver(resolve) {
+  if (FLUSHING_BUFFER === false) {
+    CURRENT_RESOLVE = resolve;
+    requestAnimationFrame(flushReactionBuffer);
+  }
+}
 
 function flushReactionBuffer() {
 
@@ -101,7 +107,11 @@ function flushReactionBuffer() {
     RESOLVED.pop();
   }
 
-  REACTION_BUFFER = null;
   FLUSHING_BUFFER = false;
+
+  CURRENT_RESOLVE();
+
+  CURRENT_RESOLVE = null;
+  PENDING_PROMISE = null;
 
 }

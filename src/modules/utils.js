@@ -1,5 +1,7 @@
 export const NOOP = (() => {});
 
+export const RESOLVED_PROMISE = Promise.resolve();
+
 export function deepEqual(a, b) {
 
   if (Array.isArray(a)) {

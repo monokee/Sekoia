@@ -1,4 +1,5 @@
-import {deepEqual} from "./utils.js";
+import {RESOLVED_PROMISE, deepEqual} from "./utils.js";
+import {Reactor} from "./reactor.js";
 
 const STORE = new Map();
 const EVENTS = new Map();
@@ -37,20 +38,32 @@ export const Store = {
 
   set(path, value) {
 
-    if (arguments.length === 1) {
-
-      if (typeof path !== 'object' || path === null) {
-        throw new Error('Invalid arguments provided to Store.set...');
-      }
+    if (arguments.length === 1 && typeof path === 'object' && path !== null) {
 
       let didChange = false;
 
-      for (const key in path) {
-        const changed = this.set(key, path[key]);
-        if (changed === true) didChange = true;
+      for (const prop in path) {
+
+        const keys = prop.split('/');
+        const root = STORE.get(keys[0]);
+        const newValue = path[prop];
+
+        if (keys.length > 1) {
+          const [targetNode, targetKey] = getNode(root, keys);
+          if (!deepEqual(targetNode[targetKey], newValue)) {
+            didChange = true;
+            targetNode[targetKey] = newValue;
+            bubbleEvent(prop, newValue, keys, root);
+          }
+        } else if (root === void 0 || !deepEqual(root, newValue)) {
+          didChange = true;
+          STORE.set(prop, newValue);
+          dispatchEvent(prop, newValue);
+        }
+
       }
 
-      return didChange;
+      return didChange ? Reactor.react() : RESOLVED_PROMISE;
 
     }
 
@@ -62,22 +75,20 @@ export const Store = {
       const [targetNode, targetKey] = getNode(root, keys);
 
       if (deepEqual(targetNode[targetKey], value)) {
-        return false;
+        return RESOLVED_PROMISE;
       }
 
       targetNode[targetKey] = value;
-      bubbleEvent(path, value, keys, root);
-      return true;
+      return bubbleEvent(path, value, keys, root);
 
     }
 
     if (root === void 0 || !deepEqual(root, value)) { // first write or full replace
       STORE.set(path, value);
-      dispatchEvent(path, value);
-      return true;
+      return dispatchEvent(path, value);
     }
 
-    return false;
+    return RESOLVED_PROMISE;
 
   },
 
@@ -112,7 +123,7 @@ export const Store = {
 
     if (root === void 0) {
       console.warn(`Can't remove Store entry "${path}" because it doesn't exist.`);
-      return;
+      return RESOLVED_PROMISE;
     }
 
     if (keys.length > 1) {
@@ -125,34 +136,36 @@ export const Store = {
         delete targetNode[targetKey];
       }
 
-      bubbleEvent(path, void 0, keys, root);
-      return;
+      return bubbleEvent(path, void 0, keys, root);
 
     }
 
     STORE.delete(keys[0]);
-    dispatchEvent(path, void 0);
+    return dispatchEvent(path, void 0);
 
   },
 
   clear(options = {silently: false}) {
 
     if (STORE.size === 0) {
-      return;
+      return RESOLVED_PROMISE;
     }
 
     if (options.silently === true) {
       STORE.clear();
-      return;
+      return RESOLVED_PROMISE;
     }
 
     const keys = STORE.keys();
 
     STORE.clear();
 
+    const promises = [];
     for (const key of keys) {
-      dispatchEvent(key, void 0);
+      promises.push(dispatchEvent(key, void 0));
     }
+
+    return Promise.all(promises);
 
   },
 
@@ -170,10 +183,9 @@ export const Store = {
     }
 
     const event = Object.assign({
-      scope: null,
       bubbles: false
     }, options, {
-      handler: handler
+      handler: options.scope ? handler.bind(options.scope) : handler
     });
 
     if (EVENTS.has(path)) {
@@ -227,24 +239,26 @@ function getNode(root, keys) {
 
 function dispatchEvent(path, payload) {
   const event = EVENTS.get(path);
-  if (event && event.length) {
-    for (let i = 0, e; i < event.length; i++) {
-      e = event[i];
-      e.handler.call(e.scope, payload);
+  if (event) {
+    for (let i = 0; i < event.length; i++) {
+      Reactor.cueCallback(event[i].handler, payload);
     }
+    return Reactor.react();
+  } else {
+    return RESOLVED_PROMISE;
   }
 }
 
 function bubbleEvent(path, value, keys, root) {
 
-  let event = EVENTS.get(path);
+  const Event = EVENTS.get(path);
 
-  if (event && event.length) {
+  if (Event) {
 
     let doBubble = false;
     let i, k, ev, e;
-    for (i = 0; i < event.length; i++) {
-      if (event[i].bubbles === true) {
+    for (i = 0; i < Event.length; i++) {
+      if (Event[i].bubbles === true) {
         doBubble = true;
         break;
       }
@@ -258,7 +272,7 @@ function bubbleEvent(path, value, keys, root) {
       let node = root;
       let event = EVENTS.get(key);
 
-      if (event && event.length) {
+      if (event) {
         for (i = 0; i < event.length; i++) {
           events.push([event[i], root]);
         }
@@ -268,7 +282,7 @@ function bubbleEvent(path, value, keys, root) {
         key += `/${keys[i]}`;
         node = node[keys[i]];
         event = EVENTS.get(key);
-        if (event && event.length) {
+        if (event) {
           for (k = 0; k < event.length; k++) {
             events.push([event[k], node]);
           }
@@ -278,17 +292,22 @@ function bubbleEvent(path, value, keys, root) {
       for (i = events.length - 1; i >= 0; i--) {
         ev = events[i];
         e = ev[0];
-        e.handler.call(e.scope, ev[1]);
+        Reactor.cueCallback(ev[0].handler, ev[1]);
       }
 
     } else {
 
-      for (i = 0; i < event.length; i++) {
-        e = event[i];
-        e.handler.call(e.scope, value);
+      for (i = 0; i < Event.length; i++) {
+        Reactor.cueCallback(Event[i].handler, value);
       }
 
     }
+
+    return Reactor.react();
+
+  } else {
+
+    return RESOLVED_PROMISE;
 
   }
 
