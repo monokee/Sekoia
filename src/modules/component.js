@@ -104,18 +104,12 @@ export const Component = {
 
           internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
-            () => {
-              Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
-              Reactor.react();
-            }
+            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data)
           ));
 
           internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
-            value => {
-              Reactor.cueCallback(internal.reactions[key], value);
-              Reactor.react();
-            }
+            value => Reactor.cueCallback(internal.reactions[key], value)
           ));
 
         }
@@ -197,13 +191,16 @@ export const Component = {
           }
 
           // ---------------- Trigger First Render
-          Reactor.react();
+          Reactor.react().then(() => {
+            Module.initialize.call(this, internal.refs);
+            Module.connected.call(this, internal.refs);
+          });
 
-          Module.initialize.call(this, internal.refs);
+        } else {
+
+          Module.connected.call(this, internal.refs); // runs whenever instance is (re-) inserted into DOM
 
         }
-
-        Module.connected.call(this, internal.refs); // runs whenever instance is (re-) inserted into DOM
 
       }
 
@@ -227,6 +224,8 @@ export const Component = {
       }
 
       set(key, value) {
+
+        // when we set and change a dependency of a computed property, set the computed to needsUpdate = true.
 
         if (arguments.length === 1 && typeof key === 'object' && key !== null) {
 

@@ -2,12 +2,17 @@ let PENDING_PROMISE = null;
 let CURRENT_RESOLVE = null;
 let FLUSHING_BUFFER = false;
 
+const EVENTS = new Map();
 const CALLBACKS = new Map();
 const COMPUTED_PROPERTIES = new Map();
 const DEPENDENCIES = new Map();
 const RESOLVED = [];
 
 export const Reactor = {
+
+  cueEvent(eventHandler, value) {
+    EVENTS.set(eventHandler, value);
+  },
 
   cueCallback(handler, value) {
     CALLBACKS.set(handler, value);
@@ -41,6 +46,10 @@ function flushReactionBuffer() {
   FLUSHING_BUFFER = true;
 
   let i, tuple, deps, computedProperty, context, callbacks, dependencyGraph, result;
+
+  for (tuple of EVENTS.entries()) {
+    tuple[0](tuple[1]);
+  }
 
   // RESOLVE COMPUTED_PROPERTIES ------------>
   while (COMPUTED_PROPERTIES.size > 0) {
@@ -101,6 +110,7 @@ function flushReactionBuffer() {
   }
 
   // RESET BUFFERS -------->
+  EVENTS.clear();
   CALLBACKS.clear();
 
   while(RESOLVED.length > 0) {

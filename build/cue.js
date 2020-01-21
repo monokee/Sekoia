@@ -239,12 +239,17 @@ let PENDING_PROMISE = null;
 let CURRENT_RESOLVE = null;
 let FLUSHING_BUFFER = false;
 
+const EVENTS = new Map();
 const CALLBACKS = new Map();
 const COMPUTED_PROPERTIES = new Map();
 const DEPENDENCIES = new Map();
 const RESOLVED = [];
 
 const Reactor = {
+
+  cueEvent(eventHandler, value) {
+    EVENTS.set(eventHandler, value);
+  },
 
   cueCallback(handler, value) {
     CALLBACKS.set(handler, value);
@@ -278,6 +283,10 @@ function flushReactionBuffer() {
   FLUSHING_BUFFER = true;
 
   let i, tuple, deps, computedProperty, context, callbacks, dependencyGraph, result;
+
+  for (tuple of EVENTS.entries()) {
+    tuple[0](tuple[1]);
+  }
 
   // RESOLVE COMPUTED_PROPERTIES ------------>
   while (COMPUTED_PROPERTIES.size > 0) {
@@ -338,6 +347,7 @@ function flushReactionBuffer() {
   }
 
   // RESET BUFFERS -------->
+  EVENTS.clear();
   CALLBACKS.clear();
 
   while(RESOLVED.length > 0) {
@@ -354,9 +364,9 @@ function flushReactionBuffer() {
 }
 
 const STORE = new Map();
-const EVENTS = new Map();
+const EVENTS$1 = new Map();
 
-const Store = {
+const Store = Object.defineProperty({
 
   get(path) {
 
@@ -540,27 +550,25 @@ const Store = {
       handler: options.scope ? handler.bind(options.scope) : handler
     });
 
-    if (EVENTS.has(path)) {
-      EVENTS.get(path).push(event);
+    if (EVENTS$1.has(path)) {
+      EVENTS$1.get(path).push(event);
     } else {
-      EVENTS.set(path, [event]);
+      EVENTS$1.set(path, [event]);
     }
 
     return {
       unsubscribe() {
-        const events = EVENTS.get(path);
+        const events = EVENTS$1.get(path);
         events.splice(events.indexOf(event), 1);
         if (events.length === 0) {
-          EVENTS.delete(path);
+          EVENTS$1.delete(path);
         }
       }
     }
 
   }
 
-};
-
-Object.defineProperty(Store, 'id', {
+}, 'id', {
   value: Symbol('Store ID')
 });
 
@@ -590,10 +598,10 @@ function getNode(root, keys) {
 }
 
 function dispatchEvent(path, payload) {
-  const event = EVENTS.get(path);
+  const event = EVENTS$1.get(path);
   if (event) {
     for (let i = 0; i < event.length; i++) {
-      Reactor.cueCallback(event[i].handler, payload);
+      Reactor.cueEvent(event[i].handler, payload);
     }
     return Reactor.react();
   } else {
@@ -603,7 +611,7 @@ function dispatchEvent(path, payload) {
 
 function bubbleEvent(path, value, keys, root) {
 
-  const Event = EVENTS.get(path);
+  const Event = EVENTS$1.get(path);
 
   if (Event) {
 
@@ -622,7 +630,7 @@ function bubbleEvent(path, value, keys, root) {
 
       let key = keys[0];
       let node = root;
-      let event = EVENTS.get(key);
+      let event = EVENTS$1.get(key);
 
       if (event) {
         for (i = 0; i < event.length; i++) {
@@ -633,7 +641,7 @@ function bubbleEvent(path, value, keys, root) {
       for (i = 1; i < keys.length; i++) {
         key += `/${keys[i]}`;
         node = node[keys[i]];
-        event = EVENTS.get(key);
+        event = EVENTS$1.get(key);
         if (event) {
           for (k = 0; k < event.length; k++) {
             events.push([event[k], node]);
@@ -644,13 +652,13 @@ function bubbleEvent(path, value, keys, root) {
       for (i = events.length - 1; i >= 0; i--) {
         ev = events[i];
         e = ev[0];
-        Reactor.cueCallback(ev[0].handler, ev[1]);
+        Reactor.cueEvent(ev[0].handler, ev[1]);
       }
 
     } else {
 
       for (i = 0; i < Event.length; i++) {
-        Reactor.cueCallback(Event[i].handler, value);
+        Reactor.cueEvent(Event[i].handler, value);
       }
 
     }
@@ -972,18 +980,12 @@ const Component = {
 
           internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
-            () => {
-              Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
-              Reactor.react();
-            }
+            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data)
           ));
 
           internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
-            value => {
-              Reactor.cueCallback(internal.reactions[key], value);
-              Reactor.react();
-            }
+            value => Reactor.cueCallback(internal.reactions[key], value)
           ));
 
         }
@@ -1065,13 +1067,16 @@ const Component = {
           }
 
           // ---------------- Trigger First Render
-          Reactor.react();
+          Reactor.react().then(() => {
+            Module.initialize.call(this, internal.refs);
+            Module.connected.call(this, internal.refs);
+          });
 
-          Module.initialize.call(this, internal.refs);
+        } else {
+
+          Module.connected.call(this, internal.refs); // runs whenever instance is (re-) inserted into DOM
 
         }
-
-        Module.connected.call(this, internal.refs); // runs whenever instance is (re-) inserted into DOM
 
       }
 
@@ -1095,6 +1100,8 @@ const Component = {
       }
 
       set(key, value) {
+
+        // when we set and change a dependency of a computed property, set the computed to needsUpdate = true.
 
         if (arguments.length === 1 && typeof key === 'object' && key !== null) {
 

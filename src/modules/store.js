@@ -4,7 +4,7 @@ import {Reactor} from "./reactor.js";
 const STORE = new Map();
 const EVENTS = new Map();
 
-export const Store = {
+export const Store = Object.defineProperty({
 
   get(path) {
 
@@ -206,9 +206,7 @@ export const Store = {
 
   }
 
-};
-
-Object.defineProperty(Store, 'id', {
+}, 'id', {
   value: Symbol('Store ID')
 });
 
@@ -241,7 +239,7 @@ function dispatchEvent(path, payload) {
   const event = EVENTS.get(path);
   if (event) {
     for (let i = 0; i < event.length; i++) {
-      Reactor.cueCallback(event[i].handler, payload);
+      Reactor.cueEvent(event[i].handler, payload);
     }
     return Reactor.react();
   } else {
@@ -292,13 +290,13 @@ function bubbleEvent(path, value, keys, root) {
       for (i = events.length - 1; i >= 0; i--) {
         ev = events[i];
         e = ev[0];
-        Reactor.cueCallback(ev[0].handler, ev[1]);
+        Reactor.cueEvent(ev[0].handler, ev[1]);
       }
 
     } else {
 
       for (i = 0; i < Event.length; i++) {
-        Reactor.cueCallback(Event[i].handler, value);
+        Reactor.cueEvent(Event[i].handler, value);
       }
 
     }
