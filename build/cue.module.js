@@ -1,4 +1,3 @@
-(function() {
 const LocalStorage = window.localStorage;
 const pendingCalls = new Map();
 
@@ -1771,4 +1770,4 @@ function longestIncreasingSubsequence(ns, newStart) {
 }
 
 window.Cue = {Server, Store, Component};
-}());
+export {Component, Store, Server};
