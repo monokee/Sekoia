@@ -1,8 +1,9 @@
 (function() {
 const LocalStorage = window.localStorage;
 const pendingCalls = new Map();
+const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
 
-const Server = {
+const Server = Object.defineProperty({
 
   fetch(url, expires = 24 * 60 * 60, token) {
 
@@ -15,7 +16,7 @@ const Server = {
       } else {
         makeCall(url, 'GET', token).then(response => {
           setCache(url, response, expires);
-          resolve(JSON.parse(response));
+          resolve(typeof response === 'string' ? JSON.parse(response) : response);
         }).catch(error => {
           reject(error);
         });
@@ -31,18 +32,34 @@ const Server = {
         .then(response => resolve(JSON.parse(response)))
         .catch(error => reject(error));
     });
-  }
+  },
 
-};
+}, 'clearCache', {
+  value: clearCache
+});
 
 // --------------------------------------------------------
 
 function setCache(url, value, expires) {
+
   const now = Date.now();
   const schedule = now + expires * 1000;
+
   if (typeof value === 'object') value = JSON.stringify(value);
+
+  const url_stamped = `${url}::ts`;
   LocalStorage.setItem(url, value);
-  LocalStorage.setItem(`${url}::ts`, schedule);
+  LocalStorage.setItem(url_stamped, `${schedule}`);
+
+  let allKeys = LocalStorage.getItem(ALL_KEYS);
+  if (allKeys === null) {
+    allKeys = `${url},${url_stamped},`;
+  } else if (allKeys.indexOf(`${url},`) === -1) {
+    allKeys = `${allKeys}${url},${url_stamped},`;
+  }
+
+  LocalStorage.setItem(ALL_KEYS, allKeys);
+
 }
 
 function getCache(url) {
@@ -50,26 +67,42 @@ function getCache(url) {
   const timestamp = LocalStorage.getItem(`${url}::ts`);
 
   if (timestamp === null) {
-
     return null;
-
   } else {
-
-    if (timestamp < Date.now()) {
-
-      LocalStorage.removeItem(url);
-      LocalStorage.removeItem(`${url}::ts`);
-
+    if (Number(timestamp) < Date.now()) {
+      clearCache(url);
       return null;
-
     } else {
-
       return LocalStorage.getItem(url);
-
     }
-
   }
 
+}
+
+function clearCache(url) {
+  if (url) {
+    if (LocalStorage.getItem(url) !== null) {
+      const url_stamped = `${url}::ts`;
+      LocalStorage.removeItem(url);
+      LocalStorage.removeItem(url_stamped);
+      const _allKeys = LocalStorage.getItem(ALL_KEYS);
+      if (_allKeys !== null) {
+        const allKeys = _allKeys.split(',');
+        allKeys.splice(allKeys.indexOf(url), 1);
+        allKeys.splice(allKeys.indexOf(url_stamped), 1);
+        LocalStorage.setItem(ALL_KEYS, `${allKeys.join(',')},`);
+      }
+    }
+  } else {
+    const _allKeys = LocalStorage.getItem(ALL_KEYS);
+    if (_allKeys !== null) {
+      const allKeys = _allKeys.split(',');
+      for (let i = 0; i < allKeys.length; i++) {
+        LocalStorage.removeItem(allKeys[i]);
+      }
+      LocalStorage.removeItem(ALL_KEYS);
+    }
+  }
 }
 
 function makeCall(url, method, token, data = {}) {
@@ -100,10 +133,15 @@ function makeCall(url, method, token, data = {}) {
         referrer: 'no-referrer',
         body: method === 'GET' ? null : JSON.stringify(data)
       }).then(response => {
-        response.json().then(json => {
+        if (response && typeof response.json === 'function') {
+          response.json().then(json => {
+            pendingCalls.delete(url);
+            resolve(json);
+          });
+        } else {
           pendingCalls.delete(url);
-          resolve(json);
-        });
+          reject('Invalid response. Cue Server expects JSON response...');
+        }
       }).catch(error => {
         pendingCalls.delete(url);
         reject(error);
