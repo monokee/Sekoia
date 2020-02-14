@@ -1299,7 +1299,7 @@ function createModule(name, config) {
 
     // rewrite refs from "name" to [ref="name"] to allow for shorthand styling
     for (tuple of Module.refNames.entries()) {
-      Module.styles = Module.styles.split(tuple[0]).join(tuple[1]); //TODO: this messes things up when two refs contain the same sequence of letters!
+      Module.styles = Module.styles.replace(new RegExp(`\\b${tuple[0]}\\b`, 'g'), tuple[1]);
     }
 
     // not encapsulated in shadowDOM, scope all styles to name-tag
@@ -1429,8 +1429,8 @@ function getTopLevelSelector(selectorText, componentName) {
 
 function scopeStylesToComponent(name, styles) {
 
-  TMP_STYLESHEET.innerHTML = styles;
   document.head.appendChild(TMP_STYLESHEET);
+  TMP_STYLESHEET.innerHTML = styles;
   const tmpSheet = TMP_STYLESHEET.sheet;
 
   for (let i = 0, rule, text, tls; i < tmpSheet.rules.length; i++) {
