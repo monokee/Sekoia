@@ -219,13 +219,21 @@ export const Component = {
         Module.adopted.call(this, this[INTERNAL].refs);
       }
 
-      get(key) {
+      get(key) { // DEPRECATE
+        console.warn('CUE DEPRECATION WARNING: Use Component.getData instead of Component.get as the latter will be deprecated in a future release.');
+        return this.getData(key);
+      }
+
+      getData(key) {
         return this[INTERNAL].data[key];
       }
 
-      set(key, value) {
+      set(key, value) { // DEPRECATE
+        console.warn('CUE DEPRECATION WARNING: Use Component.setData instead of Component.set as the latter will be deprecated in a future release.');
+        return this.setData(key, value);
+      }
 
-        // when we set and change a dependency of a computed property, set the computed to needsUpdate = true.
+      setData(key, value) {
 
         if (arguments.length === 1 && typeof key === 'object' && key !== null) {
 
@@ -491,22 +499,35 @@ function createModule(name, config) {
 
 }
 
+function getTopLevelSelector(selectorText, componentName) {
+  return selectorText === componentName ? '' :
+    selectorText.lastIndexOf(`${componentName} `, 0) === 0 ? ' ' : // generic child selector
+    selectorText.lastIndexOf(`${componentName}.`, 0) === 0 ? '.' : // class selector
+    selectorText.lastIndexOf(`${componentName}:`, 0) === 0 ? ':' : // pseudo-class AND/OR pseudo-element
+    selectorText.lastIndexOf(`${componentName}#`, 0) === 0 ? '#' : // id selector
+    selectorText.lastIndexOf(`${componentName}[`, 0) === 0 ? '[' : // attribute selector
+    selectorText.lastIndexOf(`${componentName}>`, 0) === 0 ? '>' : // immediate child selector
+    selectorText.lastIndexOf(`${componentName}+`, 0) === 0 ? '+' : // immediate sibling selector
+    selectorText.lastIndexOf(`${componentName}~`, 0) === 0 ? '~' : // generic sibling selector
+    false;
+}
+
 function scopeStylesToComponent(name, styles) {
 
   TMP_STYLESHEET.innerHTML = styles;
   document.head.appendChild(TMP_STYLESHEET);
   const tmpSheet = TMP_STYLESHEET.sheet;
 
-  for (let i = 0, rule, text; i < tmpSheet.rules.length; i++) {
+  for (let i = 0, rule, text, tls; i < tmpSheet.rules.length; i++) {
 
     rule = tmpSheet.rules[i];
 
     if (rule.type === 1) { // style
       text = rule.selectorText;
-      if (text.lastIndexOf(name, 0) === 0) { // do not scope self...
+      if ((tls = getTopLevelSelector(text, name)) !== false) { // do not scope self...
         CUE_STYLESHEET.insertRule(rule.cssText);
-      } else if (text.lastIndexOf('self', 0) === 0) { // replace "self" with name
-        CUE_STYLESHEET.insertRule(rule.cssText.split('self').join(name));
+      } else if ((tls = getTopLevelSelector(text, 'self')) !== false) { // replace "self" with name
+        CUE_STYLESHEET.insertRule(rule.cssText.split(`self${tls}`).join(`${name}${tls}`));
       } else { // prefix with element tag to create scoping
         CUE_STYLESHEET.insertRule(`${name} ${rule.cssText}`);
       }
@@ -529,15 +550,15 @@ function constructScopedCSSText(name, rule, cssText = '') {
 
   cssText += `${rule.type === 4 ? '@media' : '@supports'} ${rule.conditionText} {`;
 
-  for (let i = 0, r; i < rule.cssRules.length; i++) {
+  for (let i = 0, r, tls; i < rule.cssRules.length; i++) {
 
     r = rule.cssRules[i];
 
     if (r.type === 1) {
-      if (r.selectorText.lastIndexOf(name, 0) === 0) {
+      if ((tls = getTopLevelSelector(r.selectorText, name)) !== false) {
         cssText += r.cssText
-      } else if (r.selectorText.lastIndexOf('self', 0) === 0) {
-        cssText += r.cssText.split('self').join(name);
+      } else if ((tls = getTopLevelSelector(r.selectorText, 'self')) !== false) {
+        cssText += r.cssText.split(`self${tls}`).join(`${name}${tls}`);
       } else {
         cssText += `${name} ${r.cssText}`;
       }
