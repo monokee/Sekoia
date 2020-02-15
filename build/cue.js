@@ -918,14 +918,20 @@ function visitDependency(sourceProperty, dependencies, target) {
 
 }
 
-const REF_ID = 'ref';
+const REF_ID = '$';
+const REF_ID_JS = '\\' + REF_ID;
+
 const INTERNAL = Symbol('Component Data');
+
 const CUE_STYLESHEET = (() => {
   const stylesheet = document.createElement('style');
   stylesheet.id = 'cue::components';
   document.head.appendChild(stylesheet);
   return stylesheet.sheet;
 })();
+
+const CUE_STYLENODE = CUE_STYLESHEET.ownerNode;
+
 const TMP_STYLESHEET = document.createElement('style');
 
 const Component = {
@@ -1134,18 +1140,8 @@ const Component = {
         Module.adopted.call(this, this[INTERNAL].refs);
       }
 
-      get(key) { // DEPRECATE
-        console.warn('CUE DEPRECATION WARNING: Use Component.getData instead of Component.get as the latter will be deprecated in a future release.');
-        return this.getData(key);
-      }
-
       getData(key) {
         return this[INTERNAL].data[key];
-      }
-
-      set(key, value) { // DEPRECATE
-        console.warn('CUE DEPRECATION WARNING: Use Component.setData instead of Component.set as the latter will be deprecated in a future release.');
-        return this.setData(key, value);
       }
 
       setData(key, value) {
@@ -1282,31 +1278,20 @@ function createModule(name, config) {
   ).firstChild;
 
   // ---------------------- REFS ----------------------
-  const _refElements = Module.template.querySelectorAll(`[${REF_ID}]`);
+  const _refElements = Module.template.querySelectorAll(`[${REF_ID_JS}]`);
   Module.refNames = new Map();
 
-  let i, k, v, tuple;
+  let i, k, v;
   for (i = 0; i < _refElements.length; i++) {
     k = _refElements[i].getAttribute(REF_ID);
-    k && k.length && Module.refNames.set(k, `[${REF_ID}="${k}"]`);
+    k && k.length && Module.refNames.set(`${REF_ID}${k}`, `[${REF_ID_JS}="${k}"]`);
   }
 
   // ---------------------- STYLES ----------------------
   Module.styles = '';
   if (typeof config.styles === 'string' && config.styles.length) {
-
     Module.styles = config.styles;
-
-    // rewrite refs from "name" to [ref="name"] to allow for shorthand styling
-    for (tuple of Module.refNames.entries()) {
-      Module.styles = Module.styles.replace(new RegExp(`\\b${tuple[0]}\\b`, 'g'), tuple[1]);
-    }
-
-    // not encapsulated in shadowDOM, scope all styles to name-tag
-    if (Module.encapsulated === false) {
-      scopeStylesToComponent(name, Module.styles);
-    }
-
+    createComponentCSS(name, Module.styles, Module.refNames, Module.encapsulated);
   }
 
   // ---------------------- REACTIONS ----------------------
@@ -1414,75 +1399,80 @@ function createModule(name, config) {
 
 }
 
-function getTopLevelSelector(selectorText, componentName) {
-  return selectorText === componentName ? '' :
-    selectorText.lastIndexOf(`${componentName} `, 0) === 0 ? ' ' : // generic child selector
-    selectorText.lastIndexOf(`${componentName}.`, 0) === 0 ? '.' : // class selector
-    selectorText.lastIndexOf(`${componentName}:`, 0) === 0 ? ':' : // pseudo-class AND/OR pseudo-element
-    selectorText.lastIndexOf(`${componentName}#`, 0) === 0 ? '#' : // id selector
-    selectorText.lastIndexOf(`${componentName}[`, 0) === 0 ? '[' : // attribute selector
-    selectorText.lastIndexOf(`${componentName}>`, 0) === 0 ? '>' : // immediate child selector
-    selectorText.lastIndexOf(`${componentName}+`, 0) === 0 ? '+' : // immediate sibling selector
-    selectorText.lastIndexOf(`${componentName}~`, 0) === 0 ? '~' : // generic sibling selector
-    false;
-}
+function createComponentCSS(name, styles, refNames, encapsulated) {
 
-function scopeStylesToComponent(name, styles) {
+  // Re-write $self to component-name
+  styles = styles.split(`${REF_ID}self`).join(name);
+
+  // Re-write $refName(s) in style text to valid css selector
+  for (const tuple of refNames.entries()) {
+    styles = styles.split(tuple[0]).join(tuple[1]);
+  }
 
   document.head.appendChild(TMP_STYLESHEET);
   TMP_STYLESHEET.innerHTML = styles;
   const tmpSheet = TMP_STYLESHEET.sheet;
 
-  for (let i = 0, rule, text, tls; i < tmpSheet.rules.length; i++) {
+  let styleNodeInnerHTML = CUE_STYLENODE.innerHTML;
+  for (let i = 0, rule, tls; i < tmpSheet.rules.length; i++) {
 
     rule = tmpSheet.rules[i];
 
-    if (rule.type === 1) { // style
-      text = rule.selectorText;
-      if ((tls = getTopLevelSelector(text, name)) !== false) { // do not scope self...
-        CUE_STYLESHEET.insertRule(rule.cssText);
-      } else if ((tls = getTopLevelSelector(text, 'self')) !== false) { // replace "self" with name
-        CUE_STYLESHEET.insertRule(rule.cssText.split(`self${tls}`).join(`${name}${tls}`));
-      } else { // prefix with element tag to create scoping
-        CUE_STYLESHEET.insertRule(`${name} ${rule.cssText}`);
+    if (encapsulated === true || rule.type === 7 || rule.type === 8) { // don't scope shadow-encapsulated modules and @keyframes
+      styleNodeInnerHTML += rule.cssText;
+    } else if (rule.type === 1) { // style rule
+      if ((tls = getTopLevelSelector(rule.selectorText, name)) !== false) { // dont scope component-name
+        styleNodeInnerHTML += rule.cssText;
+      } else { // prefix with component-name to create soft scoping
+        styleNodeInnerHTML += `${name} ${rule.cssText}`;
       }
-    } else if (rule.type === 7 || rule.type === 8) { // @keyframe(s)
-      CUE_STYLESHEET.insertRule(rule.cssText);
-    } else if (rule.type === 4 || rule.type === 12) { // @media OR @supports
-      CUE_STYLESHEET.insertRule(constructScopedCSSText(name, rule));
+    } else if (rule.type === 4 || rule.type === 12) { // @media/@supports query
+      styleNodeInnerHTML += constructScopedStyleQuery(name, rule, encapsulated);
     } else {
-      console.warn(`CSS Rule of type "${rule.type}" is not currently supported by Components.`);
+      console.warn(`CSS Rule of type "${rule.type}" is not currently supported by Cue Components.`);
     }
 
   }
 
+  CUE_STYLENODE.innerHTML = styleNodeInnerHTML;
   TMP_STYLESHEET.innerHTML = '';
   document.head.removeChild(TMP_STYLESHEET);
 
 }
 
-function constructScopedCSSText(name, rule, cssText = '') {
+function getTopLevelSelector(selectorText, componentName) {
+  return selectorText === componentName ? '' :
+    selectorText.lastIndexOf(`${componentName} `, 0) === 0 ? ' ' : // generic child selector
+      selectorText.lastIndexOf(`${componentName}.`, 0) === 0 ? '.' : // class selector
+        selectorText.lastIndexOf(`${componentName}:`, 0) === 0 ? ':' : // pseudo-class AND/OR pseudo-element
+          selectorText.lastIndexOf(`${componentName}#`, 0) === 0 ? '#' : // id selector
+            selectorText.lastIndexOf(`${componentName}[`, 0) === 0 ? '[' : // attribute selector
+              selectorText.lastIndexOf(`${componentName}>`, 0) === 0 ? '>' : // immediate child selector
+                selectorText.lastIndexOf(`${componentName}+`, 0) === 0 ? '+' : // immediate sibling selector
+                  selectorText.lastIndexOf(`${componentName}~`, 0) === 0 ? '~' : // generic sibling selector
+                    false;
+}
 
-  cssText += `${rule.type === 4 ? '@media' : '@supports'} ${rule.conditionText} {`;
+function constructScopedStyleQuery(name, query, encapsulated, cssText = '') {
 
-  for (let i = 0, r, tls; i < rule.cssRules.length; i++) {
+  cssText += `${query.type === 4 ? '@media' : '@supports'} ${query.conditionText} {`;
 
-    r = rule.cssRules[i];
+  for (let i = 0, rule, tls; i < query.cssRules.length; i++) {
 
-    if (r.type === 1) {
-      if ((tls = getTopLevelSelector(r.selectorText, name)) !== false) {
-        cssText += r.cssText;
-      } else if ((tls = getTopLevelSelector(r.selectorText, 'self')) !== false) {
-        cssText += r.cssText.split(`self${tls}`).join(`${name}${tls}`);
-      } else {
-        cssText += `${name} ${r.cssText}`;
+    rule = query.cssRules[i];
+
+    if (encapsulated === true || rule.type === 7 || rule.type === 8) { // @keyframes or encapsulated in shadow
+      cssText += rule.cssText;
+    } else if (rule.type === 1) {
+      if ((tls = getTopLevelSelector(rule.selectorText, name)) !== false) { // own-name
+        cssText += rule.cssText;
+      } else { // soft scope with own-name prefix
+        cssText += `${name} ${rule.cssText}`;
       }
-    } else if (r.type === 7 || r.type === 8) {
-      cssText += r.cssText;
-    } else if (r.type === 4 || r.type === 12) {
-      cssText += constructScopedCSSText(name, r, cssText);
+    } else if (rule.type === 4 || rule.type === 12) { // nested query
+      cssText += constructScopedStyleQuery(name, rule, encapsulated, cssText);
     } else {
-      console.warn(`CSS Rule of type "${r.type}" is not currently supported by Components.`);
+      console.warn(`CSS Rule of type "${rule.type}" is not currently supported by Components.`);
     }
 
   }
@@ -1491,19 +1481,19 @@ function constructScopedCSSText(name, rule, cssText = '') {
 
 }
 
-function assignElementReferences(parentElement, refs, names) {
+function assignElementReferences(parentElement, targetObject, refNames) {
 
-  let tuple, el; //tuple[0] === refName, tuple[1] === selector
-  for (tuple of names.entries()) {
+  let tuple, el; //tuple[0] = refName, tuple[1] = selector
+  for (tuple of refNames.entries()) {
     el = parentElement.querySelector(tuple[1]);
     if (!el[INTERNAL]) {
       el[INTERNAL] = {};
       el.renderEach = renderEach;
     }
-    refs[tuple[0]] = el;
+    targetObject[`${tuple[0]}`] = el; // makes ref available as $refName in js
   }
 
-  refs['self'] = parentElement;
+  targetObject[`${REF_ID}self`] = parentElement; // makes container available as $self in js
 
 }
 
@@ -1536,6 +1526,8 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
   // https://github.com/localvoid/ivi
   // https://github.com/adamhaile/surplus
   // https://github.com/Freak613/stage0
+
+  // important: reconcile does not currently work with dynamically adding or removing elements that have $refAttributes
 
   let prevStart = 0, newStart = 0;
   let loop = true;
