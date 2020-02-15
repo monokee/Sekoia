@@ -32,24 +32,24 @@ blazingly fast list rendering (faster than any Virtual DOM alternatives), a fami
 <p style="font-weight:bold;">Let's take a look at a really simple Component written with Cue:</p>
 
 ```javascript
-import {Component, Store} from './build/cue.min.js';
+import {Component, Store} from './build/cue.module.js';
 
 Component.define('my-component', {
 
   element: (`
-    <h1 ref="title"></h1>
-    <ul ref="userList"></ul>
-    <button ref="deleteButton">Delete All Users</button>
+    <h1 $="title"></h1>
+    <ul $="userList"></ul>
+    <button $="deleteButton">Delete All Users</button>
   `),
 
   styles: (`
-    self {
+    $self {
       position: absolute;
     }
-    self:hover {
+    $self:hover {
       opacity: 0.75;
     }
-    title {
+    $title {
       text-transform: uppercase;
     }
   `),
@@ -57,28 +57,23 @@ Component.define('my-component', {
   data: {
     users: { // reads/writes from a global, persistent store. provides empty array as default value (if store has no value)
       value: Store.bind('users', []),
-      reaction: 'renderUsers'
+      reaction({$userList}) {
+        userList.renderEach(users, user => Component.create(`
+          <li>${user.firstName} ${user.lastName}</li>
+        `));
+      }
     },
     title: { // computed property which dynamically reevaluates whenever "users" changes.
       value: ({users}) => users.length ? 'Our Users' : 'We have no users...',
-      reaction: 'renderTitle'
+      reaction({$title}, value) {
+        $title.textContent = value;
+      }
     } 
   },
 
-  reactions: {
-    renderUsers({userList}, users) {
-      userList.renderEach(users, user => Component.create(`
-        <li>${user.firstName} ${user.lastName}</li>
-      `))
-    },
-    renderTitle({title}, value) {
-      title.textContent = value;
-    } 
-  },
-
-  initialize({deleteButton}) {
-    deleteButton.addEventListener('click', () => {
-      this.set('users', []);
+  initialize({$deleteButton}) {
+    $deleteButton.addEventListener('click', () => {
+      this.setData('users', []);
       this.logMyCustomMessage('Delete Button was clicked 😱😱😱');
     });
   },
@@ -94,52 +89,39 @@ Let's break down the Component piece by piece:
 
 ### Component.element
 Plain old static HTML - your components skeleton. 
-Your markup should be truly static. Don't include anything that should dynamically change here. We'll take care of dynamic parts later.
+Your markup should be truly static. Don't include anything that should dynamically change here. We'll take care of dynamic parts outside of the markup later.
 ```javascript
 {
   element: `
-    <h1 ref="title"></h1>
-    <ul ref="userList"></ul>
-    <button ref="deleteButton">Delete All Users</button>
+    <h1 $="title"></h1>
+    <ul $="userList"></ul>
+    <button $="deleteButton">Delete All Users</button>
   `
 }
 ```
 
-<b>Note</b> the special "ref" attribute. Cue automatically parses your component and passes these "refs" to all reactions and lifecycle methods
+<b>Note</b> the special "$" attribute on some of the elements children: Cue automatically passes these cached anchor elements (we call them $refs) to all reactions and lifecycle methods
 for programmatic access.
 ***
 ### Component.styles
 Plain old CSS - with a twist.
 The CSS written here will be "softly" scoped to your component. Soft scoping means that outside, global CSS can still reach into the
-component for global theming etc via classes. Cue simply prepends all selectors (except component-name and "self") with the name of the component. 
-Refs can be used as style selectors as is.
+component for global theming etc via classes. Cue simply prepends all selectors (except component-name and "$self") with the name of the component. 
+$refs can be used as style selectors as is.
 
-With that in mind Cue will internally convert:
+With that in mind, this is a valid Cue component style:
 ```css
-  self {
+  $self {
     position: absolute;
   }
-  self:hover {
+  $self:hover {
     opacity: 0.75;
   }
-  title {
+  $title {
     text-transform: uppercase;
   }
 ``` 
-into:
-
-```css
-  my-component {
-    position: absolute;
-  }
-  my-component:hover {
-    opacity: 0.75;
-  }
-  my-component [ref="title"] {
-    text-transform: uppercase;
-  }
-``` 
-and append these rules to a global stylesheet.
+You can simply inspect the CSS that Cue internally generates from this in your browsers console because Cue writes all styles into a global stylesheet in the head of your page.
 
 <b>Note</b> that you can enable true style encapsulation by passing "encapsulated: true" to the configuration object. 
 This will append all styles and element content to the components shadow dom (see official shadow dom specs for details).
@@ -155,7 +137,11 @@ This is the data that the component needs to somehow display to the user. This i
 data: {
   simple: {
     value: 'Hey this is a String!',
-    reaction: 'renderString'
+    reaction({$refName, $anotherRef}, value) {
+      // $refName and $anotherRef are DOM Elements that we want to manipulate with the current data value
+      $refName.textContent = value;
+      $anotherRef.classList.toggle('string', value.toLowerCase().contains('string'));
+    }
   }
 }
 ``` 
@@ -165,7 +151,7 @@ by referencing a function in the "reactions" object by name. More on reactions l
 
 You can read and write the value of a data property inside of lifecycle and custom top-level methods via:
 
-```this.get('property') | this.set('property', value)```
+```this.getData('property') | this.setData({property: value})```
 
 Whenever the value of a data property changes, its corresponding reaction callback is added to Cue's render queue.
 Cue automatically determines if the value has actually changed (deep comparison for objects and arrays) and only then
@@ -196,7 +182,7 @@ This allows different components to share and access the exact same data. When t
 all Components which bind to the changed property in the store are automatically updated. 
 It doesn't matter how the store changes. 
 It can be changed externally via ```Store.set('property', value)``` or via any component
-that binds to the store via ```Component.set('propertyBoundToStore', value)```
+that binds to the store via ```Component.setData('propertyBoundToStore', value)```
 When a component binds to the store, it can optionally provide a default value, which will be written into the store
 in case the store doesn't have a value yet.
 ```javascript
@@ -209,7 +195,7 @@ data: {
 ``` 
 <b>Note</b> that any computations and reactions will be fired when the data in the store changes. The data can change 
 by directly calling ```Store.set('thePropertyInTheStore', value)``` or via any Component which is bound to the Store via
-```Component.set('storeBound', value)```
+```Component.setData('storeBound', value)```
 
 Oh and btw: You never need to manually unsubscribe from your Store bindings in lifecycle methods - Cue automatically protects you
 from manual work and potential memory leaks. You're welcome.
@@ -219,24 +205,24 @@ from manual work and potential memory leaks. You're welcome.
 Reactions are callbacks that are fired in response to data changes and update fragments of DOM.
 ```javascript
 reactions: {
-  renderUsers({userList}, users) {
-    userList.renderEach(users, user => Component.create(`
+  renderUsers({$userList}, users) {
+    $userList.renderEach(users, user => Component.create(`
       <li>${user.firstName} ${user.lastName}</li>
     `))
   },
-  renderTitle({title}, value) {
-    title.textContent = value;
+  renderTitle({$title}, value) {
+    $title.textContent = value;
   } 
 }
 ```
-Reactions receive an object of all "ref" elements as their first argument. As a best practice, always destructure the elements
+Reactions receive an object of all "$ref" elements as their first argument. As a best practice, always destructure the elements
 you need to manipulate directly in the parameter.
 The second parameter is the value of the data property that has changed in the data model and triggered the reaction.
 
-The single responsibility of reactions is to update the DOM. You can not access "this" inside of reactions for this reason.
-All you should need is the ref elements you want to update with the value of the data property that has changed.
+The single responsibility of reactions is to update the DOM. You can not directly access "this" inside of reactions for this reason. (For edge cases you can still access this indirectly via $self).
+All you should need is the $ref elements you want to update with the value of the data property that has changed.
 
-When you work with refs you directly target <b>real DOM nodes</b> - there is no abstraction layer and reactions thus offer incredible performance.
+When you work with $refs you directly target <b>real DOM nodes</b> - there is no abstraction layer and reactions thus offer incredible performance.
 And because these reactions are only running in response to changes of the data model, even complex Cue Components never become 
 hard to predict or maintain. Another benefit of working with the real DOM is that you can use pretty much all libraries anywhere. Just like that.
 
@@ -250,7 +236,7 @@ as a third parameter to renderEach which will attempt to update the element inst
 
 ### Component Lifecycle
 The Lifecycle methods of Cue Components are largely equivalent to those of CustomElements.
-All lifecycle methods have access to the underlying CustomElement via "this" and receive "refs" 
+All lifecycle methods have access to the underlying CustomElement via "this" and receive "$refs" 
 object as the first and only argument.
 <ol>
   <li>initialize - called only once per component instance, after the component has been inserted into the DOM but before "connected" fires.
@@ -304,7 +290,7 @@ data: {
   }     
 }
 ```
-Now when your component calls ```this.set('localProp', 'Hello there!')```
+Now when your component calls ```this.setData('localProp', 'Hello there!')```
 any other component(s) which have a property bound via ```Store.bind('aPropertyInTheStoreInstead')``` will be updated 
 with the value "Hello there!". Pretty cool, aye? 👽
 
@@ -361,14 +347,6 @@ You can optionally pass an "options" object as the third parameter to Store.subs
   <li>once: [default: false] - whether the change event should only be executed once and then be unsubscribed automatically.</li>
 </ul>
 
-#### Persisting the Store
-This is simple. Because the Store is implemented as a wrapper over localStorage, anything you add to the 
-Store is <b>automatically persisted on the client</b>. No extra work necessary.
-
-The Store automatically stringifies objects and arrays and parses them when it returns them to you. When you save JSON data
-in the Store it will return the unparsed JSON data. Just how you would expect.
-Entries to localStorage are internally namespaced so you don't have to worry about prop-clashing.
-
 ***
 ### License
 ```
@@ -404,5 +382,5 @@ Jonathan Ochmann (@monokee)
 </ul>
 
 ***
-Made with ♥️ in CGN | (C) Patchflyer GmbH 2014-2049
+Made with ♥️ in CGN | (C) Patchflyer GmbH 2014-2020
 
