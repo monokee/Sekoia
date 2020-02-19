@@ -6,11 +6,10 @@
 </head>
 <body>
 <test-component></test-component>
-<script type="module">
+<script src="build/cue.min.js"></script>
+<script type="text/javascript">
 
-  import {Component, Store, Server} from './build/cue.module.js';
-
-  Component.define('test-component', {
+  Cue.Component.define('test-component', {
 
     element: (`
       <div $="myFirstRef" class="extension">
@@ -42,7 +41,10 @@
       $myFirstRef.extension {
         border: 1px dashed blue;
       }
-      @media (max-width: 400px) {
+      $content {
+
+      }
+      @media (max-width: 800px) {
         $self {
           background: yellow;
         }

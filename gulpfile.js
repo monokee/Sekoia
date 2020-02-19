@@ -20,7 +20,6 @@ function buildIIFE() {
 
 function minifyIIFE() {
   return src('build/cue.js')
-    .pipe(rename('cue.min.mjs'))
     .pipe(minify({
       mangle: {
         topLevel: true

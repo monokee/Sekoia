@@ -1404,7 +1404,7 @@ function createComponentCSS(name, styles, refNames, encapsulated) {
   // Re-write $self to component-name
   styles = styles.split(`${REF_ID}self`).join(name);
 
-  // Re-write $refName(s) in style text to valid css selector
+  // Re-write $refName(s) in style text to [\$="refName"] selector
   for (const tuple of refNames.entries()) {
     styles = styles.split(tuple[0]).join(tuple[1]);
   }
@@ -1434,7 +1434,12 @@ function createComponentCSS(name, styles, refNames, encapsulated) {
 
   }
 
-  CUE_STYLENODE.innerHTML = styleNodeInnerHTML;
+  if (styleNodeInnerHTML.indexOf(REF_ID_JS) !== -1) { // Escape character still exists (Chromium, Firefox)
+    CUE_STYLENODE.innerHTML = styleNodeInnerHTML;
+  } else { // Escape character has been removed, add it back (Safari)
+    CUE_STYLENODE.innerHTML = styleNodeInnerHTML.split(REF_ID).join(REF_ID_JS);
+  }
+
   TMP_STYLESHEET.innerHTML = '';
   document.head.removeChild(TMP_STYLESHEET);
 
