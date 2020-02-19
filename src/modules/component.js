@@ -8,15 +8,6 @@ const REF_ID_JS = '\\' + REF_ID;
 
 const INTERNAL = Symbol('Component Data');
 
-const CUE_STYLESHEET = (() => {
-  const stylesheet = document.createElement('style');
-  stylesheet.id = 'cue::components';
-  document.head.appendChild(stylesheet);
-  return stylesheet.sheet;
-})();
-
-const CUE_STYLENODE = CUE_STYLESHEET.ownerNode;
-
 const TMP_STYLESHEET = document.createElement('style');
 
 export const Component = {
@@ -498,7 +489,7 @@ function createComponentCSS(name, styles, refNames, encapsulated) {
   TMP_STYLESHEET.innerHTML = styles;
   const tmpSheet = TMP_STYLESHEET.sheet;
 
-  let styleNodeInnerHTML = CUE_STYLENODE.innerHTML;
+  let styleNodeInnerHTML = '';
   for (let i = 0, rule, tls; i < tmpSheet.rules.length; i++) {
 
     rule = tmpSheet.rules[i];
@@ -519,14 +510,21 @@ function createComponentCSS(name, styles, refNames, encapsulated) {
 
   }
 
-  if (styleNodeInnerHTML.indexOf(REF_ID_JS) !== -1) { // Escape character still exists (Chromium, Firefox)
-    CUE_STYLENODE.innerHTML = styleNodeInnerHTML;
-  } else { // Escape character has been removed, add it back (Safari)
-    CUE_STYLENODE.innerHTML = styleNodeInnerHTML.split(REF_ID).join(REF_ID_JS);
-  }
-
+  // Clean up temp stylesheet
   TMP_STYLESHEET.innerHTML = '';
   document.head.removeChild(TMP_STYLESHEET);
+
+  // Build a new stylesheet for the component
+  const componentStylesheet = document.createElement('style');
+  componentStylesheet.id = 'cue::' + name;
+
+  if (styleNodeInnerHTML.indexOf(REF_ID_JS) !== -1) { // Escape character still exists (Chromium, Firefox)
+    componentStylesheet.innerHTML = styleNodeInnerHTML;
+  } else { // Escape character has been removed, add it back (Safari)
+    componentStylesheet.innerHTML = styleNodeInnerHTML.split(REF_ID).join(REF_ID_JS);
+  }
+
+  document.head.appendChild(componentStylesheet);
 
 }
 
@@ -545,7 +543,11 @@ function getTopLevelSelector(selectorText, componentName) {
 
 function constructScopedStyleQuery(name, query, encapsulated, cssText = '') {
 
-  cssText += `${query.type === 4 ? '@media' : '@supports'} ${query.conditionText} {`;
+  if (query.type === 4) {
+    cssText += `@media ${query.media.mediaText} {`;
+  } else {
+    cssText += `@supports ${query.conditionText} {`;
+  }
 
   for (let i = 0, rule, tls; i < query.cssRules.length; i++) {
 
