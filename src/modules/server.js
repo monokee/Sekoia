@@ -28,7 +28,7 @@ export const Server = Object.defineProperty({
   post(url, data, token) {
     return new Promise((resolve, reject) => {
       makeCall(url, 'POST', token, data)
-        .then(response => resolve(JSON.parse(response)))
+        .then(response => resolve(typeof response === 'string' ? JSON.parse(response) : response))
         .catch(error => reject(error));
     });
   },
