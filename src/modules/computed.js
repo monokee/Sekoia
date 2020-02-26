@@ -42,7 +42,7 @@ export class ComputedProperty {
 
       if (Array.isArray(this.intermediate)) {
 
-        if ((this.hasChanged = this._type !== DATA_TYPE_ARRAY || this.intermediate.length !== this._value.length || !areArraysShallowEqual(this._value, this.intermediate))) {
+        if ((this.hasChanged = this._type !== DATA_TYPE_ARRAY || !areArraysShallowEqual(this._value, this.intermediate))) {
           this._value = this.intermediate.slice();
           this._type = DATA_TYPE_ARRAY;
         }

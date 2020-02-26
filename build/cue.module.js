@@ -4,7 +4,7 @@ const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
 
 const Server = Object.defineProperty({
 
-  fetch(url, expires = 24 * 60 * 60, token) {
+  fetch(url, expires = 0, token) {
 
     return new Promise((resolve, reject) => {
 
@@ -199,11 +199,36 @@ function deepEqual(a, b) {
 }
 
 function deepClone(x) {
-  return Array.isArray(x) ? deepCloneArray(x) : deepClonePlainObject(x);
+
+  if (!x || typeof x !== 'object') {
+    return x;
+  }
+
+  if (Array.isArray(x)) {
+    const y = [];
+    for (let i = 0; i < x.length; i++) {
+      y.push(deepClone(x[i]));
+    }
+    return y;
+  }
+
+  const keys = Object.keys(x);
+  const y = {};
+  for (let i = 0, k; i < keys.length; i++) {
+    k = keys[i];
+    y[k] = deepClone(x[k]);
+  }
+
+  return y;
+
 }
 
 function areArraysShallowEqual(a, b) {
-  // pre-compare array length outside of this function!
+
+  if (a.length !== b.length) {
+    return false;
+  }
+
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) {
       return false;
@@ -236,70 +261,6 @@ function arePlainObjectsShallowEqual(a, b) {
 
 function ifFn(x) {
   return typeof x === 'function' ? x : NOOP;
-}
-
-// ------------------------------------
-
-/*
-function arePlainObjectsDeepEqual(a, b) {
-
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-
-  if (keysA.length !== keysB.length) {
-    return false;
-  }
-
-  for (let i = 0, k; i < keysA.length; i++) {
-    k = keysA[i];
-    if (keysB.indexOf(k) === -1 || !deepEqual(a[k], b[keysB[i]])) {
-      return false;
-    }
-  }
-
-  return true;
-
-}
-
-function areArraysDeepEqual(a, b) {
-
-  for (let i = 0; i < a.length; i++) {
-    if (!deepEqual(a[i], b[i])) {
-      return false;
-    }
-  }
-
-  return true;
-
-}
-*/
-
-function deepClonePlainObject(o) {
-
-  const clone = {};
-  const keys = Object.keys(o);
-
-  for (let i = 0, prop, val; i < keys.length; i++) {
-    prop = keys[i];
-    val = o[prop];
-    clone[prop] = !val ? val : Array.isArray(val) ? deepCloneArray(val) : typeof val === 'object' ? deepClonePlainObject(val) : val;
-  }
-
-  return clone;
-
-}
-
-function deepCloneArray(a) {
-
-  const clone = [];
-
-  for (let i = 0, val; i < a.length; i++) {
-    val = a[i];
-    clone[i] = !val ? val : Array.isArray(val) ? deepCloneArray(val) : typeof val === 'object' ? deepClonePlainObject(val) : val;
-  }
-
-  return clone;
-
 }
 
 let PENDING_PROMISE = null;
@@ -442,7 +403,7 @@ const Store = Object.defineProperty({
       const entireStore = {};
 
       for (const tuple of STORE.entries()) {
-        entireStore[tuple[0]] = tuple[1];
+        entireStore[tuple[0]] = deepClone(tuple[1]);
       }
 
       return entireStore;
@@ -458,10 +419,10 @@ const Store = Object.defineProperty({
 
     if (keys.length > 1) { // slash into object tree
       const [targetNode, targetKey] = getNode(root, keys);
-      return targetNode[targetKey];
+      return deepClone(targetNode[targetKey]);
     }
 
-    return root;
+    return deepClone(root);
 
   },
 
@@ -612,7 +573,8 @@ const Store = Object.defineProperty({
     }
 
     const event = Object.assign({
-      bubbles: false
+      bubbles: false,
+      autorun: true,
     }, options, {
       handler: options.scope ? handler.bind(options.scope) : handler
     });
@@ -621,6 +583,19 @@ const Store = Object.defineProperty({
       EVENTS$1.get(path).push(event);
     } else {
       EVENTS$1.set(path, [event]);
+    }
+
+    if (event.autorun === true) {
+      if (!STORE.has(path)) {
+        console.warn(`Can not auto-run Store subscription handler because "${path}" does not have a value. Pass {autorun: false} option to avoid this warning.`);
+      } else {
+        if (event.bubbles === false) {
+          dispatchEvent(path, STORE.get(path));
+        } else {
+          const keys = path.split('/');
+          bubbleEvent(path, STORE.get(path), keys, STORE.get(keys[0]));
+        }
+      }
     }
 
     return {
@@ -782,7 +757,7 @@ class ComputedProperty {
 
       if (Array.isArray(this.intermediate)) {
 
-        if ((this.hasChanged = this._type !== DATA_TYPE_ARRAY || this.intermediate.length !== this._value.length || !areArraysShallowEqual(this._value, this.intermediate))) {
+        if ((this.hasChanged = this._type !== DATA_TYPE_ARRAY || !areArraysShallowEqual(this._value, this.intermediate))) {
           this._value = this.intermediate.slice();
           this._type = DATA_TYPE_ARRAY;
         }
@@ -962,7 +937,6 @@ const Component = {
 
     // ---------------------- ATTRIBUTES (PRE-MODULE) ----------------------
     const observedAttributes = config.attributes ? Object.keys(config.attributes) : [];
-    //const attributeChangedCallbacks = observedAttributes.map(name => config.attributes[name]);
 
     // ---------------------- CUSTOM ELEMENT INSTANCE ----------------------
     const component = class extends HTMLElement {
@@ -996,12 +970,9 @@ const Component = {
           _data: _data,
           data: new Proxy(_data, {
             get(target, key) {
-              if (Module.storeBindings[key]) return Store.get(Module.storeBindings[key].path);
-              if (_computedProperties.has(key)) return _computedProperties.get(key).value(internal.data);
-              const value = target[key];
-              if (Array.isArray(value)) return value.slice();
-              if (typeof value === 'object' && value !== null) return Object.assign({}, value);
-              return value;
+              if (Module.storeBindings[key]) return Store.get(Module.storeBindings[key].path); // does deep clone
+              if (_computedProperties.has(key)) return _computedProperties.get(key).value(internal.data); // deep by default
+              return deepClone(target[key]); // deep clone
             }
           }),
           computedProperties: _computedProperties,
@@ -1044,12 +1015,14 @@ const Component = {
 
           internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
-            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data)
+            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data),
+            {autorun: false}
           ));
 
           internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
-            value => Reactor.cueCallback(internal.reactions[key], value)
+            value => Reactor.cueCallback(internal.reactions[key], value),
+            {autorun: false}
           ));
 
         }
@@ -1160,7 +1133,27 @@ const Component = {
       }
 
       getData(key) {
-        return this[INTERNAL].data[key];
+
+        if (!key) {
+          // when no key is passed, retrieve object of all settable properties (all except computed)
+          const internal = this[INTERNAL];
+          const dataClone = {};
+          let key;
+
+          for (key in Module.storeBindings) {
+            dataClone[key] = Store.get(Module.storeBindings[key].path); // returns deep clone
+          }
+
+          for (key in internal._data) {
+            dataClone[key] = deepClone(internal._data[key]); // make deep clone
+          }
+
+          return dataClone;
+
+        }
+
+        return this[INTERNAL].data[key]; // proxy returns deep clone
+
       }
 
       setData(key, value) {

@@ -44,11 +44,36 @@ export function deepEqual(a, b) {
 }
 
 export function deepClone(x) {
-  return Array.isArray(x) ? deepCloneArray(x) : deepClonePlainObject(x);
+
+  if (!x || typeof x !== 'object') {
+    return x;
+  }
+
+  if (Array.isArray(x)) {
+    const y = [];
+    for (let i = 0; i < x.length; i++) {
+      y.push(deepClone(x[i]));
+    }
+    return y;
+  }
+
+  const keys = Object.keys(x);
+  const y = {};
+  for (let i = 0, k; i < keys.length; i++) {
+    k = keys[i];
+    y[k] = deepClone(x[k]);
+  }
+
+  return y;
+
 }
 
 export function areArraysShallowEqual(a, b) {
-  // pre-compare array length outside of this function!
+
+  if (a.length !== b.length) {
+    return false;
+  }
+
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) {
       return false;
@@ -84,40 +109,6 @@ export function ifFn(x) {
 }
 
 // ------------------------------------
-
-/*
-function arePlainObjectsDeepEqual(a, b) {
-
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-
-  if (keysA.length !== keysB.length) {
-    return false;
-  }
-
-  for (let i = 0, k; i < keysA.length; i++) {
-    k = keysA[i];
-    if (keysB.indexOf(k) === -1 || !deepEqual(a[k], b[keysB[i]])) {
-      return false;
-    }
-  }
-
-  return true;
-
-}
-
-function areArraysDeepEqual(a, b) {
-
-  for (let i = 0; i < a.length; i++) {
-    if (!deepEqual(a[i], b[i])) {
-      return false;
-    }
-  }
-
-  return true;
-
-}
-*/
 
 function deepClonePlainObject(o) {
 

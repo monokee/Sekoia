@@ -19,7 +19,6 @@ export const Component = {
 
     // ---------------------- ATTRIBUTES (PRE-MODULE) ----------------------
     const observedAttributes = config.attributes ? Object.keys(config.attributes) : [];
-    //const attributeChangedCallbacks = observedAttributes.map(name => config.attributes[name]);
 
     // ---------------------- CUSTOM ELEMENT INSTANCE ----------------------
     const component = class extends HTMLElement {
@@ -53,12 +52,9 @@ export const Component = {
           _data: _data,
           data: new Proxy(_data, {
             get(target, key) {
-              if (Module.storeBindings[key]) return Store.get(Module.storeBindings[key].path);
-              if (_computedProperties.has(key)) return _computedProperties.get(key).value(internal.data);
-              const value = target[key];
-              if (Array.isArray(value)) return value.slice();
-              if (typeof value === 'object' && value !== null) return Object.assign({}, value);
-              return value;
+              if (Module.storeBindings[key]) return Store.get(Module.storeBindings[key].path); // does deep clone
+              if (_computedProperties.has(key)) return _computedProperties.get(key).value(internal.data); // deep by default
+              return deepClone(target[key]); // deep clone
             }
           }),
           computedProperties: _computedProperties,
@@ -101,12 +97,14 @@ export const Component = {
 
           internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
-            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data)
+            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data),
+            {autorun: false}
           ));
 
           internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
-            value => Reactor.cueCallback(internal.reactions[key], value)
+            value => Reactor.cueCallback(internal.reactions[key], value),
+            {autorun: false}
           ));
 
         }
@@ -217,7 +215,27 @@ export const Component = {
       }
 
       getData(key) {
-        return this[INTERNAL].data[key];
+
+        if (!key) {
+          // when no key is passed, retrieve object of all settable properties (all except computed)
+          const internal = this[INTERNAL];
+          const dataClone = {};
+          let key;
+
+          for (key in Module.storeBindings) {
+            dataClone[key] = Store.get(Module.storeBindings[key].path); // returns deep clone
+          }
+
+          for (key in internal._data) {
+            dataClone[key] = deepClone(internal._data[key]); // make deep clone
+          }
+
+          return dataClone;
+
+        }
+
+        return this[INTERNAL].data[key]; // proxy returns deep clone
+
       }
 
       setData(key, value) {

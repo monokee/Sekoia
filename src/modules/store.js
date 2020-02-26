@@ -1,4 +1,4 @@
-import {RESOLVED_PROMISE, deepEqual} from "./utils.js";
+import {RESOLVED_PROMISE, deepEqual, deepClone} from "./utils.js";
 import {Reactor} from "./reactor.js";
 
 const STORE = new Map();
@@ -13,7 +13,7 @@ export const Store = Object.defineProperty({
       const entireStore = {};
 
       for (const tuple of STORE.entries()) {
-        entireStore[tuple[0]] = tuple[1];
+        entireStore[tuple[0]] = deepClone(tuple[1]);
       }
 
       return entireStore;
@@ -29,10 +29,10 @@ export const Store = Object.defineProperty({
 
     if (keys.length > 1) { // slash into object tree
       const [targetNode, targetKey] = getNode(root, keys);
-      return targetNode[targetKey];
+      return deepClone(targetNode[targetKey]);
     }
 
-    return root;
+    return deepClone(root);
 
   },
 
@@ -183,7 +183,8 @@ export const Store = Object.defineProperty({
     }
 
     const event = Object.assign({
-      bubbles: false
+      bubbles: false,
+      autorun: true,
     }, options, {
       handler: options.scope ? handler.bind(options.scope) : handler
     });
@@ -192,6 +193,19 @@ export const Store = Object.defineProperty({
       EVENTS.get(path).push(event);
     } else {
       EVENTS.set(path, [event]);
+    }
+
+    if (event.autorun === true) {
+      if (!STORE.has(path)) {
+        console.warn(`Can not auto-run Store subscription handler because "${path}" does not have a value. Pass {autorun: false} option to avoid this warning.`);
+      } else {
+        if (event.bubbles === false) {
+          dispatchEvent(path, STORE.get(path));
+        } else {
+          const keys = path.split('/');
+          bubbleEvent(path, STORE.get(path), keys, STORE.get(keys[0]));
+        }
+      }
     }
 
     return {

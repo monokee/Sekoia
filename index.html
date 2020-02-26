@@ -5,62 +5,8 @@
   <title>Cue.js</title>
 </head>
 <body>
-<test-component></test-component>
-<script src="build/cue.min.js"></script>
-<script type="text/javascript">
 
-  Cue.Component.define('test-component', {
-
-    element: (`
-      <div $="myFirstRef" class="extension">
-        <span $="content"></span>
-      </div>
-      <div $="mySecondRef"></div>
-      <div $="myThirdRef"></div>
-    `),
-
-    styles: (`
-      $self {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 250px;
-        height: 250px;
-        display: flex;
-        align-items: column;
-        background: yellow;
-      }
-      $myFirstRef {
-        width: 100%;
-        height: 56px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      $myFirstRef.extension {
-        border: 1px dashed blue;
-      }
-      $content {
-
-      }
-      @media (max-width: 800px) {
-        $self {
-          background: red;
-        }
-        $myFirstRef.extension {
-          border: 1px dashed pink;
-        }
-      }
-    `),
-
-    initialize({$self, $myFirstRef, $content, $mySecondRef, $myThirdRef}) {
-      console.log($self, $myFirstRef, $content, $mySecondRef, $myThirdRef);
-    }
-
-  });
-
-</script>
+<script src="build/cue.js"></script>
 
 </body>
 </html>

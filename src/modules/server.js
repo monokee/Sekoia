@@ -4,7 +4,7 @@ const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
 
 export const Server = Object.defineProperty({
 
-  fetch(url, expires = 24 * 60 * 60, token) {
+  fetch(url, expires = 0, token) {
 
     return new Promise((resolve, reject) => {
 
