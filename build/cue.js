@@ -4,14 +4,6 @@ const pendingCalls = new Map();
 const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
 const EMPTY_CACHE_STORAGE_KEY = Symbol();
 
-const responseErrorHandler = res => {
-  if (!res.ok) {
-    throw new Error(res.statusText);
-  } else {
-    return res;
-  }
-};
-
 const Server = Object.defineProperty({
 
   fetch(url, expires = 0, token) {
@@ -141,11 +133,17 @@ function makeCall(url, method, token, data = {}) {
         redirect: 'follow',
         referrer: 'no-referrer',
         body: method === 'GET' ? null : typeof data === 'string' ? data : JSON.stringify(data)
-      })
-        .then(responseErrorHandler)
-        .then(r => r.json().then(d => resolve(d)))
-        .catch(e => reject(e))
-        .finally(() => pendingCalls.delete(url));
+      }).then(res => {
+        if (!res.ok) {
+          res.json().then(error => reject(error));
+        } else {
+          res.json().then(data => resolve(data));
+        }
+      }).catch(error => {
+        reject(error);
+      }).finally(() => {
+        pendingCalls.delete(url);
+      });
 
     }));
 
