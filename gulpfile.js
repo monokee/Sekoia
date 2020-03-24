@@ -4,6 +4,7 @@ const minify = require('gulp-babel-minify');
 const rename = require('gulp-rename');
 const iife = require('gulp-iife');
 const footer = require('gulp-footer');
+const removeCode = require('gulp-remove-code');
 
 function buildIIFE() {
   return src('src/index.js')
@@ -13,7 +14,9 @@ function buildIIFE() {
       useStrict: false,
       trimCode: true,
       prependSemicolon: false,
-      bindThis: false
+      bindThis: false,
+      params: ['window'],
+      args: ['window || this']
     }))
     .pipe(dest('build'));
 }
@@ -32,6 +35,7 @@ function minifyIIFE() {
 function buildModule() {
   return src('src/index.js')
     .pipe(rollup({}, 'esm'))
+    .pipe(removeCode({esModule: true}))
     .pipe(footer('export {Component, Store, Server};'))
     .pipe(rename('cue.module.js'))
     .pipe(dest('build'));

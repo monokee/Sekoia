@@ -1,7 +1,16 @@
-(function() {
+(function(window) {
 const LocalStorage = window.localStorage;
 const pendingCalls = new Map();
 const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
+const EMPTY_CACHE_STORAGE_KEY = Symbol();
+
+const responseErrorHandler = res => {
+  if (!res.ok) {
+    throw new Error(res.statusText);
+  } else {
+    return res;
+  }
+};
 
 const Server = Object.defineProperty({
 
@@ -11,15 +20,15 @@ const Server = Object.defineProperty({
 
       const data = getCache(url);
 
-      if (data !== null) {
-        resolve(JSON.parse(data));
-      } else {
+      if (data === EMPTY_CACHE_STORAGE_KEY) {
         makeCall(url, 'GET', token).then(response => {
           setCache(url, response, expires);
-          resolve(typeof response === 'string' ? JSON.parse(response) : response);
+          resolve(response);
         }).catch(error => {
           reject(error);
         });
+      } else {
+        resolve(data);
       }
 
     });
@@ -29,7 +38,7 @@ const Server = Object.defineProperty({
   post(url, data, token) {
     return new Promise((resolve, reject) => {
       makeCall(url, 'POST', token, data)
-        .then(response => resolve(typeof response === 'string' ? JSON.parse(response) : response))
+        .then(response => resolve(response))
         .catch(error => reject(error));
     });
   },
@@ -67,13 +76,13 @@ function getCache(url) {
   const timestamp = LocalStorage.getItem(`${url}::ts`);
 
   if (timestamp === null) {
-    return null;
+    return EMPTY_CACHE_STORAGE_KEY;
   } else {
     if (Number(timestamp) < Date.now()) {
       clearCache(url);
-      return null;
+      return EMPTY_CACHE_STORAGE_KEY;
     } else {
-      return LocalStorage.getItem(url);
+      return JSON.parse(LocalStorage.getItem(url));
     }
   }
 
@@ -123,7 +132,7 @@ function makeCall(url, method, token, data = {}) {
 
     pendingCalls.set(url, new Promise((resolve, reject) => {
 
-      const response = fetch(url, {
+      fetch(url, {
         method: method,
         mode: 'cors',
         cache: 'no-cache',
@@ -131,21 +140,13 @@ function makeCall(url, method, token, data = {}) {
         headers: headers,
         redirect: 'follow',
         referrer: 'no-referrer',
-        body: method === 'GET' ? null : JSON.stringify(data)
-      }).then(response => {
-        if (response && typeof response.json === 'function') {
-          response.json().then(json => {
-            pendingCalls.delete(url);
-            resolve(json);
-          });
-        } else {
-          pendingCalls.delete(url);
-          reject('Invalid response. Cue Server expects JSON response...');
-        }
-      }).catch(error => {
-        pendingCalls.delete(url);
-        reject(error);
-      });
+        body: method === 'GET' ? null : typeof data === 'string' ? data : JSON.stringify(data)
+      })
+        .then(responseErrorHandler)
+        .then(r => r.json().then(d => resolve(d)))
+        .catch(e => reject(e))
+        .finally(() => pendingCalls.delete(url));
+
     }));
 
     return pendingCalls.get(url);
@@ -1850,5 +1851,16 @@ function longestIncreasingSubsequence(ns, newStart) {
 
 }
 
-window.Cue = {Server, Store, Component};
-}());
+//removeIf(esModule)
+const Cue = {Component, Store, Server};
+if (typeof module === 'object' && typeof module.exports === 'object') {
+  module.exports = Cue;
+} else if (typeof define === 'function' && define.amd) {
+  define('Cue', [], function() {
+    return Cue;
+  });
+} else {
+  window.Cue = Cue;
+}
+//endRemoveIf(esModule)
+}(window || this));
