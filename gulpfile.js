@@ -36,7 +36,7 @@ function buildModule() {
   return src('src/index.js')
     .pipe(rollup({}, 'esm'))
     .pipe(removeCode({esModule: true}))
-    .pipe(footer('export {Component, Store, Server};'))
+    .pipe(footer('export {Component, Store, Server, Router};'))
     .pipe(rename('cue.module.js'))
     .pipe(dest('build'));
 }
