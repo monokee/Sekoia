@@ -585,8 +585,23 @@ const Store = Object.defineProperty({
     }
 
     if (event.autorun === true) {
-      if (!STORE.has(path)) {
-        console.warn(`Can not auto-run Store subscription handler because "${path}" does not have a value. Pass {autorun: false} option to avoid this warning.`);
+
+      const keys = path.split('/');
+      const root = STORE.get(keys[0]);
+
+      let warn = false;
+
+      if (root === void 0) {
+        warn = true;
+      } else if (keys.length > 1) {
+        const [targetNode, targetKey] = getNode(root, keys);
+        if (targetNode[targetKey] === void 0) {
+          warn = true;
+        }
+      }
+
+      if (warn === true) {
+        console.warn(`Can not auto-run Store subscription handler because value at "${path}" is undefined. Pass {autorun: false} option to avoid this warning.`);
       } else {
         if (event.bubbles === false) {
           dispatchEvent(path, STORE.get(path));
