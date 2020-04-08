@@ -174,7 +174,7 @@ export const Router = {
 
   navigate(route, revertible = true, forceReload = false) {
 
-    const routeParts = splitRouteAtQuery; // split url into [route, query]
+    const routeParts = splitRouteAtQuery(route); // split url into [route, query]
     const { relativeRoute, absoluteRoute } = getAbsRelRoute(routeParts.shift());
     const queryString = routeParts[0] ? `?${routeParts[0]}` : window.location.search; // the query
 
