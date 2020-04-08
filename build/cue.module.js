@@ -1935,10 +1935,10 @@ const Router = {
       const onRoute = options;
       options = { onRoute };
     } else if (typeof options.beforeRoute !== 'function' && typeof options.onRoute !== 'function') {
-      throw new Error('Router.subsribe requires "options" object with "beforeRoute", "onRoute" or both handler functions.');
+      throw new Error('Router.subscribe requires "options" object with "beforeRoute", "onRoute" or both handler functions.');
     }
 
-    baseRoute = sanitizeRoute(baseRoute);
+    baseRoute = getAbsRelRoute(baseRoute).relativeRoute;
 
     // dont register a route twice (do quick lookup)
     if (ROUTES.has(baseRoute)) {
@@ -1982,21 +1982,23 @@ const Router = {
 
       listenerRegistered = true;
 
-      const urlHandler = () => {
-        Router.navigate(window.location.href, false).then(route => {
+      const urlHandler = (forceReload) => {
+        Router.navigate(window.location.href, false, forceReload).then(route => {
           window.history.replaceState(null, document.title, route);
         });
       };
 
       if (document.readyState === 'complete') {
-        urlHandler();
+        urlHandler(true);
       } else {
         document.addEventListener('readystatechange', () => {
-          document.readyState === 'complete' && urlHandler();
+          document.readyState === 'complete' && urlHandler(true);
         });
       }
 
-      window.addEventListener('hashchange', urlHandler);
+      window.addEventListener('hashchange', () => {
+        urlHandler(false);
+      });
 
     }
 
@@ -2004,29 +2006,29 @@ const Router = {
 
   navigate(route, revertible = true, forceReload = false) {
 
-    const routeParts = route.split(/\?(.+)/).filter(s => s);
-    route = sanitizeRoute(routeParts.shift());
-    const queryParams = routeParts[0] ? `?${routeParts[0]}` : window.location.search;
+    const routeParts = route.split(/\?(.+)/).filter(s => s); // split url into [route, query]
+    const { relativeRoute, absoluteRoute } = getAbsRelRoute(routeParts.shift());
+    const queryParams = routeParts[0] ? `?${routeParts[0]}` : window.location.search; // the query
 
-    if (route === currentRoute && forceReload === false) {
-      fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, route);
-      fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, route);
+    if (relativeRoute === currentRoute && forceReload === false) {
+      fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
+      fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, relativeRoute);
       return defaultResponse;
     }
 
     if (navigationInProgress) {
-      console.warn('Router.navigate to "' + route + '" not executed because navigation to "' + pendingRoute + '" is still in progress.');
+      console.warn('Router.navigate to "' + absoluteRoute + '" not executed because navigation to "' + pendingRoute + '" is still in progress.');
       return defaultResponse;
     } else {
-      pendingRoute = route;
+      pendingRoute = absoluteRoute;
       navigationInProgress = true;
     }
 
-    fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, route);
+    fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
 
     return new Promise(resolve => {
 
-      resolveRouteHandlers(route).then(resolvedStruct => {
+      buildRouteStruct(absoluteRoute).then(resolvedStruct => {
 
         buildURLFromStruct(resolvedStruct).then(finalRoute => {
 
@@ -2045,7 +2047,7 @@ const Router = {
                 tuple = callbacks[i]; handler = tuple[0]; param = tuple[1];
 
                 if (forceReload === true || !ON_ROUTE_HANDLER_CACHE.has(handler) || ON_ROUTE_HANDLER_CACHE.get(handler) !== param) {
-                  handler(param); // TODO: when implemented as cue module, add handler to reaction queue
+                  handler(param);
                   ON_ROUTE_HANDLER_CACHE.set(handler, param);
                 }
 
@@ -2076,7 +2078,7 @@ const Router = {
 
 // --------------------------------------------------------
 
-function resolveRouteHandlers(route) {
+function buildRouteStruct(absoluteRoute) {
 
   return new Promise(resolve => {
 
@@ -2087,38 +2089,75 @@ function resolveRouteHandlers(route) {
     routesDidResolve = false;
 
     if (!ROUTES_STRUCT[ORIGIN]) {
-      resolve(null);
+      onRoutesResolved(null);
     }
 
-    resolveRootRouteHandlers(route, resolve);
+    resolveRouteHandlers(absoluteRoute);
 
   });
 
 }
 
-function resolveRootRouteHandlers(route, resolve) {
-  collectRouteNodes(ROUTES_STRUCT, [ORIGIN]).then(baseNode => {
-    resolvedBaseNode = baseNode;
-    if (route === ORIGIN) {
+function resolveRouteHandlers(route) {
+
+  if (route === ORIGIN) {
+
+    if (resolvedBaseNode !== null) {
+      onRoutesResolved(resolvedBaseNode);
+    } else {
+      collectRouteNodes(ROUTES_STRUCT, [ORIGIN]).then(baseNode => {
+        resolvedBaseNode = baseNode;
+        if (routesDidResolve === false) {
+          routesDidResolve = true;
+          onRoutesResolved(resolvedBaseNode);
+        }
+      });
+    }
+
+  } else if (route.lastIndexOf(ORIGIN, 0) === 0) { // starts with origin (split at hash)
+
+    const hashPart = route.substr(ORIGIN.length);
+
+    if (hashPart[0] !== '#') {
+      throw new Error('Invalid route "' + hashPart + '". Nested routes must be hash based.');
+    }
+
+    if (resolvedBaseNode !== null) {
+
+      collectRouteNodes(ROUTES_STRUCT.children, hashPart.split('/')).then(hashNode => {
+        if (routesDidResolve === false) {
+          routesDidResolve = true;
+          onRoutesResolved(Object.assign(resolvedBaseNode, {
+            nextNode: hashNode
+          }));
+        }
+      });
+
+    } else {
+
+      collectRouteNodes(ROUTES_STRUCT, [ORIGIN, ...hashPart.split('/')]).then(baseNode => {
+        resolvedBaseNode = baseNode;
+        if (routesDidResolve === false) {
+          routesDidResolve = true;
+          onRoutesResolved(resolvedBaseNode);
+        }
+      });
+
+    }
+
+  } else if (route[0] === '#') { // is hash
+
+    collectRouteNodes(ROUTES_STRUCT[ORIGIN].children, route.split('/')).then(hashNode => {
       if (routesDidResolve === false) {
         routesDidResolve = true;
-        resolve(resolvedBaseNode);
+        onRoutesResolved(Object.assign(resolvedBaseNode, {
+          nextNode: hashNode
+        }));
       }
-    } else {
-      resolveHashRouteHandlers(route, resolvedBaseNode, resolve);
-    }
-  });
-}
+    });
 
-function resolveHashRouteHandlers(route, baseNode, resolve) {
-  collectRouteNodes(ROUTES_STRUCT[ORIGIN].children, route.split('/')).then(hashNode => {
-    if (routesDidResolve === false) {
-      routesDidResolve = true;
-      resolve(Object.assign(baseNode, {
-        nextNode: hashNode
-      }));
-    }
-  });
+  }
+
 }
 
 function collectRouteNodes(root, parts, rest = '') {
@@ -2215,25 +2254,23 @@ function collectRouteNodes(root, parts, rest = '') {
 
             } else { // current node is nth child
 
-              if (oNextNodeValue === ORIGIN) {
+              // rewritten to origin, hash or something that starts with origin
+              if (oNextNodeValue === ORIGIN || oNextNodeValue[0] === '#' || oNextNodeValue.lastIndexOf(ORIGIN, 0) === 0) {
+
                 if (tryRecursion(parts)) {
-                  resolveRootRouteHandlers(oNextNodeValue, onRoutesResolved);
+                  resolveRouteHandlers(oNextNodeValue);
                 }
-              } else if (oNextNodeValue[0] === '#') {
-                if (tryRecursion(parts)) {
-                  resolveHashRouteHandlers(oNextNodeValue, resolvedBaseNode, onRoutesResolved);
-                }
-              } else if (oNextNodeValue.lastIndexOf(ORIGIN, 0) === 0) {
-                if (tryRecursion(parts)) {
-                  resolveHashRouteHandlers(oNextNodeValue.substr(ORIGIN.length), resolvedBaseNode, onRoutesResolved);
-                }
+
               } else { // relative re-write
+
                 resolve({
                   value: rest,
                   onRoute: frag.onRoute,
                   nextNode: collectRouteNodes(frag.children, oNextNodeValue.split('/'))
                 });
+
               }
+
             }
 
           }
@@ -2337,14 +2374,20 @@ function tryRecursion(parts) {
 
 }
 
-function sanitizeRoute(route) {
+function getAbsRelRoute(route) {
 
   if (ALLOWED_ORIGIN_NAMES.indexOf(route) > -1) {
-    return ORIGIN;
+    return {
+      relativeRoute: ORIGIN,
+      absoluteRoute: ORIGIN
+    };
   }
 
   if (route[0] === '#') {
-    return route;
+    return {
+      relativeRoute: route,
+      absoluteRoute: ORIGIN + route
+    };
   }
 
   route = removeAllowedOriginPrefix(route);
@@ -2353,7 +2396,10 @@ function sanitizeRoute(route) {
     throw new Error('Invalid Route: "' + route + '". Nested routes must be hash based.');
   }
 
-  return route;
+  return {
+    relativeRoute: route,
+    absoluteRoute: ORIGIN + route
+  };
 
 }
 
