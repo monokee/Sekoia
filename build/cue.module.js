@@ -1880,6 +1880,7 @@ const ROUTES = new Set();
 const ON_ROUTE_HANDLER_CACHE = new Map();
 const ROUTES_STRUCT = {};
 
+const ROUTE_HOOK_HANDLERS = new Map();
 const BEFORE_EACH_HANDLERS = [];
 const AFTER_EACH_HANDLERS = [];
 
@@ -1917,6 +1918,18 @@ const Router = {
         return pendingRoute;
       }
     }
+  },
+
+  addHook(route, handler, scope = null, once = false) {
+
+    route = getAbsRelRoute(route).relativeRoute;
+
+    if (!ROUTE_HOOK_HANDLERS.has(route)) {
+      ROUTE_HOOK_HANDLERS.set(route, []);
+    }
+
+    addRouterEvent(ROUTE_HOOK_HANDLERS.get(route), handler, scope, once);
+
   },
 
   beforeEach(handler, scope = null, once = false) {
@@ -2009,6 +2022,25 @@ const Router = {
     const routeParts = route.split(/\?(.+)/).filter(s => s); // split url into [route, query]
     const { relativeRoute, absoluteRoute } = getAbsRelRoute(routeParts.shift());
     const queryParams = routeParts[0] ? `?${routeParts[0]}` : window.location.search; // the query
+
+    if (ROUTE_HOOK_HANDLERS.has(relativeRoute)) {
+
+      const params = {};
+
+      if (queryParams.length > 1) {
+        const queries = queryParams.substring(1).replace(/\+/g, ' ').replace(/;/g, '&').split('&');
+        for (let i = 0, kv, key; i < queries.length; i++) {
+          kv = queries[i].split('=', 2);
+          key = decodeURIComponent(kv[0]);
+          if (key) {
+            params[key] = kv.length > 1 ? decodeURIComponent(kv[1]) : true;
+          }
+        }
+      }
+
+      fireRouterEvents(ROUTE_HOOK_HANDLERS.get(relativeRoute), params);
+
+    }
 
     if (relativeRoute === currentRoute && forceReload === false) {
       fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
@@ -2442,8 +2474,8 @@ function addRouterEvent(stack, handler, scope, once) {
   if (once === false) {
     _handler = handler.bind(scope);
   } else {
-    _handler = (from, to) => {
-      handler.call(scope, from, to);
+    _handler = (x, y, z) => {
+      handler.call(scope, x, y, z);
       const i = stack.indexOf(_handler);
       stack.splice(i, 1);
     };
@@ -2453,9 +2485,11 @@ function addRouterEvent(stack, handler, scope, once) {
 
 }
 
-function fireRouterEvents(stack, from, to) {
-  for (let i = 0; i < stack.length; i++) {
-    stack[i](from, to);
+function fireRouterEvents(stack, x, y, z) {
+  if (stack && stack.length) {
+    for (let i = 0; i < stack.length; i++) {
+      stack[i](x, y, z);
+    }
   }
 }
 
