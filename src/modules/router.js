@@ -55,7 +55,7 @@ export const Router = {
     }
   },
 
-  addHook(route, handler, scope = null, once = false) {
+  hook(route, handler, scope = null, once = false) {
 
     route = getAbsRelRoute(route).relativeRoute;
 
@@ -64,6 +64,25 @@ export const Router = {
     }
 
     addRouterEvent(ROUTE_HOOK_HANDLERS.get(route), handler, scope, once);
+
+  },
+
+  trigger(route, params = {}) {
+
+    const parts = splitRouteAtQuery(route);
+    const relativeRoute = getAbsRelRoute(parts.shift()).relativeRoute;
+
+    const routeHooks = ROUTE_HOOK_HANDLERS.get(relativeRoute);
+
+    if (routeHooks) {
+
+      const params = Object.assign(buildParamsFromQueryString(parts[0] ? `?${parts[0]}` : ''), params);
+
+      for (let i = 0; i < routeHooks.length; i++) {
+        routeHooks[i](params);
+      }
+
+    }
 
   },
 
@@ -154,27 +173,17 @@ export const Router = {
 
   navigate(route, revertible = true, forceReload = false) {
 
-    const routeParts = route.split(/\?(.+)/).filter(s => s); // split url into [route, query]
+    const routeParts = splitRouteAtQuery; // split url into [route, query]
     const { relativeRoute, absoluteRoute } = getAbsRelRoute(routeParts.shift());
-    const queryParams = routeParts[0] ? `?${routeParts[0]}` : window.location.search; // the query
+    const queryString = routeParts[0] ? `?${routeParts[0]}` : window.location.search; // the query
 
-    if (ROUTE_HOOK_HANDLERS.has(relativeRoute)) {
+    const routeHooks = ROUTE_HOOK_HANDLERS.get(relativeRoute);
 
-      const params = {};
-
-      if (queryParams.length > 1) {
-        const queries = queryParams.substring(1).replace(/\+/g, ' ').replace(/;/g, '&').split('&');
-        for (let i = 0, kv, key; i < queries.length; i++) {
-          kv = queries[i].split('=', 2);
-          key = decodeURIComponent(kv[0]);
-          if (key) {
-            params[key] = kv.length > 1 ? decodeURIComponent(kv[1]) : true;
-          }
-        }
+    if (routeHooks) {
+      const params = buildParamsFromQueryString(queryString);
+      for (let i = 0; i < routeHooks.length; i++) {
+        routeHooks[i](params);
       }
-
-      fireRouterEvents(ROUTE_HOOK_HANDLERS.get(relativeRoute), params);
-
     }
 
     if (relativeRoute === currentRoute && forceReload === false) {
@@ -203,7 +212,7 @@ export const Router = {
 
             navigationInProgress = false;
             fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, finalRoute);
-            resolve(finalRoute + queryParams);
+            resolve(finalRoute + queryString);
 
           } else {
 
@@ -223,12 +232,12 @@ export const Router = {
               currentRoute = finalRoute;
 
               if (revertible === true) {
-                window.history.pushState(null, document.title, finalRoute + queryParams);
+                window.history.pushState(null, document.title, finalRoute + queryString);
               }
 
               navigationInProgress = false;
               fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, finalRoute);
-              resolve(finalRoute + queryParams);
+              resolve(finalRoute + queryString);
 
             });
           }
@@ -602,6 +611,10 @@ function getLongestOccurringPrefix(s, prefixes) {
     .sort((a, b) => b.length - a.length)[0];
 }
 
+function splitRouteAtQuery(route) {
+  return route.split(/\?(.+)/).filter(s => s);
+}
+
 function addRouterEvent(stack, handler, scope, once) {
 
   let _handler;
@@ -626,4 +639,23 @@ function fireRouterEvents(stack, x, y, z) {
       stack[i](x, y, z);
     }
   }
+}
+
+function buildParamsFromQueryString(queryString) {
+
+  const params = {};
+
+  if (queryString.length > 1) {
+    const queries = queryString.substring(1).replace(/\+/g, ' ').replace(/;/g, '&').split('&');
+    for (let i = 0, kv, key; i < queries.length; i++) {
+      kv = queries[i].split('=', 2);
+      key = decodeURIComponent(kv[0]);
+      if (key) {
+        params[key] = kv.length > 1 ? decodeURIComponent(kv[1]) : true;
+      }
+    }
+  }
+
+  return params;
+
 }
