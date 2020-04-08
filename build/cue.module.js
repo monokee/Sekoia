@@ -169,7 +169,7 @@ function deepEqual(a, b) {
     let i;
     if (Array.isArray(a)) {
       if (a.length !== b.length) return false;
-      for (i = length; i-- !== 0;) {
+      for (i = a.length; i-- !== 0;) {
         if (!deepEqual(a[i], b[i])) return false;
       }
       return true;
