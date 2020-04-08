@@ -76,10 +76,11 @@ export const Router = {
 
     if (routeHooks) {
 
-      const params = Object.assign(buildParamsFromQueryString(parts[0] ? `?${parts[0]}` : ''), params);
+      const allParams = Object.assign(buildParamsFromQueryString(parts[0] ? `?${parts[0]}` : ''), params);
+      const fullQueryString = buildQueryStringFromParams(allParams);
 
       for (let i = 0; i < routeHooks.length; i++) {
-        routeHooks[i](params);
+        routeHooks[i](allParams, fullQueryString);
       }
 
     }
@@ -182,7 +183,7 @@ export const Router = {
     if (routeHooks) {
       const params = buildParamsFromQueryString(queryString);
       for (let i = 0; i < routeHooks.length; i++) {
-        routeHooks[i](params);
+        routeHooks[i](params, queryString);
       }
     }
 
@@ -622,8 +623,8 @@ function addRouterEvent(stack, handler, scope, once) {
   if (once === false) {
     _handler = handler.bind(scope);
   } else {
-    _handler = (x, y, z) => {
-      handler.call(scope, x, y, z);
+    _handler = (a, b) => {
+      handler.call(scope, a, b);
       const i = stack.indexOf(_handler);
       stack.splice(i, 1);
     };
@@ -633,11 +634,10 @@ function addRouterEvent(stack, handler, scope, once) {
 
 }
 
-function fireRouterEvents(stack, x, y, z) {
-  if (stack && stack.length) {
-    for (let i = 0; i < stack.length; i++) {
-      stack[i](x, y, z);
-    }
+function fireRouterEvents(stack, a, b) {
+  // a/b = from/to || params/query
+  for (let i = 0; i < stack.length; i++) {
+    stack[i](a, b);
   }
 }
 
@@ -657,5 +657,21 @@ function buildParamsFromQueryString(queryString) {
   }
 
   return params;
+
+}
+
+function buildQueryStringFromParams(params) {
+
+  let queryString = '', key, k, v;
+
+  for (key in params) {
+    k = encodeURIComponent(key);
+    if (k) {
+      v = encodeURIComponent(params[key]);
+      queryString += queryString.length ? `&${k}=${v}` : `?${k}=${v}`;
+    }
+  }
+
+  return queryString;
 
 }
