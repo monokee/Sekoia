@@ -29,6 +29,7 @@ let pendingRoute = '';
 let navigationInProgress = false;
 let listenerRegistered = false;
 let currentRoute = '';
+let lastRequestedNavigation = null;
 
 const defaultResponse = {
   then: cb => cb(window.location.href)
@@ -38,7 +39,8 @@ export const Router = {
 
   options: {
     recursionWarningCount: 5,
-    recursionThrowCount: 10
+    recursionThrowCount: 10,
+    defer: 0 // only execute navigations n milliseconds after the last call to Router.navigate
   },
 
   state: {
@@ -173,87 +175,100 @@ export const Router = {
   },
 
   navigate(route, revertible = true, forceReload = false) {
-
-    const routeParts = splitRouteAtQuery(route); // split url into [route, query]
-    const { relativeRoute, absoluteRoute } = getAbsRelRoute(routeParts.shift());
-    const queryString = routeParts[0] ? `?${routeParts[0]}` : window.location.search; // the query
-
-    const routeHooks = ROUTE_HOOK_HANDLERS.get(relativeRoute);
-
-    if (routeHooks) {
-      const params = buildParamsFromQueryString(queryString);
-      for (let i = 0; i < routeHooks.length; i++) {
-        routeHooks[i](params, queryString);
-      }
-    }
-
-    if (relativeRoute === currentRoute && forceReload === false) {
-      fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
-      fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, relativeRoute);
-      return defaultResponse;
-    }
-
-    if (navigationInProgress) {
-      console.warn('Router.navigate to "' + absoluteRoute + '" not executed because navigation to "' + pendingRoute + '" is still in progress.');
-      return defaultResponse;
-    } else {
-      pendingRoute = absoluteRoute;
-      navigationInProgress = true;
-    }
-
-    fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
-
-    return new Promise(resolve => {
-
-      buildRouteStruct(absoluteRoute).then(resolvedStruct => {
-
-        buildURLFromStruct(resolvedStruct).then(finalRoute => {
-
-          if (forceReload === false && finalRoute === currentRoute) {
-
-            navigationInProgress = false;
-            fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, finalRoute);
-            resolve(finalRoute + queryString);
-
-          } else {
-
-            gatherRouteCallbacks(resolvedStruct).then(callbacks => {
-
-              for (let i = 0, tuple, handler, param; i < callbacks.length; i++) {
-
-                tuple = callbacks[i]; handler = tuple[0]; param = tuple[1];
-
-                if (forceReload === true || !ON_ROUTE_HANDLER_CACHE.has(handler) || ON_ROUTE_HANDLER_CACHE.get(handler) !== param) {
-                  handler(param);
-                  ON_ROUTE_HANDLER_CACHE.set(handler, param);
-                }
-
-              }
-
-              currentRoute = finalRoute;
-
-              if (revertible === true) {
-                window.history.pushState(null, document.title, finalRoute + queryString);
-              }
-
-              navigationInProgress = false;
-              fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, finalRoute);
-              resolve(finalRoute + queryString);
-
-            });
-          }
-
-        });
-
+    if (Router.options.defer > 0) {
+      return new Promise(resolve => {
+        clearTimeout(lastRequestedNavigation);
+        lastRequestedNavigation = setTimeout(() => {
+          navigate(route, revertible, forceReload).then(res => resolve(res));
+          lastRequestedNavigation = null;
+        }, Router.options.defer);
       });
-
-    });
-
+    } else {
+      return navigate(route, revertible, forceReload);
+    }
   }
 
 };
 
 // --------------------------------------------------------
+
+function navigate(route, revertible, forceReload) {
+
+  const routeParts = splitRouteAtQuery(route); // split url into [route, query]
+  const { relativeRoute, absoluteRoute } = getAbsRelRoute(routeParts.shift());
+  const queryString = routeParts[0] ? `?${routeParts[0]}` : window.location.search; // the query
+
+  const routeHooks = ROUTE_HOOK_HANDLERS.get(relativeRoute);
+
+  if (routeHooks) {
+    const params = buildParamsFromQueryString(queryString);
+    for (let i = 0; i < routeHooks.length; i++) {
+      routeHooks[i](params, queryString);
+    }
+  }
+
+  if (relativeRoute === currentRoute && forceReload === false) {
+    fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
+    fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, relativeRoute);
+    return defaultResponse;
+  }
+
+  if (navigationInProgress) {
+    console.warn('Router.navigate to "' + absoluteRoute + '" not executed because navigation to "' + pendingRoute + '" is still in progress.');
+    return defaultResponse;
+  } else {
+    pendingRoute = absoluteRoute;
+    navigationInProgress = true;
+  }
+
+  fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
+
+  return new Promise(resolve => {
+
+    buildRouteStruct(absoluteRoute).then(resolvedStruct => {
+
+      buildURLFromStruct(resolvedStruct).then(finalRoute => {
+
+        if (forceReload === false && finalRoute === currentRoute) {
+
+          navigationInProgress = false;
+          resolve(finalRoute + queryString);
+
+        } else {
+
+          gatherRouteCallbacks(resolvedStruct).then(callbacks => {
+
+            for (let i = 0, tuple, handler, param; i < callbacks.length; i++) {
+
+              tuple = callbacks[i]; handler = tuple[0]; param = tuple[1];
+
+              if (forceReload === true || !ON_ROUTE_HANDLER_CACHE.has(handler) || ON_ROUTE_HANDLER_CACHE.get(handler) !== param) {
+                handler(param);
+                ON_ROUTE_HANDLER_CACHE.set(handler, param);
+              }
+
+            }
+
+            currentRoute = finalRoute;
+
+            if (revertible === true) {
+              window.history.pushState(null, document.title, finalRoute + queryString);
+            }
+
+            navigationInProgress = false;
+            fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, finalRoute);
+            resolve(finalRoute + queryString);
+
+          });
+        }
+
+      });
+
+    });
+
+  });
+
+}
 
 function buildRouteStruct(absoluteRoute) {
 
