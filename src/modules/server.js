@@ -126,7 +126,7 @@ function makeCall(url, method, token, data = {}) {
       fetch(url, {
         method: method,
         mode: 'cors',
-        cache: 'no-cache',
+        cache: 'no-store',
         credentials: 'same-origin',
         headers: headers,
         redirect: 'follow',
