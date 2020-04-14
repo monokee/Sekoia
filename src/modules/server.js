@@ -136,7 +136,11 @@ function makeCall(url, method, token, data = {}) {
         if (!res.ok) {
           res.json().then(error => reject(error));
         } else {
-          res.json().then(data => resolve(data));
+          if (res.status === 204) {
+            resolve({});
+          } else {
+            res.json().then(data => resolve(data));
+          }
         }
       }).catch(error => {
         reject(error)

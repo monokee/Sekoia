@@ -12,12 +12,19 @@ if (window.location.pathname && window.location.pathname !== '/') {
 const ALLOWED_ORIGIN_NAMES = ['/', '#', '/#', '/#/', ...ABSOLUTE_ORIGIN_NAMES];
 
 const ROUTES = new Set();
+const ROUTE_HOOK_HANDLERS = new Map();
 const ON_ROUTE_HANDLER_CACHE = new Map();
 const ROUTES_STRUCT = {};
 
-const ROUTE_HOOK_HANDLERS = new Map();
-const BEFORE_EACH_HANDLERS = [];
-const AFTER_EACH_HANDLERS = [];
+const DEFAULT_TRIGGER_OPTIONS = {
+  params: {},
+  revertible: true,
+  forceReload: false
+};
+
+const DEFAULT_RESPONSE = {
+  then: cb => cb(window.location.href)
+};
 
 let recursions = 0;
 let onRoutesResolved = null;
@@ -25,15 +32,11 @@ let resolveCancelled = false;
 let resolvedBaseNode = null;
 let routesDidResolve = false;
 
-let pendingRoute = '';
+let pendingParams = {};
 let navigationInProgress = false;
 let listenerRegistered = false;
-let currentRoute = '';
+let currentAbs = '';
 let lastRequestedNavigation = null;
-
-const defaultResponse = {
-  then: cb => cb(window.location.href)
-};
 
 export const Router = {
 
@@ -43,58 +46,50 @@ export const Router = {
     defer: 0 // only execute navigations n milliseconds after the last call to Router.navigate
   },
 
-  state: {
-    get currentRoute() {
-      return currentRoute;
-    },
-    navigation: {
-      get inProgress() {
-        return navigationInProgress;
-      },
-      get pendingRoute() {
-        return pendingRoute;
-      }
-    }
-  },
-
   hook(route, handler, scope = null, once = false) {
 
-    route = getAbsRelRoute(route).relativeRoute;
+    const hash = getRouteParts(route).hash;
 
-    if (!ROUTE_HOOK_HANDLERS.has(route)) {
-      ROUTE_HOOK_HANDLERS.set(route, []);
+    if (!ROUTE_HOOK_HANDLERS.has(hash)) {
+      ROUTE_HOOK_HANDLERS.set(hash, []);
     }
 
-    addRouterEvent(ROUTE_HOOK_HANDLERS.get(route), handler, scope, once);
+    const hooks = ROUTE_HOOK_HANDLERS.get(hash);
+
+    let _handler;
+
+    if (once === false) {
+      _handler = handler.bind(scope);
+    } else {
+      _handler = params => {
+        handler.call(scope, params);
+        const i = hooks.indexOf(_handler);
+        hooks.splice(i, 1);
+      };
+    }
+
+    hooks.push(_handler);
 
   },
 
-  trigger(route, params = {}) {
+  trigger(route, options = {}) {
 
-    const parts = splitRouteAtQuery(route);
-    const relativeRoute = getAbsRelRoute(parts.shift()).relativeRoute;
+    options = Object.assign(options, DEFAULT_TRIGGER_OPTIONS);
 
-    const routeHooks = ROUTE_HOOK_HANDLERS.get(relativeRoute);
+    const {hash, query} = getRouteParts(route);
 
-    if (routeHooks) {
+    const hooks = ROUTE_HOOK_HANDLERS.get(hash);
 
-      const allParams = Object.assign(buildParamsFromQueryString(parts[0] ? `?${parts[0]}` : ''), params);
-      const fullQueryString = buildQueryStringFromParams(allParams);
+    if (hooks && hooks.length) {
 
-      for (let i = 0; i < routeHooks.length; i++) {
-        routeHooks[i](allParams, fullQueryString);
+      const params = Object.assign(buildParamsFromQueryString(query), options.params);
+
+      for (let i = 0; i < hooks.length; i++) {
+        hooks[i](params);
       }
 
     }
 
-  },
-
-  beforeEach(handler, scope = null, once = false) {
-    addRouterEvent(BEFORE_EACH_HANDLERS, handler, scope, once);
-  },
-
-  afterEach(handler, scope = null, once = false) {
-    addRouterEvent(AFTER_EACH_HANDLERS, handler, scope, once);
   },
 
   subscribe(baseRoute, options) {
@@ -108,30 +103,31 @@ export const Router = {
       throw new Error('Router.subscribe requires "options" object with "beforeRoute", "onRoute" or both handler functions.');
     }
 
-    baseRoute = getAbsRelRoute(baseRoute).relativeRoute;
+    const hash = getRouteParts(baseRoute).hash;
+    const isRoot = hash === '#';
 
     // dont register a route twice (do quick lookup)
-    if (ROUTES.has(baseRoute)) {
-      throw new Error('Router already has an active subscription for "' + baseRoute + '".');
+    if (ROUTES.has(hash)) {
+      throw new Error('Router already has an active subscription for "' + isRoot ? 'root' : baseRoute + '".');
     } else {
-      ROUTES.add(baseRoute);
+      ROUTES.add(hash);
     }
 
     // create root struct if it doesnt exist
     const root = (ROUTES_STRUCT[ORIGIN] = ROUTES_STRUCT[ORIGIN] || {
-      beforeRoute: undefined,
-      onRoute: undefined,
+      beforeRoute: void 0,
+      onRoute: void 0,
       children: {}
     });
 
     // register the baseRoute structurally so that its callbacks can be resolved in order of change
-    if (baseRoute === ORIGIN) {
+    if (isRoot) {
       root.beforeRoute = options.beforeRoute;
       root.onRoute = options.onRoute;
     } else {
-      const routeParts = baseRoute.split('/');
-      const leafPart = routeParts[routeParts.length -1];
-      routeParts.reduce((branch, part) => {
+      const hashParts = hash.split('/');
+      const leafPart = hashParts[hashParts.length -1];
+      hashParts.reduce((branch, part) => {
         if (branch[part]) {
           if (part === leafPart) {
             branch[part].beforeRoute = options.beforeRoute;
@@ -140,8 +136,8 @@ export const Router = {
           return branch[part].children;
         } else {
           return (branch[part] = {
-            beforeRoute: part === leafPart ? options.beforeRoute : undefined,
-            onRoute: part === leafPart ? options.onRoute : undefined,
+            beforeRoute: part === leafPart ? options.beforeRoute : void 0,
+            onRoute: part === leafPart ? options.onRoute : void 0,
             children: {}
           }).children;
         }
@@ -152,9 +148,12 @@ export const Router = {
 
       listenerRegistered = true;
 
-      const urlHandler = (forceReload) => {
-        Router.navigate(window.location.href, false, forceReload).then(route => {
-          window.history.replaceState(null, document.title, route);
+      const urlHandler = forceReload => {
+        Router.navigate(window.location.href, {
+          revertible: false,
+          forceReload: forceReload
+        }).then(url => {
+          window.history.replaceState(null, document.title, url);
         });
       };
 
@@ -174,17 +173,18 @@ export const Router = {
 
   },
 
-  navigate(route, revertible = true, forceReload = false) {
+  navigate(route, options = {}) {
+    options = Object.assign(options, DEFAULT_TRIGGER_OPTIONS);
     if (Router.options.defer > 0) {
       return new Promise(resolve => {
         clearTimeout(lastRequestedNavigation);
         lastRequestedNavigation = setTimeout(() => {
-          navigate(route, revertible, forceReload).then(res => resolve(res));
+          navigate(route, options).then(res => resolve(res));
           lastRequestedNavigation = null;
         }, Router.options.defer);
       });
     } else {
-      return navigate(route, revertible, forceReload);
+      return navigate(route, options);
     }
   }
 
@@ -192,74 +192,72 @@ export const Router = {
 
 // --------------------------------------------------------
 
-function navigate(route, revertible, forceReload) {
+function navigate(route, options) {
 
-  const routeParts = splitRouteAtQuery(route); // split url into [route, query]
-  const { relativeRoute, absoluteRoute } = getAbsRelRoute(routeParts.shift());
-  const queryString = routeParts[0] ? `?${routeParts[0]}` : window.location.search; // the query
+  const {abs, hash, query} = getRouteParts(route);
 
-  const routeHooks = ROUTE_HOOK_HANDLERS.get(relativeRoute);
+  pendingParams = Object.assign(buildParamsFromQueryString(query), options.params);
 
-  if (routeHooks) {
-    const params = buildParamsFromQueryString(queryString);
-    for (let i = 0; i < routeHooks.length; i++) {
-      routeHooks[i](params, queryString);
+  const hooks = ROUTE_HOOK_HANDLERS.get(hash);
+
+  if (hooks) {
+    for (let i = 0; i < hooks.length; i++) {
+      hooks[i](pendingParams);
     }
   }
 
-  if (relativeRoute === currentRoute && forceReload === false) {
-    fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
-    fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, relativeRoute);
-    return defaultResponse;
+  if (abs === currentAbs && options.forceReload === false) {
+    return DEFAULT_RESPONSE;
   }
 
   if (navigationInProgress) {
-    console.warn('Router.navigate to "' + absoluteRoute + '" not executed because navigation to "' + pendingRoute + '" is still in progress.');
-    return defaultResponse;
+    console.warn('Router.navigate to "' + route + '" not executed because another navigation is still in progress.');
+    return DEFAULT_RESPONSE;
   } else {
-    pendingRoute = absoluteRoute;
     navigationInProgress = true;
   }
 
-  fireRouterEvents(BEFORE_EACH_HANDLERS, currentRoute, relativeRoute);
-
   return new Promise(resolve => {
 
-    buildRouteStruct(absoluteRoute).then(resolvedStruct => {
+    buildRouteStruct(abs).then(resolvedStruct => {
 
-      buildURLFromStruct(resolvedStruct).then(finalRoute => {
+      buildURLFromStruct(resolvedStruct).then(finalAbs => { // finalRoute is absolute
 
-        if (forceReload === false && finalRoute === currentRoute) {
+        const url = new URL(finalAbs);
+        url.search = query;
+        const urlString = url.toString();
+
+        if (finalAbs === currentAbs && options.forceReload === false) {
 
           navigationInProgress = false;
-          resolve(finalRoute + queryString);
+          resolve(urlString);
 
         } else {
 
           gatherRouteCallbacks(resolvedStruct).then(callbacks => {
 
-            for (let i = 0, tuple, handler, param; i < callbacks.length; i++) {
+            for (let i = 0, tuple, handler, path; i < callbacks.length; i++) {
 
-              tuple = callbacks[i]; handler = tuple[0]; param = tuple[1];
+              tuple = callbacks[i]; handler = tuple[0]; path = tuple[1];
 
-              if (forceReload === true || !ON_ROUTE_HANDLER_CACHE.has(handler) || ON_ROUTE_HANDLER_CACHE.get(handler) !== param) {
-                handler(param);
-                ON_ROUTE_HANDLER_CACHE.set(handler, param);
+              if (options.forceReload === true || !ON_ROUTE_HANDLER_CACHE.has(handler) || ON_ROUTE_HANDLER_CACHE.get(handler) !== path) {
+                handler(path, pendingParams);
+                ON_ROUTE_HANDLER_CACHE.set(handler, path);
               }
 
             }
 
-            currentRoute = finalRoute;
+            currentAbs = finalAbs;
 
-            if (revertible === true) {
-              window.history.pushState(null, document.title, finalRoute + queryString);
+            if (options.revertible === true) {
+              window.history.pushState(null, document.title, urlString);
             }
 
             navigationInProgress = false;
-            fireRouterEvents(AFTER_EACH_HANDLERS, currentRoute, finalRoute);
-            resolve(finalRoute + queryString);
+            resolve(urlString);
 
           });
+
         }
 
       });
@@ -376,7 +374,7 @@ function collectRouteNodes(root, parts, rest = '') {
 
         const iNextNodeValue = getNextNodeValue(frag.children, nextParts);
 
-        Promise.resolve(frag.beforeRoute(iNextNodeValue)).then(oNextNodeValue => {
+        Promise.resolve(frag.beforeRoute(iNextNodeValue, pendingParams)).then(oNextNodeValue => {
 
           oNextNodeValue = typeof oNextNodeValue === 'string'
             ? normalizeAbsoluteOriginPrefix(removeSlashes(oNextNodeValue))
@@ -566,32 +564,38 @@ function tryRecursion(parts) {
 
 }
 
-function getAbsRelRoute(route) {
+function getRouteParts(route) {
 
   if (ALLOWED_ORIGIN_NAMES.indexOf(route) > -1) {
     return {
-      relativeRoute: ORIGIN,
-      absoluteRoute: ORIGIN
-    };
+      abs: ORIGIN,
+      hash: '#',
+      query: ''
+    }
   }
 
-  if (route[0] === '#') {
+  if (route[0] === '?' || route[0] === '#') {
+    const url = new URL(route, ORIGIN);
     return {
-      relativeRoute: route,
-      absoluteRoute: ORIGIN + route
-    };
+      abs: ORIGIN + url.hash,
+      hash: url.hash || '#',
+      query: url.search
+    }
   }
 
   route = removeAllowedOriginPrefix(route);
 
-  if (route[0] !== '#') {
-    throw new Error('Invalid Route: "' + route + '". Nested routes must be hash based.');
+  if (route [0] !== '?' && route[0] !== '#') {
+    throw new Error('Invalid Route: "' + route + '". Non-root paths must start with ? query or # hash.');
   }
 
+  const url = new URL(route, ORIGIN);
+
   return {
-    relativeRoute: route,
-    absoluteRoute: ORIGIN + route
-  };
+    abs: ORIGIN + url.hash,
+    hash: url.hash || '#',
+    query: url.search
+  }
 
 }
 
@@ -627,35 +631,6 @@ function getLongestOccurringPrefix(s, prefixes) {
     .sort((a, b) => b.length - a.length)[0];
 }
 
-function splitRouteAtQuery(route) {
-  return route.split(/\?(.+)/).filter(s => s);
-}
-
-function addRouterEvent(stack, handler, scope, once) {
-
-  let _handler;
-
-  if (once === false) {
-    _handler = handler.bind(scope);
-  } else {
-    _handler = (a, b) => {
-      handler.call(scope, a, b);
-      const i = stack.indexOf(_handler);
-      stack.splice(i, 1);
-    };
-  }
-
-  stack.push(_handler);
-
-}
-
-function fireRouterEvents(stack, a, b) {
-  // a/b = from/to || params/query
-  for (let i = 0; i < stack.length; i++) {
-    stack[i](a, b);
-  }
-}
-
 function buildParamsFromQueryString(queryString) {
 
   const params = {};
@@ -672,21 +647,5 @@ function buildParamsFromQueryString(queryString) {
   }
 
   return params;
-
-}
-
-function buildQueryStringFromParams(params) {
-
-  let queryString = '', key, k, v;
-
-  for (key in params) {
-    k = encodeURIComponent(key);
-    if (k) {
-      v = encodeURIComponent(params[key]);
-      queryString += queryString.length ? `&${k}=${v}` : `?${k}=${v}`;
-    }
-  }
-
-  return queryString;
 
 }
