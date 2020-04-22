@@ -1034,18 +1034,19 @@ const Component = {
         const internal = this[INTERNAL];
 
         // ALWAYS add Store Subscriptions (unbind in disconnectedCallback)
-        for (const key in Module.storeBindings) {
+        let key; const ar = {autorun: false};
+        for (key in Module.storeBindings) {
 
           internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
             () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data),
-            {autorun: false}
+            ar
           ));
 
           internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
             value => Reactor.cueCallback(internal.reactions[key], value),
-            {autorun: false}
+            ar
           ));
 
         }
