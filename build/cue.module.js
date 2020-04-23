@@ -951,16 +951,13 @@ const TMP_STYLESHEET = document.createElement('style');
 
 const Component = {
 
-  define(name, config, dependencies = {}) {
+  define(name, config) {
 
-    // ---------------------- LAZY MODULE CONFIG ----------------------
-    let Config = null;
+    // ---------------------- LAZY MODULE ----------------------
     let Module = null;
 
     // ---------------------- ATTRIBUTES (PRE-MODULE) ----------------------
-    const observedAttributes = typeof config === 'function'
-      ? Object.keys(dependencies.attributes || {})  // when config is lazy function, we need to pass attributes as dependency for web component compatibility
-      : Object.keys(config.attributes || {});
+    const observedAttributes = Object.keys(config.attributes || {});
 
     // ---------------------- CUSTOM ELEMENT INSTANCE ----------------------
     const component = class extends HTMLElement {
@@ -971,12 +968,13 @@ const Component = {
 
         let key, tuple;
 
-        // Lazy Config Init
-        if (Config === null) {
+        // Lazy Module Init
+        if (Module === null) {
 
-          Config = typeof config === 'function' ? config(dependencies) : config;
+          // data can be lazy function to aid dependency management
+          config.data = typeof config.data === 'function' ? config.data() : config.data;
 
-          Module = createModule(name, Config);
+          Module = createModule(name, config);
 
           // Add Methods to this class' prototype
           component.prototype.renderEach = renderEach;
