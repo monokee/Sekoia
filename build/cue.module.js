@@ -1239,6 +1239,14 @@ const Component = {
 
       }
 
+      cloneNode(deep = false) {
+        if (deep === false) {
+          return document.createElement(name);
+        } else {
+          return Component.create(name, deepClone(this[INTERNAL]._data));
+        }
+      }
+
     };
 
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
