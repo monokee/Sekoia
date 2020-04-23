@@ -5,6 +5,9 @@ import { Reactor } from "./reactor.js";
 
 const REF_ID = '$';
 const REF_ID_JS = '\\' + REF_ID;
+const HYDRATION_ATT = 'cue-dom-hydrated';
+
+const TMP_DIV = document.createElement('div');
 
 const INTERNAL = Symbol('Component Data');
 
@@ -54,8 +57,12 @@ export const Component = {
         const _data = deepClone(Module.data);
 
         const internal = this[INTERNAL] = {
+          _module: Module,
           _data: _data,
           data: new Proxy(_data, {
+            set(target, key, value) {
+              throw new Error(`Can not change data in reactions: this.${key} = ${value} has been ignored.`);
+            },
             get(target, key) {
               if (Module.storeBindings[key]) return Store.get(Module.storeBindings[key].path); // does deep clone
               if (_computedProperties.has(key)) return _computedProperties.get(key).value(internal.data); // deep by default
@@ -78,18 +85,15 @@ export const Component = {
         // Build Dependency Graph
         internal.dependencyGraph = buildDependencyGraph(internal.computedProperties);
 
-        // Bind reactions with first argument as "refs" object ("this" is explicitly null to discourage impurity)
+        // Bind reactions with first argument as "refs" object ("this" is data proxy so reactions can work with all data)
         for (key in Module.reactions) {
-          internal.reactions[key] = Module.reactions[key].bind(null, internal.refs);
+          internal.reactions[key] = Module.reactions[key].bind(internal.data, internal.refs);
         }
 
         // Same for Attribute Reactions
         for (key in Module.attributeChangedCallbacks) {
-          internal.attributeChangedCallbacks[key] = Module.attributeChangedCallbacks[key].bind(null, internal.refs);
+          internal.attributeChangedCallbacks[key] = Module.attributeChangedCallbacks[key].bind(internal.data, internal.refs);
         }
-
-        // Construct Lifecycle
-        Module.construct.call(this, {$self: this}); // only ref that is available is self...
 
       }
 
@@ -98,19 +102,18 @@ export const Component = {
         const internal = this[INTERNAL];
 
         // ALWAYS add Store Subscriptions (unbind in disconnectedCallback)
-        let key; const ar = {autorun: false};
-        for (key in Module.storeBindings) {
+        for (const key in Module.storeBindings) {
 
           internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
             () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data),
-            ar
+            {autorun: false}
           ));
 
           internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
             Module.storeBindings[key].path,
             value => Reactor.cueCallback(internal.reactions[key], value),
-            ar
+            {autorun: false}
           ));
 
         }
@@ -120,35 +123,17 @@ export const Component = {
 
           let i, path, key;
 
-          // ------------- Create DOM
-          if (Module.encapsulated === true) {
-
-            const shadow = internal.shadowDom = this.attachShadow({mode: 'open'});
-
-            shadow.innerHTML = Module.styles; // styles will be string
-
-            // move inline child nodes into shadowDOM
-            for (i = 0; i < this.childNodes.length; i++) {
-              shadow.appendChild(this.childNodes[i]);
-            }
-
-            // write template to the beginning
-            for (i = Module.template.children.length - 1; i >= 0; i--) {
-              shadow.insertBefore(Module.template.children[i].cloneNode(true), this.firstChild);
-            }
-
-          } else {
-
-            // Style has already been added to global CSS...
-            // Clone template into light dom (if element has content, the content is automatically rendered AFTER the internal template nodes)
+          // ------------- Insert inner DOM only if it has not been appended yet
+          if (!this.hasAttribute(HYDRATION_ATT)) {
             for (i = Module.template.children.length - 1; i >= 0; i--) {
               this.insertBefore(Module.template.children[i].cloneNode(true), this.firstChild);
             }
-
+          } else {
+            this.removeAttribute(HYDRATION_ATT);
           }
 
           // ---------------- Create Refs
-          assignElementReferences(Module.encapsulated ? internal.shadowDom : this, internal.refs, Module.refNames);
+          assignElementReferences(this, internal.refs, Module.refNames);
 
           // ---------------- Consider Element Initialized
           internal.initialized = true;
@@ -214,10 +199,6 @@ export const Component = {
 
         Module.disconnected.call(this, this[INTERNAL].refs);
 
-      }
-
-      adoptedCallback() {
-        Module.adopted.call(this, this[INTERNAL].refs);
       }
 
       getData(key) {
@@ -331,9 +312,9 @@ export const Component = {
 
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
     return (attributes = {}) => {
-      let htmlString = '<' + name;
-      for (const att in attributes) htmlString += ` ${att}="${attributes[att]}"`;
-      return htmlString += `></${name}>`;
+      let htmlString = `<${name} ${HYDRATION_ATT}="true"`, att; // mark element as hydrated
+      for (att in attributes) htmlString += ` ${att}="${attributes[att]}"`;
+      return htmlString += `>${config.element || ''}</${name}>`;
     };
 
   },
@@ -342,20 +323,38 @@ export const Component = {
 
     node = node.trim();
 
-    const element = node[0] === '<' ? document.createRange().createContextualFragment(node).firstChild : document.createElement(node);
+    let element;
 
-    if (typeof data === 'object' && data !== null) {
-      if (element[INTERNAL]) {
+    if (node[0] === '<') {
+      TMP_DIV.innerHTML = node;
+      element = TMP_DIV.children[0];
+    } else {
+      element = document.createElement(node);
+    }
+
+    const internal = element[INTERNAL];
+
+    if (internal) {
+
+      // HYDRATE ELEMENT WITH DOM FOR COMPOSITION
+      if (!element.hasAttribute(HYDRATION_ATT)) { // not pre-hydrated via string factory, hydrate
+        for (let i = internal._module.template.children.length - 1; i >= 0; i--) {
+          element.insertBefore(internal._module.template.children[i].cloneNode(true), element.firstChild);
+        }
+        element.setAttribute(HYDRATION_ATT, 'true');
+      }
+
+      // HYDRATE ELEMENT WITH DATA FOR REACTIVITY
+      if (data && typeof data === 'object') {
         for (const prop in data) {
-          if (element[INTERNAL]._data.hasOwnProperty(prop)) {
-            element[INTERNAL]._data[prop] = data[prop]; // element will self-react with this data in connectedCallback...
+          if (internal._data.hasOwnProperty(prop)) {
+            internal._data[prop] = data[prop]; // element will self-react with this data in connectedCallback...
           } else {
             console.warn(`Cannot pass data property "${prop}" to component "${element.tagName}" because the property has not been explicitly defined in the components data model.`);
           }
         }
-      } else {
-        console.warn(`Cannot set data on element "${element.tagName}" because it has not been defined via Component.define!`);
       }
+
     }
 
     return element;
@@ -371,11 +370,8 @@ function createModule(name, config) {
   const Module = {};
 
   // ---------------------- TEMPLATE ----------------------
-  Module.encapsulated = config.encapsulated === true;
-
-  Module.template = document.createRange().createContextualFragment(
-    `<cue-template>${config.element ? config.element.trim() : ''}</cue-template>`
-  ).firstChild;
+  Module.template = document.createElement('div');
+  Module.template.innerHTML = config.element || '';
 
   // ---------------------- REFS ----------------------
   const _refElements = Module.template.querySelectorAll(`[${REF_ID_JS}]`);
@@ -391,20 +387,7 @@ function createModule(name, config) {
   Module.styles = '';
   if (typeof config.styles === 'string' && config.styles.length) {
     Module.styles = config.styles;
-    createComponentCSS(name, Module.styles, Module.refNames, Module.encapsulated);
-  }
-
-  // ---------------------- REACTIONS ----------------------
-  const reactions = {}; // reactionName -> Function
-  if (config.reactions) {
-    const assignedReactions = new Set();
-    for (k in config.reactions) {
-      v = config.reactions[k];
-      if (typeof v !== 'function') throw new Error(`Reaction "${k}" is not a function...`);
-      if (assignedReactions.has(v)) throw new Error(`Reaction "${k}" already in use. You can't use the same reaction for multiple data properties.`);
-      reactions[k] = v;
-      assignedReactions.add(v);
-    }
+    createComponentCSS(name, Module.styles, Module.refNames);
   }
 
   // ---------------------- METHODS ----------------------
@@ -412,20 +395,18 @@ function createModule(name, config) {
   for (k in config) {
     k !== 'initialize'
     && k !== 'connectedCallback'
-    && k !== 'adoptedCallback'
     && k !== 'disconnectedCallback'
+    && k !== 'attributeChangedCallback'
     && typeof config[k] === 'function'
     && (Module.methods[k] = config[k]);
   }
 
   // ---------------------- LIFECYCLE ----------------------
-  Module.construct = ifFn(config.construct);
   Module.initialize = ifFn(config.initialize);
   Module.connected = ifFn(config.connectedCallback);
   Module.disconnected = ifFn(config.disconnectedCallback);
-  Module.adopted = ifFn(config.adoptedCallback);
 
-  // ---------------------- DATA ----------------------
+  // ------------------- DATA / REACTIONS ------------------
   Module.data = {};
   Module.storeBindings = {};
   Module.reactions = {};
@@ -441,7 +422,7 @@ function createModule(name, config) {
 
       _allProperties[k] = v.value;
 
-      if (typeof v.value === 'object' && v.value !== null && v.value.id === Store.id) {
+      if (v.value && v.value.id === Store.id) {
         Module.storeBindings[k] = v.value;
       } else if (typeof v.value === 'function') {
         _computedProperties.set(k, new ComputedProperty(k, v.value));
@@ -449,14 +430,8 @@ function createModule(name, config) {
         Module.data[k] = v.value;
       }
 
-      if (v.reaction) {
-        if (typeof v.reaction === 'string') {
-          if (!reactions[v.reaction]) throw new Error(`No Reaction with name "${v.reaction}" exists.`);
-          Module.reactions[k] = reactions[v.reaction];
-        } else if (typeof v.reaction === 'function') {
-          if (reactions[k] || Module.reactions[k]) throw new Error(`A reaction for data property "${k}" has already been registered.`);
-          Module.reactions[k] = v.reaction;
-        }
+      if (typeof v.reaction === 'function') {
+        Module.reactions[k] = v.reaction;
       }
 
     }
@@ -481,10 +456,7 @@ function createModule(name, config) {
         }
       }
 
-      if (typeof v.reaction === 'string') {
-        if (!reactions[v.reaction]) throw new Error(`No Reaction with name "${v.reaction}" exists.`);
-        Module.attributeChangedCallbacks[k] = reactions[v.reaction];
-      } else if (typeof v.reaction === 'function') {
+      if (typeof v.reaction === 'function') {
         Module.attributeChangedCallbacks[k] = v.reaction;
       }
 
@@ -499,7 +471,7 @@ function createModule(name, config) {
 
 }
 
-function createComponentCSS(name, styles, refNames, encapsulated) {
+function createComponentCSS(name, styles, refNames) {
 
   // Re-write $self to component-name
   styles = styles.split(`${REF_ID}self`).join(name);
@@ -518,7 +490,7 @@ function createComponentCSS(name, styles, refNames, encapsulated) {
 
     rule = tmpSheet.rules[i];
 
-    if (encapsulated === true || rule.type === 7 || rule.type === 8) { // don't scope shadow-encapsulated modules and @keyframes
+    if (rule.type === 7 || rule.type === 8) { // don't scope @keyframes
       styleNodeInnerHTML += rule.cssText;
     } else if (rule.type === 1) { // style rule
       if ((tls = getTopLevelSelector(rule.selectorText, name)) !== false) { // dont scope component-name
@@ -527,7 +499,7 @@ function createComponentCSS(name, styles, refNames, encapsulated) {
         styleNodeInnerHTML += `${name} ${rule.cssText}`;
       }
     } else if (rule.type === 4 || rule.type === 12) { // @media/@supports query
-      styleNodeInnerHTML += constructScopedStyleQuery(name, rule, encapsulated);
+      styleNodeInnerHTML += constructScopedStyleQuery(name, rule);
     } else {
       console.warn(`CSS Rule of type "${rule.type}" is not currently supported by Cue Components.`);
     }
@@ -565,7 +537,7 @@ function getTopLevelSelector(selectorText, componentName) {
                     false;
 }
 
-function constructScopedStyleQuery(name, query, encapsulated, cssText = '') {
+function constructScopedStyleQuery(name, query, cssText = '') {
 
   if (query.type === 4) {
     cssText += `@media ${query.media.mediaText} {`;
@@ -577,7 +549,7 @@ function constructScopedStyleQuery(name, query, encapsulated, cssText = '') {
 
     rule = query.cssRules[i];
 
-    if (encapsulated === true || rule.type === 7 || rule.type === 8) { // @keyframes or encapsulated in shadow
+    if (rule.type === 7 || rule.type === 8) { // @keyframes
       cssText += rule.cssText;
     } else if (rule.type === 1) {
       if ((tls = getTopLevelSelector(rule.selectorText, name)) !== false) { // own-name
@@ -586,7 +558,7 @@ function constructScopedStyleQuery(name, query, encapsulated, cssText = '') {
         cssText += `${name} ${rule.cssText}`;
       }
     } else if (rule.type === 4 || rule.type === 12) { // nested query
-      cssText += constructScopedStyleQuery(name, rule, encapsulated, cssText);
+      cssText += constructScopedStyleQuery(name, rule, cssText);
     } else {
       console.warn(`CSS Rule of type "${rule.type}" is not currently supported by Components.`);
     }
@@ -622,16 +594,14 @@ function renderEach(dataArray, createElement, updateElement = NOOP) {
   const previousData = this[INTERNAL].childData || [];
   this[INTERNAL].childData = dataArray;
 
-  // differentiate between encapsulated elements (have shadowDOM) and open elements
   if (dataArray.length === 0) {
-    (this[INTERNAL].shadowDom || this).textContent = '';
+    this.innerHTML = '';
   } else if (previousData.length === 0) {
-    const el = this[INTERNAL].shadowDom || this;
     for (let i = 0; i < dataArray.length; i++) {
-      el.appendChild(createElement(dataArray[i]));
+      this.appendChild(createElement(dataArray[i]));
     }
   } else {
-    reconcile((this[INTERNAL].shadowDom || this), previousData, dataArray, createElement, updateElement);
+    reconcile(this, previousData, dataArray, createElement, updateElement);
   }
 
 }
