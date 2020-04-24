@@ -7,11 +7,14 @@ const REF_ID = '$';
 const REF_ID_JS = '\\' + REF_ID;
 const HYDRATION_ATT = 'cue-dom-hydrated';
 
-const TMP_DIV = document.createElement('div');
-
 const INTERNAL = Symbol('Component Data');
 
-const TMP_STYLESHEET = document.createElement('style');
+const TMP_DIV = document.createElement('div');
+
+const CUE_CSS = {
+  compiler: Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::compiler'}),
+  components: Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::components'})
+};
 
 export const Component = {
 
@@ -381,12 +384,12 @@ function createModule(name, config) {
 
   // ---------------------- REFS ----------------------
   const _refElements = Module.template.querySelectorAll(`[${REF_ID_JS}]`);
-  Module.refNames = new Map();
+  Module.refNames = {};
 
   let i, k, v;
   for (i = 0; i < _refElements.length; i++) {
     k = _refElements[i].getAttribute(REF_ID);
-    k && k.length && Module.refNames.set(`${REF_ID}${k}`, `[${REF_ID_JS}="${k}"]`);
+    k && k.length && (Module.refNames[`${REF_ID}${k}`] = `[${REF_ID_JS}="${k}"]`);
   }
 
   // ---------------------- STYLES ----------------------
@@ -399,11 +402,10 @@ function createModule(name, config) {
   // ---------------------- METHODS ----------------------
   Module.methods = {};
   for (k in config) {
-    k !== 'initialize'
+    typeof config[k] === 'function'
+    && k !== 'initialize'
     && k !== 'connectedCallback'
     && k !== 'disconnectedCallback'
-    && k !== 'attributeChangedCallback'
-    && typeof config[k] === 'function'
     && (Module.methods[k] = config[k]);
   }
 
@@ -471,7 +473,9 @@ function createModule(name, config) {
   }
 
   // ---------------------- COMPUTED PROPERTIES ----------------------
-  Module.computedProperties = setupComputedProperties(_allProperties, _computedProperties);
+  Module.computedProperties = _computedProperties.size > 0
+    ? setupComputedProperties(_allProperties, _computedProperties)
+    : _computedProperties;
 
   return Module;
 
@@ -483,13 +487,13 @@ function createComponentCSS(name, styles, refNames) {
   styles = styles.split(`${REF_ID}self`).join(name);
 
   // Re-write $refName(s) in style text to [\$="refName"] selector
-  for (const tuple of refNames.entries()) {
-    styles = styles.split(tuple[0]).join(tuple[1]);
+  let refName;
+  for (refName in refNames) {
+    styles = styles.split(refName).join(refNames[refName]);
   }
 
-  document.head.appendChild(TMP_STYLESHEET);
-  TMP_STYLESHEET.innerHTML = styles;
-  const tmpSheet = TMP_STYLESHEET.sheet;
+  CUE_CSS.compiler.innerHTML = styles;
+  const tmpSheet = CUE_CSS.compiler.sheet;
 
   let styleNodeInnerHTML = '';
   for (let i = 0, rule, tls; i < tmpSheet.rules.length; i++) {
@@ -512,21 +516,14 @@ function createComponentCSS(name, styles, refNames) {
 
   }
 
-  // Clean up temp stylesheet
-  TMP_STYLESHEET.innerHTML = '';
-  document.head.removeChild(TMP_STYLESHEET);
-
-  // Build a new stylesheet for the component
-  const componentStylesheet = document.createElement('style');
-  componentStylesheet.id = 'cue::' + name;
+  // Empty Compiler styleSheet
+  CUE_CSS.compiler.innerHTML = '';
 
   if (styleNodeInnerHTML.indexOf(REF_ID_JS) !== -1) { // Escape character still exists (Chromium, Firefox)
-    componentStylesheet.innerHTML = styleNodeInnerHTML;
+    CUE_CSS.components.innerHTML += styleNodeInnerHTML;
   } else { // Escape character has been removed, add it back (Safari)
-    componentStylesheet.innerHTML = styleNodeInnerHTML.split(REF_ID).join(REF_ID_JS);
+    CUE_CSS.components.innerHTML += styleNodeInnerHTML.split(REF_ID).join(REF_ID_JS);
   }
-
-  document.head.appendChild(componentStylesheet);
 
 }
 
@@ -577,14 +574,14 @@ function constructScopedStyleQuery(name, query, cssText = '') {
 
 function assignElementReferences(parentElement, targetObject, refNames) {
 
-  let tuple, el; //tuple[0] = refName, tuple[1] = selector
-  for (tuple of refNames.entries()) {
-    el = parentElement.querySelector(tuple[1]);
+  let refName, el;
+  for (refName in refNames) {
+    el = parentElement.querySelector(refNames[refName]);
     if (!el[INTERNAL]) {
       el[INTERNAL] = {};
       el.renderEach = renderEach;
     }
-    targetObject[`${tuple[0]}`] = el; // makes ref available as $refName in js
+    targetObject[refName] = el; // makes ref available as $refName in js
   }
 
   targetObject[`${REF_ID}self`] = parentElement; // makes container available as $self in js

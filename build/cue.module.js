@@ -1,161 +1,3 @@
-const LocalStorage = window.localStorage;
-const pendingCalls = new Map();
-const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
-const EMPTY_CACHE_STORAGE_KEY = Symbol();
-
-const Server = Object.defineProperty({
-
-  fetch(url, expires = 0, token) {
-
-    return new Promise((resolve, reject) => {
-
-      const data = getCache(url);
-
-      if (data === EMPTY_CACHE_STORAGE_KEY) {
-        makeCall(url, 'GET', token).then(response => {
-          setCache(url, response, expires);
-          resolve(response);
-        }).catch(error => {
-          reject(error);
-        });
-      } else {
-        resolve(data);
-      }
-
-    });
-
-  },
-
-  post(url, data, token) {
-    return new Promise((resolve, reject) => {
-      makeCall(url, 'POST', token, data)
-        .then(response => resolve(response))
-        .catch(error => reject(error));
-    });
-  },
-
-}, 'clearCache', {
-  value: clearCache
-});
-
-// --------------------------------------------------------
-
-function setCache(url, value, expires) {
-
-  const now = Date.now();
-  const schedule = now + expires * 1000;
-
-  if (typeof value === 'object') value = JSON.stringify(value);
-
-  const url_stamped = `${url}::ts`;
-  LocalStorage.setItem(url, value);
-  LocalStorage.setItem(url_stamped, `${schedule}`);
-
-  let allKeys = LocalStorage.getItem(ALL_KEYS);
-  if (allKeys === null) {
-    allKeys = `${url},${url_stamped},`;
-  } else if (allKeys.indexOf(`${url},`) === -1) {
-    allKeys = `${allKeys}${url},${url_stamped},`;
-  }
-
-  LocalStorage.setItem(ALL_KEYS, allKeys);
-
-}
-
-function getCache(url) {
-
-  const timestamp = LocalStorage.getItem(`${url}::ts`);
-
-  if (timestamp === null) {
-    return EMPTY_CACHE_STORAGE_KEY;
-  } else {
-    if (Number(timestamp) < Date.now()) {
-      clearCache(url);
-      return EMPTY_CACHE_STORAGE_KEY;
-    } else {
-      return JSON.parse(LocalStorage.getItem(url));
-    }
-  }
-
-}
-
-function clearCache(url) {
-  if (url) {
-    if (LocalStorage.getItem(url) !== null) {
-      const url_stamped = `${url}::ts`;
-      LocalStorage.removeItem(url);
-      LocalStorage.removeItem(url_stamped);
-      const _allKeys = LocalStorage.getItem(ALL_KEYS);
-      if (_allKeys !== null) {
-        const allKeys = _allKeys.split(',');
-        allKeys.splice(allKeys.indexOf(url), 1);
-        allKeys.splice(allKeys.indexOf(url_stamped), 1);
-        LocalStorage.setItem(ALL_KEYS, `${allKeys.join(',')},`);
-      }
-    }
-  } else {
-    const _allKeys = LocalStorage.getItem(ALL_KEYS);
-    if (_allKeys !== null) {
-      const allKeys = _allKeys.split(',');
-      for (let i = 0; i < allKeys.length; i++) {
-        LocalStorage.removeItem(allKeys[i]);
-      }
-      LocalStorage.removeItem(ALL_KEYS);
-    }
-  }
-}
-
-function makeCall(url, method, token, data = {}) {
-
-  if (pendingCalls.has(url)) {
-
-    return pendingCalls.get(url);
-
-  } else {
-
-    const headers = {
-      'Content-Type': 'application/json'
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    pendingCalls.set(url, new Promise((resolve, reject) => {
-
-      fetch(url, {
-        method: method,
-        mode: 'cors',
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: headers,
-        redirect: 'follow',
-        referrer: 'no-referrer',
-        body: method === 'GET' ? null : typeof data === 'string' ? data : JSON.stringify(data)
-      }).then(res => {
-        if (!res.ok) {
-          res.json().then(error => reject(error));
-        } else {
-          if (res.status === 204) {
-            resolve({});
-          } else {
-            res.json().then(data => resolve(data));
-          }
-        }
-      }).catch(error => {
-        reject(error);
-      }).finally(() => {
-        pendingCalls.delete(url);
-      });
-
-    }));
-
-    return pendingCalls.get(url);
-
-  }
-
-}
-
 const NOOP = (() => {});
 
 const RESOLVED_PROMISE = Promise.resolve();
@@ -264,6 +106,178 @@ function arePlainObjectsShallowEqual(a, b) {
 
 function ifFn(x) {
   return typeof x === 'function' ? x : NOOP;
+}
+
+function hashString(str) {
+  if (!str.length) return 0;
+  let hash = 0;
+  for (let i = 0, char; i < str.length; i++) {
+    char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash;
+}
+
+const LocalStorage = window.localStorage;
+const pendingCalls = new Map();
+const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
+const EMPTY_CACHE_STORAGE_KEY = Symbol();
+
+const Server = {
+
+  fetch(url, expires = 0, token) {
+
+    return new Promise((resolve, reject) => {
+
+      const hash = hashString(url);
+      const data = getCache(hash);
+
+      if (data === EMPTY_CACHE_STORAGE_KEY) {
+        makeCall(url, 'GET', token).then(response => {
+          expires > 0 && setCache(hash, response, expires);
+          resolve(response);
+        }).catch(error => {
+          reject(error);
+        });
+      } else {
+        resolve(data);
+      }
+
+    });
+
+  },
+
+  post(url, data, token) {
+    return new Promise((resolve, reject) => {
+      makeCall(url, 'POST', token, data)
+        .then(response => resolve(response))
+        .catch(error => reject(error));
+    });
+  },
+
+  clearCache(url) {
+    clearCache(hashString(url));
+  }
+
+};
+
+// --------------------------------------------------------
+
+function setCache(hash, value, expires) {
+
+  const now = Date.now();
+  const schedule = now + expires * 1000;
+
+  if (typeof value === 'object') value = JSON.stringify(value);
+
+  const url_stamped = `${hash}::ts`;
+  LocalStorage.setItem(hash, value);
+  LocalStorage.setItem(url_stamped, `${schedule}`);
+
+  let allKeys = LocalStorage.getItem(ALL_KEYS);
+  if (allKeys === null) {
+    allKeys = `${hash},${url_stamped},`;
+  } else if (allKeys.indexOf(`${hash},`) === -1) {
+    allKeys = `${allKeys}${hash},${url_stamped},`;
+  }
+
+  LocalStorage.setItem(ALL_KEYS, allKeys);
+
+}
+
+function getCache(hash) {
+
+  const timestamp = LocalStorage.getItem(`${hash}::ts`);
+
+  if (timestamp === null) {
+    return EMPTY_CACHE_STORAGE_KEY;
+  } else {
+    if (Number(timestamp) < Date.now()) {
+      clearCache(hash);
+      return EMPTY_CACHE_STORAGE_KEY;
+    } else {
+      return JSON.parse(LocalStorage.getItem(hash));
+    }
+  }
+
+}
+
+function clearCache(hash) {
+  if (hash) {
+    if (LocalStorage.getItem(hash) !== null) {
+      const url_stamped = `${hash}::ts`;
+      LocalStorage.removeItem(hash);
+      LocalStorage.removeItem(url_stamped);
+      const _allKeys = LocalStorage.getItem(ALL_KEYS);
+      if (_allKeys !== null) {
+        const allKeys = _allKeys.split(',');
+        allKeys.splice(allKeys.indexOf(hash), 1);
+        allKeys.splice(allKeys.indexOf(url_stamped), 1);
+        LocalStorage.setItem(ALL_KEYS, `${allKeys.join(',')},`);
+      }
+    }
+  } else {
+    const _allKeys = LocalStorage.getItem(ALL_KEYS);
+    if (_allKeys !== null) {
+      const allKeys = _allKeys.split(',');
+      for (let i = 0; i < allKeys.length; i++) {
+        LocalStorage.removeItem(allKeys[i]);
+      }
+      LocalStorage.removeItem(ALL_KEYS);
+    }
+  }
+}
+
+function makeCall(url, method, token, data = {}) {
+
+  if (pendingCalls.has(url)) {
+
+    return pendingCalls.get(url);
+
+  } else {
+
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    pendingCalls.set(url, new Promise((resolve, reject) => {
+
+      fetch(url, {
+        method: method,
+        mode: 'cors',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: headers,
+        redirect: 'follow',
+        referrer: 'no-referrer',
+        body: method === 'GET' ? null : typeof data === 'string' ? data : JSON.stringify(data)
+      }).then(res => {
+        if (!res.ok) {
+          res.json().then(error => reject(error));
+        } else {
+          if (res.status === 204) {
+            resolve({});
+          } else {
+            res.json().then(data => resolve(data));
+          }
+        }
+      }).catch(error => {
+        reject(error);
+      }).finally(() => {
+        pendingCalls.delete(url);
+      });
+
+    }));
+
+    return pendingCalls.get(url);
+
+  }
+
 }
 
 let PENDING_PROMISE = null;
@@ -943,11 +957,14 @@ const REF_ID = '$';
 const REF_ID_JS = '\\' + REF_ID;
 const HYDRATION_ATT = 'cue-dom-hydrated';
 
-const TMP_DIV = document.createElement('div');
-
 const INTERNAL = Symbol('Component Data');
 
-const TMP_STYLESHEET = document.createElement('style');
+const TMP_DIV = document.createElement('div');
+
+const CUE_CSS = {
+  compiler: Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::compiler'}),
+  components: Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::components'})
+};
 
 const Component = {
 
@@ -1317,12 +1334,12 @@ function createModule(name, config) {
 
   // ---------------------- REFS ----------------------
   const _refElements = Module.template.querySelectorAll(`[${REF_ID_JS}]`);
-  Module.refNames = new Map();
+  Module.refNames = {};
 
   let i, k, v;
   for (i = 0; i < _refElements.length; i++) {
     k = _refElements[i].getAttribute(REF_ID);
-    k && k.length && Module.refNames.set(`${REF_ID}${k}`, `[${REF_ID_JS}="${k}"]`);
+    k && k.length && (Module.refNames[`${REF_ID}${k}`] = `[${REF_ID_JS}="${k}"]`);
   }
 
   // ---------------------- STYLES ----------------------
@@ -1335,11 +1352,10 @@ function createModule(name, config) {
   // ---------------------- METHODS ----------------------
   Module.methods = {};
   for (k in config) {
-    k !== 'initialize'
+    typeof config[k] === 'function'
+    && k !== 'initialize'
     && k !== 'connectedCallback'
     && k !== 'disconnectedCallback'
-    && k !== 'attributeChangedCallback'
-    && typeof config[k] === 'function'
     && (Module.methods[k] = config[k]);
   }
 
@@ -1407,7 +1423,9 @@ function createModule(name, config) {
   }
 
   // ---------------------- COMPUTED PROPERTIES ----------------------
-  Module.computedProperties = setupComputedProperties(_allProperties, _computedProperties);
+  Module.computedProperties = _computedProperties.size > 0
+    ? setupComputedProperties(_allProperties, _computedProperties)
+    : _computedProperties;
 
   return Module;
 
@@ -1419,13 +1437,13 @@ function createComponentCSS(name, styles, refNames) {
   styles = styles.split(`${REF_ID}self`).join(name);
 
   // Re-write $refName(s) in style text to [\$="refName"] selector
-  for (const tuple of refNames.entries()) {
-    styles = styles.split(tuple[0]).join(tuple[1]);
+  let refName;
+  for (refName in refNames) {
+    styles = styles.split(refName).join(refNames[refName]);
   }
 
-  document.head.appendChild(TMP_STYLESHEET);
-  TMP_STYLESHEET.innerHTML = styles;
-  const tmpSheet = TMP_STYLESHEET.sheet;
+  CUE_CSS.compiler.innerHTML = styles;
+  const tmpSheet = CUE_CSS.compiler.sheet;
 
   let styleNodeInnerHTML = '';
   for (let i = 0, rule, tls; i < tmpSheet.rules.length; i++) {
@@ -1448,21 +1466,14 @@ function createComponentCSS(name, styles, refNames) {
 
   }
 
-  // Clean up temp stylesheet
-  TMP_STYLESHEET.innerHTML = '';
-  document.head.removeChild(TMP_STYLESHEET);
-
-  // Build a new stylesheet for the component
-  const componentStylesheet = document.createElement('style');
-  componentStylesheet.id = 'cue::' + name;
+  // Empty Compiler styleSheet
+  CUE_CSS.compiler.innerHTML = '';
 
   if (styleNodeInnerHTML.indexOf(REF_ID_JS) !== -1) { // Escape character still exists (Chromium, Firefox)
-    componentStylesheet.innerHTML = styleNodeInnerHTML;
+    CUE_CSS.components.innerHTML += styleNodeInnerHTML;
   } else { // Escape character has been removed, add it back (Safari)
-    componentStylesheet.innerHTML = styleNodeInnerHTML.split(REF_ID).join(REF_ID_JS);
+    CUE_CSS.components.innerHTML += styleNodeInnerHTML.split(REF_ID).join(REF_ID_JS);
   }
-
-  document.head.appendChild(componentStylesheet);
 
 }
 
@@ -1513,14 +1524,14 @@ function constructScopedStyleQuery(name, query, cssText = '') {
 
 function assignElementReferences(parentElement, targetObject, refNames) {
 
-  let tuple, el; //tuple[0] = refName, tuple[1] = selector
-  for (tuple of refNames.entries()) {
-    el = parentElement.querySelector(tuple[1]);
+  let refName, el;
+  for (refName in refNames) {
+    el = parentElement.querySelector(refNames[refName]);
     if (!el[INTERNAL]) {
       el[INTERNAL] = {};
       el.renderEach = renderEach;
     }
-    targetObject[`${tuple[0]}`] = el; // makes ref available as $refName in js
+    targetObject[refName] = el; // makes ref available as $refName in js
   }
 
   targetObject[`${REF_ID}self`] = parentElement; // makes container available as $self in js
