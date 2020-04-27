@@ -6,6 +6,7 @@ import { Reactor } from "./reactor.js";
 const REF_ID = '$';
 const REF_ID_JS = '\\' + REF_ID;
 const HYDRATION_ATT = 'cue-dom-hydrated';
+const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
 const INTERNAL = Symbol('Component Data');
 
@@ -495,26 +496,25 @@ function createComponentCSS(name, styles, refNames) {
   CUE_CSS.compiler.innerHTML = styles;
   const tmpSheet = CUE_CSS.compiler.sheet;
 
-  let styleNodeInnerHTML = '';
-  for (let i = 0, rule, tls; i < tmpSheet.rules.length; i++) {
+  let styleNodeInnerHTML = '', styleQueries = '';
+  for (let i = 0, rule; i < tmpSheet.rules.length; i++) {
 
     rule = tmpSheet.rules[i];
 
-    if (rule.type === 7 || rule.type === 8) { // don't scope @keyframes
+    if (rule.type === 7 || rule.type === 8) { // do not scope @keyframes
       styleNodeInnerHTML += rule.cssText;
     } else if (rule.type === 1) { // style rule
-      if ((tls = getTopLevelSelector(rule.selectorText, name)) !== false) { // dont scope component-name
-        styleNodeInnerHTML += rule.cssText;
-      } else { // prefix with component-name to create soft scoping
-        styleNodeInnerHTML += `${name} ${rule.cssText}`;
-      }
+      styleNodeInnerHTML += constructScopedStyleRule(rule, name);
     } else if (rule.type === 4 || rule.type === 12) { // @media/@supports query
-      styleNodeInnerHTML += constructScopedStyleQuery(name, rule);
+      styleQueries += constructScopedStyleQuery(name, rule);
     } else {
       console.warn(`CSS Rule of type "${rule.type}" is not currently supported by Cue Components.`);
     }
 
   }
+
+  // write queries to the end of the rules AFTER the other rules (issue #13)
+  styleNodeInnerHTML += styleQueries;
 
   // Empty Compiler styleSheet
   CUE_CSS.compiler.innerHTML = '';
@@ -527,19 +527,6 @@ function createComponentCSS(name, styles, refNames) {
 
 }
 
-function getTopLevelSelector(selectorText, componentName) {
-  return selectorText === componentName ? '' :
-    selectorText.lastIndexOf(`${componentName} `, 0) === 0 ? ' ' : // generic child selector
-      selectorText.lastIndexOf(`${componentName}.`, 0) === 0 ? '.' : // class selector
-        selectorText.lastIndexOf(`${componentName}:`, 0) === 0 ? ':' : // pseudo-class AND/OR pseudo-element
-          selectorText.lastIndexOf(`${componentName}#`, 0) === 0 ? '#' : // id selector
-            selectorText.lastIndexOf(`${componentName}[`, 0) === 0 ? '[' : // attribute selector
-              selectorText.lastIndexOf(`${componentName}>`, 0) === 0 ? '>' : // immediate child selector
-                selectorText.lastIndexOf(`${componentName}+`, 0) === 0 ? '+' : // immediate sibling selector
-                  selectorText.lastIndexOf(`${componentName}~`, 0) === 0 ? '~' : // generic sibling selector
-                    false;
-}
-
 function constructScopedStyleQuery(name, query, cssText = '') {
 
   if (query.type === 4) {
@@ -548,28 +535,80 @@ function constructScopedStyleQuery(name, query, cssText = '') {
     cssText += `@supports ${query.conditionText} {`;
   }
 
-  for (let i = 0, rule, tls; i < query.cssRules.length; i++) {
+  let styleQueries = '';
+
+  for (let i = 0, rule; i < query.cssRules.length; i++) {
 
     rule = query.cssRules[i];
 
     if (rule.type === 7 || rule.type === 8) { // @keyframes
       cssText += rule.cssText;
     } else if (rule.type === 1) {
-      if ((tls = getTopLevelSelector(rule.selectorText, name)) !== false) { // own-name
-        cssText += rule.cssText;
-      } else { // soft scope with own-name prefix
-        cssText += `${name} ${rule.cssText}`;
-      }
+      cssText += constructScopedStyleRule(rule, name, cssText);
     } else if (rule.type === 4 || rule.type === 12) { // nested query
-      cssText += constructScopedStyleQuery(name, rule, cssText);
+      styleQueries += constructScopedStyleQuery(name, rule);
     } else {
       console.warn(`CSS Rule of type "${rule.type}" is not currently supported by Components.`);
     }
 
   }
 
+  // write nested queries to the end of the surrounding query (see issue #13)
+  cssText += styleQueries;
+
   return `${cssText} }`;
 
+}
+
+function constructScopedStyleRule(rule, componentName) {
+
+  let cssText = '';
+
+  if (rule.selectorText.indexOf(',') > -1) {
+
+    const selectors = rule.selectorText.split(',');
+    const scopedSelectors = [];
+
+    for (let i = 0, selector; i < selectors.length; i++) {
+
+      selector = selectors[i].trim();
+
+      if (selector.lastIndexOf(':root', 0) === 0) { // escape context (dont scope) :root notation
+        scopedSelectors.push(selector.replace(':root', ''));
+      } else if (isTopLevelSelector(selector, componentName)) { // dont scope component-name
+        scopedSelectors.push(selector);
+      } else { // prefix with component-name to create soft scoping
+        scopedSelectors.push(componentName + ' ' + selector);
+      }
+
+    }
+
+    cssText += scopedSelectors.join(', ') + rule.cssText.substr(rule.selectorText.length);
+
+  } else {
+
+    if (rule.selectorText.lastIndexOf(':root', 0) === 0) { // escape context (dont scope) :root notation
+      cssText += rule.cssText.replace(':root', ''); // remove first occurrence of :root
+    } else if (isTopLevelSelector(rule.selectorText, componentName)) { // dont scope component-name
+      cssText += rule.cssText;
+    } else { // prefix with component-name to create soft scoping
+      cssText += componentName + ' ' + rule.cssText;
+    }
+
+  }
+
+  return cssText;
+
+}
+
+function isTopLevelSelector(selectorText, componentName) {
+  if (selectorText === componentName) { // is componentName
+    return true;
+  } else if (selectorText.lastIndexOf(componentName, 0) === 0) { // starts with componentName
+    return CHILD_SELECTORS.indexOf(selectorText.charAt(componentName.length)) > -1; // character following componentName is valid child selector
+  } else { // nada
+    return false;
+  }
 }
 
 function assignElementReferences(parentElement, targetObject, refNames) {

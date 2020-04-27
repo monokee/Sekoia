@@ -5,8 +5,40 @@
   <title>Cue.js</title>
 </head>
 <body>
-
+<test-component></test-component>
 <script src="build/cue.js"></script>
+<script>
+  Cue.Component.define('test-component', {
+    element: '<div $="container" class="x"><span>Generic Text</span><a $="nested">Nested Element</a></div>',
+    styles: (`
+      @media only screen and (max-width: 767px) {
+        $self {
+          border: 1px dotted red;
+        }
+        $container span, $container a, $container $nested {
+          color: blue;
+        }
+      }
+      $self {
+        position: relative;
+        display: block;
+        width: 500px;
+        height: 250px;
+        border: 1px dotted blue;
+      }
+      $self.square {
+        height: 250px;
+      }
+      $self.square $container {
+        background-color: green;
+      }
+      $container span, $container a, $container $nested {
+        font-weight: bold;
+        color: red;
+      }
 
+    `)
+  })
+</script>
 </body>
 </html>
