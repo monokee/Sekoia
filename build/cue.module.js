@@ -1579,8 +1579,8 @@ function assignElementReferences(parentElement, targetObject, refNames) {
 
 function renderEach(dataArray, createElement, updateElement = NOOP) {
 
-  // guard against undefined
-  dataArray || (dataArray = []);
+  // accept arrays, convert plain objects to arrays, convert null or undefined to array
+  dataArray = Array.isArray(dataArray) ? dataArray : Object.values(dataArray || {});
 
   // this function is attached directly to dom elements. "this" refers to the element
   const previousData = this[INTERNAL].childData || [];
