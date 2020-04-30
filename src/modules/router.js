@@ -74,7 +74,7 @@ export const Router = {
 
   trigger(route, options = {}) {
 
-    options = Object.assign(options, DEFAULT_TRIGGER_OPTIONS);
+    options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
 
     const {hash, query} = getRouteParts(route);
 
@@ -144,37 +144,35 @@ export const Router = {
       }, root.children);
     }
 
+    // Auto-run subscription
+    if (options.autorun !== false) {
+      Router.navigate(window.location.href, {
+        revertible: false,
+        forceReload: true
+      }).then(url => {
+        window.history.replaceState(null, document.title, url);
+      });
+    }
+
+    // Add PopState Listeners once
     if (listenerRegistered === false) {
-
       listenerRegistered = true;
-
-      const urlHandler = forceReload => {
+      window.addEventListener('popstate', () => {
         Router.navigate(window.location.href, {
           revertible: false,
-          forceReload: forceReload
+          forceReload: false
         }).then(url => {
-          window.history.replaceState(null, document.title, url);
+          window.history.replaceState(null, document.title, url)
         });
-      };
-
-      if (document.readyState === 'complete') {
-        urlHandler(true);
-      } else {
-        document.addEventListener('readystatechange', () => {
-          document.readyState === 'complete' && urlHandler(true);
-        });
-      }
-
-      window.addEventListener('hashchange', () => {
-        urlHandler(false);
       });
-
     }
 
   },
 
   navigate(route, options = {}) {
-    options = Object.assign(options, DEFAULT_TRIGGER_OPTIONS);
+
+    options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
+
     if (Router.options.defer > 0) {
       return new Promise(resolve => {
         clearTimeout(lastRequestedNavigation);
@@ -186,6 +184,7 @@ export const Router = {
     } else {
       return navigate(route, options);
     }
+
   }
 
 };
