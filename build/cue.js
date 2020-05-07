@@ -149,9 +149,29 @@ const Server = {
 
   },
 
+  get(url, expires = 0, token) {
+    return this.fetch(url, expires, token);
+  },
+
   post(url, data, token) {
     return new Promise((resolve, reject) => {
       makeCall(url, 'POST', token, data)
+        .then(response => resolve(response))
+        .catch(error => reject(error));
+    });
+  },
+
+  put(url, data, token) {
+    return new Promise((resolve, reject) => {
+      makeCall(url, 'PUT', token, data)
+        .then(response => resolve(response))
+        .catch(error => reject(error));
+    });
+  },
+
+  delete(url, data, token) {
+    return new Promise((resolve, reject) => {
+      makeCall(url, 'DELETE', token, data)
         .then(response => resolve(response))
         .catch(error => reject(error));
     });
