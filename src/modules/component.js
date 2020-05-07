@@ -640,7 +640,7 @@ function renderEach(dataArray, createElement, updateElement = NOOP) {
     this.innerHTML = '';
   } else if (previousData.length === 0) {
     for (let i = 0; i < dataArray.length; i++) {
-      this.appendChild(createElement(dataArray[i]));
+      this.appendChild(createElement(dataArray[i], i));
     }
   } else {
     reconcile(this, previousData, dataArray, createElement, updateElement);
@@ -794,8 +794,8 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
     if (newStart <= newEnd) {
       while (newStart <= newEnd) {
         afterNode
-          ? parentElement.insertBefore(createFn(newArray[newStart]), afterNode)
-          : parentElement.appendChild(createFn(newArray[newStart]));
+          ? parentElement.insertBefore(createFn(newArray[newStart], newStart), afterNode)
+          : parentElement.appendChild(createFn(newArray[newStart], newStart));
         newStart++
       }
     }
@@ -835,7 +835,7 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
     parentElement.textContent = '';
 
     for (i = newStart; i <= newEnd; i++) {
-      parentElement.appendChild(createFn(newArray[i]));
+      parentElement.appendChild(createFn(newArray[i], i));
     }
 
     return;
@@ -870,7 +870,7 @@ function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
     } else {
 
       if (positions[i] === -1) {
-        tempNode = createFn(newArray[i]);
+        tempNode = createFn(newArray[i], i);
       } else {
         tempNode = nodes[positions[i]];
         updateFn(tempNode, newArray[i]);
