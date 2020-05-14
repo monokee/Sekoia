@@ -24,15 +24,9 @@ export const Component = {
 
     // ---------------------- MODULE INIT ----------------------
     const Module = {
-      initialized: false
+      initialized: false,
+      hasTemplate: false
     };
-
-    // ---------------------- TEMPLATE ----------------------
-    Module.template = document.createElement('div');
-    Module.template.innerHTML = config.element || '';
-
-    // ---------------------- REFS ----------------------
-    Module.refNames = collectElementReferences(Module.template, {});
 
     // ---------------------- ATTRIBUTES ----------------------
     const observedAttributes = Object.keys(config.attributes || {});
@@ -48,6 +42,9 @@ export const Component = {
 
         // Lazy Module Init
         if (Module.initialized === false) {
+
+          // initialize the template
+          ensureModuleHasTemplate(Module, config, name); // responsible for creating innerHTML. attributes are dynamically set on "this" shell
 
           // data can be lazy function to aid dependency management
           config.data = typeof config.data === 'function' ? config.data() : config.data;
@@ -319,14 +316,6 @@ export const Component = {
 
       }
 
-      cloneNode(deep = false) {
-        if (deep === false) {
-          return document.createElement(name);
-        } else {
-          return Component.create(name, deepClone(this[INTERNAL]._data));
-        }
-      }
-
     };
 
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
@@ -334,10 +323,15 @@ export const Component = {
 
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
 
-    return (attributes = {}) => {
+    return attributes => { // this function creates dynamic instances of the component.
+
+      ensureModuleHasTemplate(Module, config, name);
+
       let htmlString = `<${name} ${HYDRATION_ATT}="true"`, att; // mark element as hydrated
       for (att in attributes) htmlString += ` ${att}="${attributes[att]}"`;
-      return htmlString += `>${Module.template.innerHTML}</${name}>`;
+      htmlString += `>${Module.template.innerHTML}</${name}>`;
+      return htmlString;
+
     };
 
   },
@@ -387,6 +381,15 @@ export const Component = {
 };
 
 // -----------------------------------
+
+function ensureModuleHasTemplate(Module, config, name) {
+  if (Module.hasTemplate === false) {
+    Module.template = document.createElement('div'); // this should be the actual component, not a div
+    Module.template.innerHTML = config.element || '';
+    Module.refNames = collectElementReferences(Module.template, {});
+    Module.hasTemplate = true;
+  }
+}
 
 function initializeModule(Module, name, config) {
 
