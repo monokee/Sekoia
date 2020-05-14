@@ -974,9 +974,10 @@ function visitDependency(sourceProperty, dependencies, target) {
 }
 
 const REF_ID = '$';
-const REF_ID_JS = '\\' + REF_ID;
 const HYDRATION_ATT = 'cue-dom-hydrated';
 const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
+
+let CLASS_COUNTER = -1;
 
 const INTERNAL = Symbol('Component Data');
 
@@ -991,10 +992,19 @@ const Component = {
 
   define(name, config) {
 
-    // ---------------------- LAZY MODULE ----------------------
-    let Module = null;
+    // ---------------------- MODULE INIT ----------------------
+    const Module = {
+      initialized: false
+    };
 
-    // ---------------------- ATTRIBUTES (PRE-MODULE) ----------------------
+    // ---------------------- TEMPLATE ----------------------
+    Module.template = document.createElement('div');
+    Module.template.innerHTML = config.element || '';
+
+    // ---------------------- REFS ----------------------
+    Module.refNames = collectElementReferences(Module.template, {});
+
+    // ---------------------- ATTRIBUTES ----------------------
     const observedAttributes = Object.keys(config.attributes || {});
 
     // ---------------------- CUSTOM ELEMENT INSTANCE ----------------------
@@ -1007,18 +1017,20 @@ const Component = {
         let key, tuple;
 
         // Lazy Module Init
-        if (Module === null) {
+        if (Module.initialized === false) {
 
           // data can be lazy function to aid dependency management
           config.data = typeof config.data === 'function' ? config.data() : config.data;
 
-          Module = createModule(name, config);
+          initializeModule(Module, name, config);
 
           // Add Methods to this class' prototype
           component.prototype.renderEach = renderEach;
           for (key in Module.methods) {
             component.prototype[key] = Module.methods[key];
           }
+
+          Module.initialized = true;
 
         }
 
@@ -1291,10 +1303,11 @@ const Component = {
     customElements.define(name, component);
 
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
+
     return (attributes = {}) => {
       let htmlString = `<${name} ${HYDRATION_ATT}="true"`, att; // mark element as hydrated
       for (att in attributes) htmlString += ` ${att}="${attributes[att]}"`;
-      return htmlString += `>${config.element || ''}</${name}>`;
+      return htmlString += `>${Module.template.innerHTML}</${name}>`;
     };
 
   },
@@ -1345,23 +1358,9 @@ const Component = {
 
 // -----------------------------------
 
-function createModule(name, config) {
+function initializeModule(Module, name, config) {
 
-  const Module = {};
-
-  // ---------------------- TEMPLATE ----------------------
-  Module.template = document.createElement('div');
-  Module.template.innerHTML = config.element || '';
-
-  // ---------------------- REFS ----------------------
-  const _refElements = Module.template.querySelectorAll(`[${REF_ID_JS}]`);
-  Module.refNames = {};
-
-  let i, k, v;
-  for (i = 0; i < _refElements.length; i++) {
-    k = _refElements[i].getAttribute(REF_ID);
-    k && k.length && (Module.refNames[`${REF_ID}${k}`] = `[${REF_ID_JS}="${k}"]`);
-  }
+  let k, v;
 
   // ---------------------- STYLES ----------------------
   Module.styles = '';
@@ -1457,7 +1456,7 @@ function createComponentCSS(name, styles, refNames) {
   // Re-write $self to component-name
   styles = styles.split(`${REF_ID}self`).join(name);
 
-  // Re-write $refName(s) in style text to [\$="refName"] selector
+  // Re-write $refName(s) in style text to class selector
   let refName;
   for (refName in refNames) {
     styles = styles.split(refName).join(refNames[refName]);
@@ -1488,12 +1487,7 @@ function createComponentCSS(name, styles, refNames) {
 
   // Empty Compiler styleSheet
   CUE_CSS.compiler.innerHTML = '';
-
-  if (styleNodeInnerHTML.indexOf(REF_ID_JS) !== -1) { // Escape character still exists (Chromium, Firefox)
-    CUE_CSS.components.innerHTML += styleNodeInnerHTML;
-  } else { // Escape character has been removed, add it back (Safari)
-    CUE_CSS.components.innerHTML += styleNodeInnerHTML.split(REF_ID).join(REF_ID_JS);
-  }
+  CUE_CSS.components.innerHTML += styleNodeInnerHTML;
 
 }
 
@@ -1579,6 +1573,33 @@ function isTopLevelSelector(selectorText, componentName) {
   } else { // nada
     return false;
   }
+}
+
+function collectElementReferences(root, refNames) {
+
+  for (let i = 0, child, ref, cls1, cls2; i < root.children.length; i++) {
+
+    child = root.children[i];
+
+    ref = child.getAttribute(REF_ID);
+
+    if (ref) {
+      cls1 = child.getAttribute('class');
+      cls2 = ref + ++CLASS_COUNTER;
+      refNames[REF_ID + ref] = '.' + cls2;
+      child.setAttribute('class', cls1 ? cls1 + ' ' + cls2 : cls2);
+      child.removeAttribute(REF_ID);
+    }
+
+    // don't collect refs of sub-components
+    if (!child.hasAttribute(HYDRATION_ATT)) {
+      collectElementReferences(child, refNames);
+    }
+
+  }
+
+  return refNames;
+
 }
 
 function assignElementReferences(parentElement, targetObject, refNames) {
