@@ -38,7 +38,8 @@ export class ComputedProperty {
 
     if (this.needsUpdate === true) {
 
-      this.intermediate = this.computation.call(source, source);
+      // call computation with this = component.data, first argument = component.data, second argument = current value
+      this.intermediate = this.computation.call(source, source, this._value);
 
       if (Array.isArray(this.intermediate)) {
 
