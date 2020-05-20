@@ -1964,6 +1964,7 @@ const ROUTES_STRUCT = {};
 
 const DEFAULT_TRIGGER_OPTIONS = {
   params: {},
+  keepQuery: true,
   revertible: true,
   forceReload: false
 };
@@ -1989,7 +1990,7 @@ const Router = {
   options: {
     recursionWarningCount: 5,
     recursionThrowCount: 10,
-    defer: 0 // only execute navigations n milliseconds after the last call to Router.navigate
+    defer: 50 // only execute navigations n milliseconds after the last call to Router.navigate
   },
 
   hook(route, handler, scope = null, once = false) {
@@ -2028,7 +2029,8 @@ const Router = {
 
     if (hooks && hooks.length) {
 
-      const params = Object.assign(buildParamsFromQueryString(query), options.params);
+      const currentQueryString = !query && options.keepQuery ? window.location.search : query;
+      const params = Object.assign(buildParamsFromQueryString(currentQueryString), options.params);
 
       for (let i = 0; i < hooks.length; i++) {
         hooks[i](params);
@@ -2141,7 +2143,8 @@ function navigate(route, options) {
 
   const {abs, hash, query} = getRouteParts(route);
 
-  pendingParams = Object.assign(buildParamsFromQueryString(query), options.params);
+  const currentQueryString = !query && options.keepQuery ? window.location.search : query;
+  pendingParams = Object.assign(buildParamsFromQueryString(currentQueryString), options.params);
 
   const hooks = ROUTE_HOOK_HANDLERS.get(hash);
 
@@ -2169,7 +2172,7 @@ function navigate(route, options) {
       buildURLFromStruct(resolvedStruct).then(finalAbs => { // finalRoute is absolute
 
         const url = new URL(finalAbs);
-        url.search = query;
+        url.search = currentQueryString;
         const urlString = url.toString();
 
         if (finalAbs === currentAbs && options.forceReload === false) {
@@ -2321,6 +2324,7 @@ function collectRouteNodes(root, parts, rest = '') {
 
         Promise.resolve(frag.beforeRoute(iNextNodeValue, pendingParams)).then(oNextNodeValue => {
 
+          // TODO: oNextNodeValue should be object with {path: string, params: object of query parameters}
           oNextNodeValue = typeof oNextNodeValue === 'string'
             ? normalizeAbsoluteOriginPrefix(removeSlashes(oNextNodeValue))
             : iNextNodeValue;
@@ -2479,7 +2483,7 @@ function buildURLFromStruct(routeNode, url = '') {
       resolve(url);
     } else {
       Promise.resolve(routeNode.nextNode).then(nextNode => {
-        url += routeNode.value === ORIGIN || routeNode.value[0] === '#' ? routeNode.value : `/${routeNode.value}`;
+        url += url.length === 0 ? routeNode.value : '/' + routeNode.value;
         resolve(buildURLFromStruct(nextNode, url));
       });
     }
