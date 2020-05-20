@@ -537,7 +537,7 @@ function buildURLFromStruct(routeNode, url = '') {
       resolve(url);
     } else {
       Promise.resolve(routeNode.nextNode).then(nextNode => {
-        url += url.length === 0 ? routeNode.value : '/' + routeNode.value;
+        url += url.length === 0 || routeNode.value === ORIGIN || routeNode.value[0] === '#' ? routeNode.value : '/' + routeNode.value;
         resolve(buildURLFromStruct(nextNode, url));
       });
     }
