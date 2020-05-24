@@ -104,10 +104,6 @@ export function arePlainObjectsShallowEqual(a, b) {
 
 }
 
-export function ifFn(x) {
-  return typeof x === 'function' ? x : NOOP;
-}
-
 export function hashString(str) {
   if (!str.length) return 0;
   let hash = 0;

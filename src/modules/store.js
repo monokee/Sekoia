@@ -1,5 +1,5 @@
-import {RESOLVED_PROMISE, deepEqual, deepClone} from "./utils.js";
-import {Reactor} from "./reactor.js";
+import { RESOLVED_PROMISE, deepEqual, deepClone } from "./utils.js";
+import { Reactor } from "./reactor.js";
 
 const STORE = new Map();
 const EVENTS = new Map();
@@ -38,7 +38,7 @@ export const Store = Object.defineProperty({
 
   set(path, value) {
 
-    if (arguments.length === 1 && typeof path === 'object' && path !== null) {
+    if (path && typeof path === 'object') {
 
       let didChange = false;
 
@@ -306,7 +306,7 @@ function bubbleEvent(path, value, keys, root) {
       }
 
       for (i = 1; i < keys.length; i++) {
-        key += `/${keys[i]}`;
+        key += '/' + keys[i];
         node = node[keys[i]];
         event = EVENTS.get(key);
         if (event) {

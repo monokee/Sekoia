@@ -12,14 +12,14 @@
 
 <script type="module">
 
-  import { Component, Router } from "./build/cue.module.js";
+  import { Component, Store, Router } from "./build/cue.module.js";
 
   Component.define('route-component', {
 
     element: (`
       <h2>Links automatically trigger Router.navigate:</h2>
       <section class="grid">
-        <a href="#route1">#route1</a>
+        <a $="firstLink" href="#route1">#route1</a>
         <a href="#route1/jump1">#route1/jump1</a>
         <a href="#route1/jump2">#route1/jump2</a>
         <a href="#route1/infinity">Infinite Loop</a>
@@ -49,10 +49,31 @@
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         grid-gap: 1.5em;
       }
+      $firstLink {
+        color: hotpink;
+      }
       a {
         border: 1px dotted hotpink;
       }
     `),
+
+    data: () => ({
+      dummy: {
+        value: true,
+        reaction(refs, val) {
+          console.log(refs, val);
+        }
+      },
+      reverseDummy: {
+        value: ({dummy}) => !dummy,
+        reaction(refs, val) {
+          console.log('computed reverse', val);
+        }
+      },
+      nulli: {
+        value: Store.bind('nulli', 0)
+      }
+    }),
 
     initialize({$route1, $jump1, $jump2, $infinity}) {
 
@@ -60,6 +81,8 @@
         beforeRoute: (path, params) => this.getPermittedRoute(path, params),
         onRoute: (path, params) => this.onRoute(path, params)
       });
+
+      document.addEventListener('click', e => this.setData('dummy', !this.getData('dummy')));
 
       $route1.addEventListener('click', () => Router.navigate('#route1'));
       $jump1.addEventListener('click', () => Router.navigate('#route1/jump1'));

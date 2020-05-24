@@ -105,10 +105,6 @@ function arePlainObjectsShallowEqual(a, b) {
 
 }
 
-function ifFn(x) {
-  return typeof x === 'function' ? x : NOOP;
-}
-
 function hashString(str) {
   if (!str.length) return 0;
   let hash = 0;
@@ -466,7 +462,7 @@ const Store = Object.defineProperty({
 
   set(path, value) {
 
-    if (arguments.length === 1 && typeof path === 'object' && path !== null) {
+    if (path && typeof path === 'object') {
 
       let didChange = false;
 
@@ -734,7 +730,7 @@ function bubbleEvent(path, value, keys, root) {
       }
 
       for (i = 1; i < keys.length; i++) {
-        key += `/${keys[i]}`;
+        key += '/' + keys[i];
         node = node[keys[i]];
         event = EVENTS$1.get(key);
         if (event) {
@@ -976,7 +972,7 @@ function visitDependency(sourceProperty, dependencies, target) {
 }
 
 const REF_ID = '$';
-const HYDRATION_ATT = 'cue-dom-hydrated';
+const SELF_REGEXP = /\$self/g;
 const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
 let CLASS_COUNTER = -1;
@@ -994,14 +990,27 @@ const Component = {
 
   define(name, config) {
 
-    // ---------------------- MODULE INIT ----------------------
-    const Module = {
-      initialized: false,
-      hasTemplate: false
+    // ---------------------- SETUP MODULE ----------------------
+    let isConstructed = false;
+    let isConnected = false;
+
+    const Lifecycle = {
+      initialize: NOOP,
+      connected: NOOP,
+      disconnected: NOOP
     };
 
-    // ---------------------- ATTRIBUTES ----------------------
-    const observedAttributes = Object.keys(config.attributes || {});
+    const Data = {
+      static: {},
+      computed: new Map(),
+      bindings: {},
+      reactions: {}
+    };
+
+    const Template = document.createElement('template');
+    Template.innerHTML = config.element || '';
+
+    const RefNames = collectElementReferences(Template.content, {});
 
     // ---------------------- CUSTOM ELEMENT INSTANCE ----------------------
     const component = class extends HTMLElement {
@@ -1010,123 +1019,136 @@ const Component = {
 
         super();
 
-        let key, tuple;
-
-        // Lazy Module Init
-        if (Module.initialized === false) {
-
-          // initialize the template
-          ensureModuleHasTemplate(Module, config); // responsible for creating innerHTML. attributes are dynamically set on "this" shell
-
-          // data can be lazy function to aid dependency management
-          config.data = typeof config.data === 'function' ? config.data() : config.data;
-
-          initializeModule(Module, name, config);
-
-          // Add Methods to this class' prototype
-          component.prototype.renderEach = renderEach;
-          for (key in Module.methods) {
-            component.prototype[key] = Module.methods[key];
-          }
-
-          Module.initialized = true;
-
-        }
-
-        // Establish Computed Properties
-        const _computedProperties = new Map();
-
-        // Create Internal Data Structure
-        const _data = deepClone(Module.data);
-
-        const internal = this[INTERNAL] = {
-          _module: Module,
-          _data: _data,
-          data: new Proxy(_data, {
-            set(target, key, value) {
-              throw new Error(`Can not change data in reactions: this.${key} = ${value} has been ignored.`);
-            },
-            get(target, key) {
-              if (Module.storeBindings[key]) return Store.get(Module.storeBindings[key].path); // does deep clone
-              if (_computedProperties.has(key)) return _computedProperties.get(key).value(internal.data); // deep by default
-              return deepClone(target[key]); // deep clone
-            }
-          }),
-          computedProperties: _computedProperties,
+        // ---------------------- INSTANCE INTERNALS ----------------------
+        this[INTERNAL]= {
           reactions: {},
-          attributeChangedCallbacks: {},
+          computedProperties: new Map(),
           subscriptions: [],
           refs: {},
+          _data: {},
           initialized: false
         };
 
-        // Clone Computed Properties
-        for (tuple of Module.computedProperties.entries()) {
-          _computedProperties.set(tuple[0], new ComputedProperty(tuple[1].ownPropertyName, tuple[1].computation, tuple[1].sourceProperties));
-        }
+        // ---------------------- RUN ONCE ON FIRST CONSTRUCT ----------------------
+        if (isConstructed === false) {
 
-        // Build Dependency Graph
-        internal.dependencyGraph = buildDependencyGraph(internal.computedProperties);
+          isConstructed = true;
 
-        // Bind reactions with first argument as "refs" object ("this" is data proxy so reactions can work with all data)
-        for (key in Module.reactions) {
-          internal.reactions[key] = Module.reactions[key].bind(internal.data, internal.refs);
-        }
+          // ---------------------- CREATE SCOPED STYLES ----------------------
+          if (typeof config.styles === 'string' && config.styles.length) {
+            createComponentCSS(name, config.styles, RefNames);
+          }
 
-        // Same for Attribute Reactions
-        for (key in Module.attributeChangedCallbacks) {
-          internal.attributeChangedCallbacks[key] = Module.attributeChangedCallbacks[key].bind(internal.data, internal.refs);
+          // ---------------------- LIFECYCLE ----------------------
+          if (typeof config.initialize === 'function') Lifecycle.initialize = config.initialize;
+          if (typeof config.connectedCallback === 'function') Lifecycle.connected = config.connectedCallback;
+          if (typeof config.disconnectedCallback === 'function') Lifecycle.disconnected = config.disconnectedCallback;
+
         }
 
       }
 
       connectedCallback() {
 
-        const internal = this[INTERNAL];
+        // ----------- Connect Module (once) ----------
+        if (isConnected === false) {
 
-        // ALWAYS add Store Subscriptions (unbind in disconnectedCallback)
-        for (const key in Module.storeBindings) {
+          isConnected = true;
 
-          internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
-            Module.storeBindings[key].path,
-            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data),
-            {autorun: false}
-          ));
+          const allProperties = {};
 
-          internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
-            Module.storeBindings[key].path,
-            value => Reactor.cueCallback(internal.reactions[key], value),
-            {autorun: false}
-          ));
+          if (config.data) {
+
+            config.data = typeof config.data === 'function' ? config.data() : config.data;
+
+            for (const k in config.data) {
+
+              const v = config.data[k];
+
+              allProperties[k] = v.value;
+
+              if (v.value && v.value.id === Store.id) {
+                Data.bindings[k] = v.value;
+              } else if (typeof v.value === 'function') {
+                Data.computed.set(k, new ComputedProperty(k, v.value));
+              } else {
+                Data.static[k] = v.value;
+              }
+
+              if (typeof v.reaction === 'function') {
+                Data.reactions[k] = v.reaction;
+              }
+
+            }
+
+          }
+
+          // ---------------------- COMPUTED PROPERTIES ----------------------
+          if (Data.computed.size > 0) {
+            Data.computed = setupComputedProperties(allProperties, Data.computed);
+          }
 
         }
 
-        // INITIALIZER - RUN ONLY ONCE
+        const internal = this[INTERNAL];
+
+        // ------------- INSTANCE INIT ------------
+        // (only run after initial construction, never on re-connect)
+
         if (internal.initialized === false) {
 
-          let i, path, key;
-
-          // ------------- Insert inner DOM only if it has not been appended yet
-          if (!this.hasAttribute(HYDRATION_ATT)) {
-            for (i = Module.template.children.length - 1; i >= 0; i--) {
-              this.insertBefore(Module.template.children[i].cloneNode(true), this.firstChild);
-            }
-          } else {
-            this.removeAttribute(HYDRATION_ATT);
-          }
-
-          // ---------------- Create Refs
-          assignElementReferences(this, internal.refs, Module.refNames);
-
-          // ---------------- Consider Element Initialized
           internal.initialized = true;
 
-          // ----------------- Bind / Cue Store
-          let storeBinding;
-          for (key in Module.storeBindings) {
+          // ------------- Create Data Model
+          const data = internal._data = Object.assign(deepClone(Data.static), internal._data);
+          const computedProperties = internal.computedProperties;
 
-            storeBinding = Module.storeBindings[key];
-            path = storeBinding.path;
+          internal.data = new Proxy(data, {
+            set: forbiddenProxySet,
+            get(target, key) {
+              if (Data.bindings[key]) return Store.get(Data.bindings[key].path); // does deep clone
+              if (computedProperties.has(key)) return computedProperties.get(key).value(internal.data); // deep by default
+              return deepClone(target[key]); // deep clone
+            }
+          });
+
+          // Clone Computed Properties
+          for (const tuple of Data.computed.entries()) {
+            const val = tuple[1];
+            computedProperties.set(tuple[0], new ComputedProperty(val.ownPropertyName, val.computation, val.sourceProperties));
+          }
+
+          // Build Dependency Graph
+          internal.dependencyGraph = buildDependencyGraph(internal.computedProperties);
+
+          // Bind reactions with first argument as "refs" object
+          // set context to internal.data so "this" in reactions is data proxy which can read normal, computed and Store-bound data
+          for (const key in Data.reactions) {
+            internal.reactions[key] = Data.reactions[key].bind(internal.data, internal.refs);
+          }
+
+          // ----------- INSERT DOM AND ASSIGN REFS ----------
+          if (this.innerHTML.length === 0) {
+            this.innerHTML = Template.innerHTML;
+          }
+
+          // ---------------- ASSIGN REF ELEMENTS
+          for (const refName in RefNames) {
+            const el = this.querySelector(RefNames[refName]);
+            if (!el[INTERNAL]) {
+              el[INTERNAL] = {};
+              el.renderEach = renderEach; // give every ref element fast list rendering method
+            }
+            internal.refs[refName] = el; // makes ref available as $refName in js
+          }
+
+          internal.refs['$self'] = this; // this === $self for completeness
+
+          // ----------------- Bind / Cue Store
+          for (const key in Data.bindings) {
+
+            const storeBinding = Data.bindings[key];
+            const path = storeBinding.path;
 
             if (Store.has(path)) {
               if (internal.reactions[key]) {
@@ -1143,31 +1165,38 @@ const Component = {
           }
 
           // ---------------- Run reactions
-          for (key in internal.reactions) {
+          for (const key in internal.reactions) {
             Reactor.cueCallback(internal.reactions[key], internal.data[key]);
-          }
-
-          // ----------------- Run Attribute Changed Callbacks
-          for (key in internal.attributeChangedCallbacks) {
-            Reactor.cueCallback(internal.attributeChangedCallbacks[key], this.getAttribute(key));
-          }
-
-          // ---------------- Assign default attributes in case the element doesn't have them
-          for (key in Module.defaultAttributeValues) {
-            if (!this.hasAttribute(key)) {
-              this.setAttribute(key, Module.defaultAttributeValues[key]);
-            }
           }
 
           // ---------------- Trigger First Render
           Reactor.react().then(() => {
-            Module.initialize.call(this, internal.refs);
-            Module.connected.call(this, internal.refs);
+            Lifecycle.initialize.call(this, internal.refs);
+            Lifecycle.connected.call(this, internal.refs);
           });
 
         } else {
 
-          Module.connected.call(this, internal.refs); // runs whenever instance is (re-) inserted into DOM
+          Lifecycle.connected.call(this, internal.refs); // runs whenever instance is (re-) inserted into DOM
+
+        }
+
+        // Add Store Subscriptions on every connect callback - unbind in disconnectedCallback
+        for (const key in Data.bindings) {
+
+          // Computation Subscriptions
+          internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
+            Data.bindings[key].path,
+            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data),
+            { autorun: false }
+          ));
+
+          // Reaction Subscriptions
+          internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
+            Data.bindings[key].path,
+            internal.reactions[key],
+            { autorun: false }
+          ));
 
         }
 
@@ -1175,12 +1204,13 @@ const Component = {
 
       disconnectedCallback() {
 
-        const subscriptions = this[INTERNAL].subscriptions;
+        const internal = this[INTERNAL];
+        const subscriptions = internal.subscriptions;
         while (subscriptions.length) {
           subscriptions.pop().unsubscribe();
         }
 
-        Module.disconnected.call(this, this[INTERNAL].refs);
+        Lifecycle.disconnected.call(this, internal.refs);
 
       }
 
@@ -1192,8 +1222,8 @@ const Component = {
           const dataClone = {};
           let key;
 
-          for (key in Module.storeBindings) {
-            dataClone[key] = Store.get(Module.storeBindings[key].path); // returns deep clone
+          for (key in Data.bindings) {
+            dataClone[key] = Store.get(Data.bindings[key].path); // returns deep clone
           }
 
           for (key in internal._data) {
@@ -1220,11 +1250,11 @@ const Component = {
             const oldValue = internal._data[prop];
             const newValue = key[prop];
 
-            if (Module.computedProperties.has(prop)) {
+            if (Data.computed.has(prop)) {
               throw new Error(`You can not set property "${prop}" because it is a computed property.`);
-            } else if (Module.storeBindings[prop]) {
+            } else if (Data.bindings[prop]) {
               didChange = true;
-              Store.set(Module.storeBindings[prop].path, newValue);
+              Store.set(Data.bindings[prop].path, newValue);
             } else if (!deepEqual(oldValue, newValue)) {
               didChange = true;
               internal._data[prop] = newValue;
@@ -1238,11 +1268,11 @@ const Component = {
 
         }
 
-        if (Module.storeBindings[key]) {
-          return Store.set(Module.storeBindings[key].path, value);
+        if (Data.bindings[key]) {
+          return Store.set(Data.bindings[key].path, value);
         }
 
-        if (Module.computedProperties.has(key)) {
+        if (Data.computed.has(key)) {
           throw new Error(`You can not set property "${key}" because it is a computed property.`);
         }
 
@@ -1267,43 +1297,27 @@ const Component = {
 
       }
 
-      static get observedAttributes() {
-        return observedAttributes;
-      }
-
-      attributeChangedCallback(name, oldValue_omitted, newValue) {
-
-        const internal = this[INTERNAL];
-
-        if (internal.initialized === true) { // only on initialized elements
-
-          const reaction = internal.attributeChangedCallbacks[name];
-
-          if (reaction) {
-            Reactor.cueCallback(reaction, newValue);
-            Reactor.react();
-          }
-
-        }
-
-      }
-
     };
+
+    // ---------------------- ADD METHODS TO PROTOTYPE ----------------------
+    for (const k in config) {
+      if (typeof config[k] === 'function' && k !== 'initialize') {
+        component.prototype[k] = config[k];
+      }
+    }
+
+    component.prototype.renderEach = renderEach;
 
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
     customElements.define(name, component);
 
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
-
-    return attributes => { // this function creates dynamic instances of the component.
-
-      ensureModuleHasTemplate(Module, config);
-
-      let htmlString = `<${name} ${HYDRATION_ATT}="true"`, att; // mark element as hydrated
-      for (att in attributes) htmlString += ` ${att}="${attributes[att]}"`;
-      htmlString += `>${Module.template.innerHTML}</${name}>`;
+    const openTag = '<'+name, closeTag = '</'+name+'>';
+    return attributes => {
+      let htmlString = openTag, att;
+      for (att in attributes) htmlString += ' ' + att + '="' + attributes[att] + '"';
+      htmlString += '>' + Template.innerHTML + closeTag;
       return htmlString;
-
     };
 
   },
@@ -1323,27 +1337,8 @@ const Component = {
 
     const internal = element[INTERNAL];
 
-    if (internal) {
-
-      // HYDRATE ELEMENT WITH DOM FOR COMPOSITION
-      if (!element.hasAttribute(HYDRATION_ATT)) { // not pre-hydrated via string factory, hydrate
-        for (let i = internal._module.template.children.length - 1; i >= 0; i--) {
-          element.insertBefore(internal._module.template.children[i].cloneNode(true), element.firstChild);
-        }
-        element.setAttribute(HYDRATION_ATT, 'true');
-      }
-
-      // HYDRATE ELEMENT WITH DATA FOR REACTIVITY
-      if (data && typeof data === 'object') {
-        for (const prop in data) {
-          if (internal._data.hasOwnProperty(prop)) {
-            internal._data[prop] = data[prop]; // element will self-react with this data in connectedCallback...
-          } else {
-            console.warn(`Cannot pass data property "${prop}" to component "${element.tagName}" because the property has not been explicitly defined in the components data model.`);
-          }
-        }
-      }
-
+    if (internal && data && typeof data === 'object') {
+      Object.assign(internal._data, deepClone(data));
     }
 
     return element;
@@ -1354,117 +1349,38 @@ const Component = {
 
 // -----------------------------------
 
-function ensureModuleHasTemplate(Module, config, name) {
-  if (Module.hasTemplate === false) {
-    Module.template = document.createElement('div'); // this should be the actual component, not a div
-    Module.template.innerHTML = config.element || '';
-    Module.refNames = collectElementReferences(Module.template, {});
-    Module.hasTemplate = true;
-  }
-}
+function collectElementReferences(root, refNames) {
 
-function initializeModule(Module, name, config) {
+  for (let i = 0, child, ref, cls2; i < root.children.length; i++) {
 
-  let k, v;
+    child = root.children[i];
 
-  // ---------------------- STYLES ----------------------
-  Module.styles = '';
-  if (typeof config.styles === 'string' && config.styles.length) {
-    Module.styles = config.styles;
-    createComponentCSS(name, Module.styles, Module.refNames);
-  }
+    ref = child.getAttribute(REF_ID);
 
-  // ---------------------- METHODS ----------------------
-  Module.methods = {};
-  for (k in config) {
-    typeof config[k] === 'function'
-    && k !== 'initialize'
-    && k !== 'connectedCallback'
-    && k !== 'disconnectedCallback'
-    && (Module.methods[k] = config[k]);
-  }
-
-  // ---------------------- LIFECYCLE ----------------------
-  Module.initialize = ifFn(config.initialize);
-  Module.connected = ifFn(config.connectedCallback);
-  Module.disconnected = ifFn(config.disconnectedCallback);
-
-  // ------------------- DATA / REACTIONS ------------------
-  Module.data = {};
-  Module.storeBindings = {};
-  Module.reactions = {};
-
-  const _allProperties = {};
-  const _computedProperties = new Map();
-
-  if (config.data) {
-
-    for (k in config.data) {
-
-      v = config.data[k];
-
-      _allProperties[k] = v.value;
-
-      if (v.value && v.value.id === Store.id) {
-        Module.storeBindings[k] = v.value;
-      } else if (typeof v.value === 'function') {
-        _computedProperties.set(k, new ComputedProperty(k, v.value));
-      } else {
-        Module.data[k] = v.value;
-      }
-
-      if (typeof v.reaction === 'function') {
-        Module.reactions[k] = v.reaction;
-      }
-
+    if (ref) {
+      cls2 = ref + ++CLASS_COUNTER;
+      refNames[REF_ID + ref] = '.' + cls2;
+      child.className += child.className ? ' ' + cls2 : cls2;
+      child.removeAttribute(REF_ID);
     }
 
-  }
-
-  // --------------------- ATTRIBUTES ---------------------
-  Module.defaultAttributeValues = {};
-  Module.attributeChangedCallbacks = {};
-
-  if (config.attributes) {
-
-    for (k in config.attributes) {
-
-      v = config.attributes[k];
-
-      if (typeof v.value !== 'undefined') {
-        if (typeof v.value !== 'string') {
-          throw new Error(`Attribute value for ${k} is not a String.`);
-        } else {
-          Module.defaultAttributeValues[k] = v.value;
-        }
-      }
-
-      if (typeof v.reaction === 'function') {
-        Module.attributeChangedCallbacks[k] = v.reaction;
-      }
-
-    }
+    collectElementReferences(child, refNames);
 
   }
 
-  // ---------------------- COMPUTED PROPERTIES ----------------------
-  Module.computedProperties = _computedProperties.size > 0
-    ? setupComputedProperties(_allProperties, _computedProperties)
-    : _computedProperties;
-
-  return Module;
+  return refNames;
 
 }
 
+// css work
 function createComponentCSS(name, styles, refNames) {
 
   // Re-write $self to component-name
-  styles = styles.split(`${REF_ID}self`).join(name);
+  styles = styles.replace(SELF_REGEXP, name);
 
   // Re-write $refName(s) in style text to class selector
-  let refName;
-  for (refName in refNames) {
-    styles = styles.split(refName).join(refNames[refName]);
+  for (const refName in refNames) {
+    styles = styles.replace(new RegExp('\\' + refName, 'g'), refNames[refName]);
   }
 
   CUE_CSS.compiler.innerHTML = styles;
@@ -1499,9 +1415,9 @@ function createComponentCSS(name, styles, refNames) {
 function constructScopedStyleQuery(name, query, cssText = '') {
 
   if (query.type === 4) {
-    cssText += `@media ${query.media.mediaText} {`;
+    cssText += '@media ' + query.media.mediaText + ' {';
   } else {
-    cssText += `@supports ${query.conditionText} {`;
+    cssText += '@supports ' + query.conditionText + ' {';
   }
 
   let styleQueries = '';
@@ -1523,9 +1439,9 @@ function constructScopedStyleQuery(name, query, cssText = '') {
   }
 
   // write nested queries to the end of the surrounding query (see issue #13)
-  cssText += styleQueries;
+  cssText += styleQueries + ' }';
 
-  return `${cssText} }`;
+  return cssText;
 
 }
 
@@ -1580,47 +1496,9 @@ function isTopLevelSelector(selectorText, componentName) {
   }
 }
 
-function collectElementReferences(root, refNames) {
-
-  for (let i = 0, child, ref, cls1, cls2; i < root.children.length; i++) {
-
-    child = root.children[i];
-
-    ref = child.getAttribute(REF_ID);
-
-    if (ref) {
-      cls1 = child.getAttribute('class');
-      cls2 = ref + ++CLASS_COUNTER;
-      refNames[REF_ID + ref] = '.' + cls2;
-      child.setAttribute('class', cls1 ? cls1 + ' ' + cls2 : cls2);
-      child.removeAttribute(REF_ID);
-    }
-
-    // don't collect refs of sub-components
-    if (!child.hasAttribute(HYDRATION_ATT)) {
-      collectElementReferences(child, refNames);
-    }
-
-  }
-
-  return refNames;
-
-}
-
-function assignElementReferences(parentElement, targetObject, refNames) {
-
-  let refName, el;
-  for (refName in refNames) {
-    el = parentElement.querySelector(refNames[refName]);
-    if (!el[INTERNAL]) {
-      el[INTERNAL] = {};
-      el.renderEach = renderEach;
-    }
-    targetObject[refName] = el; // makes ref available as $refName in js
-  }
-
-  targetObject[`${REF_ID}self`] = parentElement; // makes container available as $self in js
-
+// utils
+function forbiddenProxySet(target, key, value) {
+  throw new Error(`Can not change data in reactions: this.${key} = ${value} has been ignored.`);
 }
 
 function renderEach(dataArray, createElement, updateElement = NOOP) {
