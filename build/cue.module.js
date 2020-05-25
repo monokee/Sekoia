@@ -1350,16 +1350,17 @@ const Component = {
 
 function collectElementReferences(root, refNames) {
 
-  for (let i = 0, child, ref, cls2; i < root.children.length; i++) {
+  for (let i = 0, child, ref, cls1, cls2; i < root.children.length; i++) {
 
     child = root.children[i];
 
     ref = child.getAttribute(REF_ID);
 
     if (ref) {
+      cls1 = child.getAttribute('class');
       cls2 = ref + ++CLASS_COUNTER;
       refNames[REF_ID + ref] = '.' + cls2;
-      child.className += child.className ? ' ' + cls2 : cls2;
+      child.setAttribute('class', cls1 ? cls1 + ' ' + cls2 : cls2);
       child.removeAttribute(REF_ID);
     }
 
