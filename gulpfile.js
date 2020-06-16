@@ -1,6 +1,6 @@
 const {series, src, dest} = require('gulp');
 const rollup = require('gulp-better-rollup');
-const minify = require('gulp-babel-minify');
+const minify = require('gulp-terser');
 const rename = require('gulp-rename');
 const iife = require('gulp-iife');
 const footer = require('gulp-footer');
@@ -25,7 +25,7 @@ function minifyIIFE() {
   return src('build/cue.js')
     .pipe(minify({
       mangle: {
-        topLevel: true
+        toplevel: true
       }
     }))
     .pipe(rename('cue.min.js'))
