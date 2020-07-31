@@ -1134,11 +1134,13 @@ const Component = {
           // ---------------- ASSIGN REF ELEMENTS
           for (const refName in RefNames) {
             const el = this.querySelector(RefNames[refName]);
-            if (!el[INTERNAL]) {
-              el[INTERNAL] = {};
-              el.renderEach = renderEach; // give every ref element fast list rendering method
+            if (el) {
+              if (!el[INTERNAL]) {
+                el[INTERNAL] = {};
+                el.renderEach = renderEach; // give every ref element fast list rendering method
+              }
+              internal.refs[refName] = el; // makes ref available as $refName in js
             }
-            internal.refs[refName] = el; // makes ref available as $refName in js
           }
 
           internal.refs['$self'] = this; // this === $self for completeness
