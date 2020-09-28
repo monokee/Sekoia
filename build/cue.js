@@ -1146,6 +1146,13 @@ const Component = {
 
           internal.refs['$self'] = this; // this === $self for completeness
 
+          // ----------------- Assign attribute data
+          if (this.hasAttribute('data')) {
+            const attributeData = JSON.parse(this.getAttribute('data'));
+            this.removeAttribute('data');
+            Object.assign(internal._data, attributeData);
+          }
+
           // ----------------- Bind / Cue Store
           for (const key in Data.bindings) {
 
@@ -1316,10 +1323,14 @@ const Component = {
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
     const openTag = '<'+name, closeTag = '</'+name+'>';
     return attributes => {
-      let htmlString = openTag, att;
-      for (att in attributes) htmlString += ' ' + att + '="' + attributes[att] + '"';
+      let htmlString = openTag, att, val;
+      for (att in attributes) {
+        val = attributes[att];
+        val = val && typeof val === 'object' ? JSON.stringify(val) : val;
+        htmlString += ` ${att}='${val}'`;
+      }
       htmlString += '>' + Template.innerHTML + closeTag;
-      return htmlString;
+      return htmlString
     };
 
   },
@@ -1840,6 +1851,7 @@ if (window.location.pathname && window.location.pathname !== '/') {
 const ALLOWED_ORIGIN_NAMES = ['/', '#', '/#', '/#/', ...ABSOLUTE_ORIGIN_NAMES];
 
 const ROUTES = new Set();
+const WILDCARD_HANDLERS = new Set();
 const ROUTE_HOOK_HANDLERS = new Map();
 const ON_ROUTE_HANDLER_CACHE = new Map();
 const ROUTES_STRUCT = {};
@@ -1931,6 +1943,11 @@ const Router = {
       options = { onRoute };
     } else if (typeof options.beforeRoute !== 'function' && typeof options.onRoute !== 'function') {
       throw new Error('Router.subscribe requires "options" object with "beforeRoute", "onRoute" or both handler functions.');
+    }
+
+    if (baseRoute === '*') {
+      WILDCARD_HANDLERS.add(options.onRoute);
+      return;
     }
 
     const hash = getRouteParts(baseRoute).hash;
@@ -2076,6 +2093,8 @@ function navigate(route, options) {
               }
 
             }
+
+            WILDCARD_HANDLERS.forEach(handler => handler(urlString, pendingParams));
 
             currentAbs = finalAbs;
 

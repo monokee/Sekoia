@@ -178,6 +178,13 @@ export const Component = {
 
           internal.refs['$self'] = this; // this === $self for completeness
 
+          // ----------------- Assign attribute data
+          if (this.hasAttribute('data')) {
+            const attributeData = JSON.parse(this.getAttribute('data'));
+            this.removeAttribute('data');
+            Object.assign(internal._data, attributeData);
+          }
+
           // ----------------- Bind / Cue Store
           for (const key in Data.bindings) {
 
@@ -348,10 +355,14 @@ export const Component = {
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
     const openTag = '<'+name, closeTag = '</'+name+'>';
     return attributes => {
-      let htmlString = openTag, att;
-      for (att in attributes) htmlString += ' ' + att + '="' + attributes[att] + '"';
+      let htmlString = openTag, att, val;
+      for (att in attributes) {
+        val = attributes[att];
+        val = val && typeof val === 'object' ? JSON.stringify(val) : val;
+        htmlString += ` ${att}='${val}'`;
+      }
       htmlString += '>' + Template.innerHTML + closeTag;
-      return htmlString;
+      return htmlString
     };
 
   },

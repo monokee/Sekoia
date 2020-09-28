@@ -12,6 +12,7 @@ if (window.location.pathname && window.location.pathname !== '/') {
 const ALLOWED_ORIGIN_NAMES = ['/', '#', '/#', '/#/', ...ABSOLUTE_ORIGIN_NAMES];
 
 const ROUTES = new Set();
+const WILDCARD_HANDLERS = new Set();
 const ROUTE_HOOK_HANDLERS = new Map();
 const ON_ROUTE_HANDLER_CACHE = new Map();
 const ROUTES_STRUCT = {};
@@ -103,6 +104,11 @@ export const Router = {
       options = { onRoute };
     } else if (typeof options.beforeRoute !== 'function' && typeof options.onRoute !== 'function') {
       throw new Error('Router.subscribe requires "options" object with "beforeRoute", "onRoute" or both handler functions.');
+    }
+
+    if (baseRoute === '*') {
+      WILDCARD_HANDLERS.add(options.onRoute);
+      return;
     }
 
     const hash = getRouteParts(baseRoute).hash;
@@ -248,6 +254,8 @@ function navigate(route, options) {
               }
 
             }
+
+            WILDCARD_HANDLERS.forEach(handler => handler(urlString, pendingParams));
 
             currentAbs = finalAbs;
 
