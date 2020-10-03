@@ -427,11 +427,13 @@ function flushReactionBuffer() {
 const STORE = new Map();
 const EVENTS$1 = new Map();
 
-const Store = Object.defineProperty({
+const Store = {
 
-  get(path) {
+  id: Symbol('Cue.Store'),
 
-    if (!path) {
+  get(key) {
+
+    if (!key) {
 
       const entireStore = {};
 
@@ -443,138 +445,52 @@ const Store = Object.defineProperty({
 
     }
 
-    const keys = path.split('/');
-    const root = STORE.get(keys[0]);
-
-    if (root === void 0) {
-      return void 0;
-    }
-
-    if (keys.length > 1) { // slash into object tree
-      const [targetNode, targetKey] = getNode(root, keys);
-      return deepClone(targetNode[targetKey]);
-    }
-
-    return deepClone(root);
+    return deepClone(STORE.get(key));
 
   },
 
-  set(path, value) {
+  set(key, value) {
 
-    if (path && typeof path === 'object') {
+    if (key && typeof key === 'object') {
 
-      let didChange = false;
+      let anyPropChanged = false;
 
-      for (const prop in path) {
-
-        const keys = prop.split('/');
-        const root = STORE.get(keys[0]);
-        const newValue = path[prop];
-
-        if (keys.length > 1) {
-          const [targetNode, targetKey] = getNode(root, keys);
-          if (!deepEqual(targetNode[targetKey], newValue)) {
-            didChange = true;
-            targetNode[targetKey] = newValue;
-            bubbleEvent(prop, newValue, keys, root);
-          }
-        } else if (root === void 0 || !deepEqual(root, newValue)) {
-          didChange = true;
-          STORE.set(prop, newValue);
-          dispatchEvent(prop, newValue);
-        }
-
+      for (const prop in key) {
+        const thisPropChanged = internalStoreSet(prop, key[prop], true);
+        anyPropChanged = anyPropChanged || thisPropChanged;
       }
 
-      return didChange ? Reactor.react() : RESOLVED_PROMISE;
+      return anyPropChanged ? Reactor.react() : RESOLVED_PROMISE;
 
     }
 
-    const keys = path.split('/');
-    const root = STORE.get(keys[0]);
-
-    if (keys.length > 1) { // sub-property
-
-      const [targetNode, targetKey] = getNode(root, keys);
-
-      if (deepEqual(targetNode[targetKey], value)) {
-        return RESOLVED_PROMISE;
-      }
-
-      targetNode[targetKey] = value;
-      return bubbleEvent(path, value, keys, root);
-
-    }
-
-    if (root === void 0 || !deepEqual(root, value)) { // first write or full replace
-      STORE.set(path, value);
-      return dispatchEvent(path, value);
-    }
-
-    return RESOLVED_PROMISE;
+    return internalStoreSet(key, value, true) ? Reactor.react() : RESOLVED_PROMISE;
 
   },
 
-  has(path) {
-
-    const keys = path.split('/');
-    const root = STORE.get(keys[0]);
-
-    if (STORE.has(keys[0])) {
-
-      if (keys.length > 1) {
-        try {
-          getNode(root, keys);
-          return true;
-        } catch(e) {
-          return false;
-        }
-      }
-
-      return true;
-
-    }
-
-    return false;
-
+  has(key) {
+    return STORE.has(key);
   },
 
-  remove(path) {
+  remove(key) {
 
-    const keys = path.split('/');
-    const root = STORE.get(keys[0]);
-
-    if (root === void 0) {
-      console.warn(`Can't remove Store entry "${path}" because it doesn't exist.`);
+    if (!STORE.has(key)) {
+      console.warn(`Can't remove Store entry "${key}" because it doesn't exist.`);
       return RESOLVED_PROMISE;
     }
 
-    if (keys.length > 1) {
-
-      const [targetNode, targetKey] = getNode(root, keys);
-
-      if (Array.isArray(targetNode)) {
-        targetNode.splice(parseInt(targetKey), 1);
-      } else {
-        delete targetNode[targetKey];
-      }
-
-      return bubbleEvent(path, void 0, keys, root);
-
-    }
-
-    STORE.delete(keys[0]);
-    return dispatchEvent(path, void 0);
+    STORE.delete(key);
+    return dispatchEvent(key, void 0);
 
   },
 
-  clear(options = {silently: false}) {
+  clear(silently = false) {
 
     if (STORE.size === 0) {
       return RESOLVED_PROMISE;
     }
 
-    if (options.silently === true) {
+    if (silently === true) {
       STORE.clear();
       return RESOLVED_PROMISE;
     }
@@ -592,165 +508,67 @@ const Store = Object.defineProperty({
 
   },
 
-  bind(path, defaultValue) {
-    const storeBinding = {id: this.id, path};
+  bind(key, defaultValue) {
+    const storeBinding = {id: this.id, path: key};
     return arguments.length === 1
       ? storeBinding
       : Object.assign(storeBinding, {defaultValue});
   },
 
-  subscribe(path, handler, options = {}) {
-
-    if (typeof path !== 'string' || typeof handler !== 'function' || (options === null || typeof options !== 'object')) {
-      throw new Error(`Invalid arguments. Expect (path:String, handler:Function, [options:Object]`);
-    }
+  subscribe(key, handler, options = {}) {
 
     const event = Object.assign({
-      bubbles: false,
-      autorun: true,
+      autorun: false
     }, options, {
       handler: options.scope ? handler.bind(options.scope) : handler
     });
 
-    if (EVENTS$1.has(path)) {
-      EVENTS$1.get(path).push(event);
+    if (EVENTS$1.has(key)) {
+      EVENTS$1.get(key).push(event);
     } else {
-      EVENTS$1.set(path, [event]);
+      EVENTS$1.set(key, [event]);
     }
 
     if (event.autorun === true) {
-
-      const keys = path.split('/');
-      const root = STORE.get(keys[0]);
-
-      let warn = false;
-
-      if (root === void 0) {
-        warn = true;
-      } else if (keys.length > 1) {
-        const [targetNode, targetKey] = getNode(root, keys);
-        if (targetNode[targetKey] === void 0) {
-          warn = true;
-        }
-      }
-
-      if (warn === true) {
-        console.warn(`Can not auto-run Store subscription handler because value at "${path}" is undefined. Pass {autorun: false} option to avoid this warning.`);
+      if (!STORE.has(key)) {
+        console.warn(`Can not autorun Store subscription because "${key}" is not set.`);
       } else {
-        if (event.bubbles === false) {
-          dispatchEvent(path, STORE.get(path));
-        } else {
-          const keys = path.split('/');
-          bubbleEvent(path, STORE.get(path), keys, STORE.get(keys[0]));
-        }
+        dispatchEvent(key, STORE.get(key));
       }
     }
 
     return {
-      unsubscribe() {
-        const events = EVENTS$1.get(path);
+      unsubscribe: () => {
+        const events = EVENTS$1.get(key);
         events.splice(events.indexOf(event), 1);
-        if (events.length === 0) {
-          EVENTS$1.delete(path);
-        }
       }
     }
 
   }
 
-}, 'id', {
-  value: Symbol('Store ID')
-});
+};
 
-// -------------------------------------
+function internalStoreSet(key, value, deepCompare) {
 
-function getNode(root, keys) {
-
-  if (root !== null && typeof root === 'object') {
-
-    let node, key;
-
-    for (let i = 1; i < keys.length; i++) {
-      key = keys[i];
-      node = i === 1 ? root : node[keys[i - 1]];
-    }
-
-    if (node.hasOwnProperty(key)) {
-      return [node, key];
-    } else {
-      throw new Error(`Can not access store path: "${keys.join('/')}". Property ".../${key}" does not exist.`);
-    }
-
-  } else {
-    throw new Error(`Can not access store path: "${keys.join('/')}". The value stored at: "${keys[0]}" is not object or array.`);
+  if (deepCompare === true && deepEqual(STORE.get(key), value)) {
+    return false;
   }
+
+  STORE.set(key, value);
+  dispatchEvent(key, value);
+
+  return true;
 
 }
 
-function dispatchEvent(path, payload) {
-  const event = EVENTS$1.get(path);
+function dispatchEvent(key, value) {
+
+  const event = EVENTS$1.get(key);
+
   if (event) {
+
     for (let i = 0; i < event.length; i++) {
-      Reactor.cueEvent(event[i].handler, payload);
-    }
-    return Reactor.react();
-  } else {
-    return RESOLVED_PROMISE;
-  }
-}
-
-function bubbleEvent(path, value, keys, root) {
-
-  const Event = EVENTS$1.get(path);
-
-  if (Event) {
-
-    let doBubble = false;
-    let i, k, ev, e;
-    for (i = 0; i < Event.length; i++) {
-      if (Event[i].bubbles === true) {
-        doBubble = true;
-        break;
-      }
-    }
-
-    if (doBubble === true) {
-
-      const events = [];
-
-      let key = keys[0];
-      let node = root;
-      let event = EVENTS$1.get(key);
-
-      if (event) {
-        for (i = 0; i < event.length; i++) {
-          events.push([event[i], root]);
-        }
-      }
-
-      for (i = 1; i < keys.length; i++) {
-        key += '/' + keys[i];
-        node = node[keys[i]];
-        event = EVENTS$1.get(key);
-        if (event) {
-          for (k = 0; k < event.length; k++) {
-            events.push([event[k], node]);
-          }
-        }
-      }
-
-      for (i = events.length - 1; i >= 0; i--) {
-        ev = events[i];
-        e = ev[0];
-        Reactor.cueEvent(ev[0].handler, ev[1]);
-      }
-
-    } else {
-
-      for (i = 0; i < Event.length; i++) {
-        Reactor.cueEvent(Event[i].handler, value);
-      }
-
+      Reactor.cueEvent(event[i].handler, value);
     }
 
     return Reactor.react();
@@ -978,6 +796,8 @@ let CLASS_COUNTER = -1;
 
 const INTERNAL = Symbol('Component Data');
 
+const CUE_DATA_EVENT_TYPE = '_cue:data';
+
 const TMP_DIV = document.createElement('div');
 
 const CUE_CSS = {
@@ -1003,7 +823,8 @@ const Component = {
       static: {},
       computed: new Map(),
       bindings: {},
-      reactions: {}
+      reactions: {},
+      events: {}
     };
 
     const Template = document.createElement('template');
@@ -1012,7 +833,7 @@ const Component = {
     const RefNames = collectElementReferences(Template.content, {});
 
     // ---------------------- CUSTOM ELEMENT INSTANCE ----------------------
-    const component = class extends HTMLElement {
+    const CueElement = class CueElement extends HTMLElement {
 
       constructor() {
 
@@ -1025,7 +846,10 @@ const Component = {
           subscriptions: [],
           refs: {},
           _data: {},
-          initialized: false
+          initialized: false,
+          hasDataEventListener: false,
+          dataEvents: {}, // what is dispatched
+          dataEventHandlers: new Map(), // what is listened to
         };
 
         // ---------------------- RUN ONCE ON FIRST CONSTRUCT ----------------------
@@ -1078,6 +902,15 @@ const Component = {
                 Data.reactions[k] = v.reaction;
               }
 
+              if (v.event === true) {
+                Data.events[k] = {
+                  bubbles: true,
+                  cancelable: true
+                };
+              } else if (typeof v.event === 'object' && v.event !== null) {
+                Data.events[k] = v.event;
+              }
+
             }
 
           }
@@ -1120,10 +953,21 @@ const Component = {
           // Build Dependency Graph
           internal.dependencyGraph = buildDependencyGraph(internal.computedProperties);
 
-          // Bind reactions with first argument as "refs" object
-          // set context to internal.data so "this" in reactions is data proxy which can read normal, computed and Store-bound data
+          // Bind reactions with first argument as "refs" object, second argument the current value and third argument the entire "data" object
           for (const key in Data.reactions) {
-            internal.reactions[key] = Data.reactions[key].bind(internal.data, internal.refs);
+            internal.reactions[key] = value => {
+              Data.reactions[key](internal.refs, value, internal.data);
+            };
+          }
+
+          // Build reusable customEvent objects for internal use
+          for (const key in Data.events) {
+            internal.dataEvents[key] = new CustomEvent(CUE_DATA_EVENT_TYPE, Object.assign(Data.events[key], {
+              detail: {
+                key: key,
+                value: void 0
+              }
+            }));
           }
 
           // ----------- INSERT DOM AND ASSIGN REFS ----------
@@ -1145,7 +989,7 @@ const Component = {
 
           internal.refs['$self'] = this; // this === $self for completeness
 
-          // ----------------- Assign attribute data
+          // ----------------- Parse attribute data into internal data model
           if (this.hasAttribute('data')) {
             const attributeData = JSON.parse(this.getAttribute('data'));
             this.removeAttribute('data');
@@ -1248,50 +1092,69 @@ const Component = {
 
       setData(key, value) {
 
-        if (arguments.length === 1 && typeof key === 'object' && key !== null) {
+        if (typeof key === 'object' && key !== null) {
 
           const internal = this[INTERNAL];
-          let didChange = false;
+
+          let anyPropChanged = false;
 
           for (const prop in key) {
 
-            const oldValue = internal._data[prop];
+            if (Data.computed.has(prop)) {
+              throw new Error(`Can not set property "${prop}" because it is a computed property.`);
+            }
+
             const newValue = key[prop];
 
-            if (Data.computed.has(prop)) {
-              throw new Error(`You can not set property "${prop}" because it is a computed property.`);
-            } else if (Data.bindings[prop]) {
-              didChange = true;
-              Store.set(Data.bindings[prop].path, newValue);
-            } else if (!deepEqual(oldValue, newValue)) {
-              didChange = true;
-              internal._data[prop] = newValue;
-              internal.reactions[prop] && Reactor.cueCallback(internal.reactions[prop], newValue);
-              internal.dependencyGraph.has(prop) && Reactor.cueComputations(internal.dependencyGraph, internal.reactions, prop, internal.data);
+            if (!deepEqual(internal._data[prop], newValue)) {
+
+              anyPropChanged = true;
+
+              if (Data.bindings[prop]) {
+                internalStoreSet(Data.bindings[prop].path, newValue, false); // do internal store set without another deep comparison
+              } else {
+                internal._data[prop] = newValue;
+                internal.reactions[prop] && Reactor.cueCallback(internal.reactions[prop], newValue);
+                internal.dependencyGraph.has(prop) && Reactor.cueComputations(internal.dependencyGraph, internal.reactions, prop, internal.data);
+              }
+
+              if (internal.dataEvents[prop]) {
+                internal.dataEvents[prop].detail.value = newValue;
+                this.dispatchEvent(internal.dataEvents[prop]);
+              }
+
+            } else {
+
+              anyPropChanged = anyPropChanged || false;
+
             }
 
           }
 
-          return didChange ? Reactor.react() : RESOLVED_PROMISE;
+          return anyPropChanged ? Reactor.react() : RESOLVED_PROMISE;
 
-        }
-
-        if (Data.bindings[key]) {
-          return Store.set(Data.bindings[key].path, value);
         }
 
         if (Data.computed.has(key)) {
           throw new Error(`You can not set property "${key}" because it is a computed property.`);
         }
 
-        const internal = this[INTERNAL];
-        const oldValue = internal._data[key]; // skip proxy
+        if (Data.bindings[key]) {
+          return internalStoreSet(Data.bindings[key].path, value, true) ? Reactor.react() : RESOLVED_PROMISE;
+        }
 
-        if (deepEqual(oldValue, value)) {
+        const internal = this[INTERNAL];
+
+        if (deepEqual(internal._data[key], value)) {
           return RESOLVED_PROMISE;
         }
 
         internal._data[key] = value; // skip proxy
+
+        if (internal.dataEvents[key]) {
+          internal.dataEvents[key].detail.value = value;
+          this.dispatchEvent(internal.dataEvents[key]);
+        }
 
         if (internal.reactions[key]) {
           Reactor.cueCallback(internal.reactions[key], value);
@@ -1305,19 +1168,44 @@ const Component = {
 
       }
 
+      onData(key, handler) {
+
+        const internal = this[INTERNAL];
+
+        if (internal.hasDataEventListener === false) { // only register one listener
+          internal.hasDataEventListener = true;
+          this.addEventListener(CUE_DATA_EVENT_TYPE, e => {
+            const thisPropListeners = internal.dataEventHandlers.get(e.detail.key);
+            if (thisPropListeners) {
+              for (let i = 0; i < thisPropListeners.length; i++) {
+                thisPropListeners[i](e.detail.value);
+              }
+            }
+          });
+        }
+
+        if (internal.dataEventHandlers.has(key)) {
+          internal.dataEventHandlers.get(key).push(handler);
+        } else {
+          internal.dataEventHandlers.set(key, [ handler ]);
+        }
+
+      }
+
     };
 
     // ---------------------- ADD METHODS TO PROTOTYPE ----------------------
     for (const k in config) {
       if (typeof config[k] === 'function' && k !== 'initialize') {
-        component.prototype[k] = config[k];
+        CueElement.prototype[k] = config[k];
       }
     }
 
-    component.prototype.renderEach = renderEach;
+    // ---------------------- ADD SPECIAL METHODS TO PROTOTYPE ----------------------
+    CueElement.prototype.renderEach = renderEach;
 
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
-    customElements.define(name, component);
+    customElements.define(name, CueElement);
 
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
     const openTag = '<'+name, closeTag = '</'+name+'>';
@@ -1350,6 +1238,7 @@ const Component = {
     const internal = element[INTERNAL];
 
     if (internal && data && typeof data === 'object') {
+      console.warn('[Cue.js] - Component.create(...) [data] parameter will be deprecated in a future version. Pass data object as an attribute to the components factory function instead.');
       Object.assign(internal._data, deepClone(data));
     }
 
@@ -1361,6 +1250,7 @@ const Component = {
 
 // -----------------------------------
 
+// html
 function collectElementReferences(root, refNames) {
 
   for (let i = 0, child, ref, cls1, cls2; i < root.children.length; i++) {
@@ -1385,7 +1275,7 @@ function collectElementReferences(root, refNames) {
 
 }
 
-// css work
+// css
 function createComponentCSS(name, styles, refNames) {
 
   // Re-write $self to component-name
