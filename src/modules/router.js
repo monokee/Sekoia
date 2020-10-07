@@ -370,13 +370,13 @@ function collectRouteNodes(root, parts, rest = '') {
     if (!frag || resolveCancelled) {
 
       resolve({
-        value: parts.length && rest.length ? rest + '/' + parts.join('/') : parts.length ? parts.join('/') : rest.length ? rest : '/',
+        value: parts.length && rest.length ? (rest[rest.length - 1] === '/' ? rest : rest + '/') + parts.join('/') : parts.length ? parts.join('/') : rest.length ? rest : '/',
         nextNode: null
       });
 
     } else {
 
-      rest += rest.length === 0 ? currentNodeValue : '/' + currentNodeValue;
+      rest += rest.length === 0 ? currentNodeValue : (rest[rest.length - 1] === '/' ? currentNodeValue : '/' + currentNodeValue);
 
       const nextParts = parts.slice(1);
 
