@@ -4,7 +4,7 @@ import { ComputedProperty, setupComputedProperties, buildDependencyGraph } from 
 import { Reactor } from "./reactor.js";
 
 const REF_ID = '$';
-const SELF_REGEXP = /\$self/g;
+const SELF_REGEXP = /(\$self(?=[\\040.:#[>+~]))|\$self\b/g;
 const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
 let CLASS_COUNTER = -1;
@@ -498,7 +498,7 @@ function createComponentCSS(name, styles, refNames) {
 
   // Re-write $refName(s) in style text to class selector
   for (const refName in refNames) {
-    styles = styles.replace(new RegExp('\\' + refName, 'g'), refNames[refName]);
+    styles = styles.replace(new RegExp("(\\" + refName + "(?=[\\40.:#[>+~]))|\\" + refName + "\b", 'g'), refNames[refName]);
   }
 
   CUE_CSS.compiler.innerHTML = styles;

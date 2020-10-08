@@ -789,7 +789,7 @@ function visitDependency(sourceProperty, dependencies, target) {
 }
 
 const REF_ID = '$';
-const SELF_REGEXP = /\$self/g;
+const SELF_REGEXP = /(\$self(?=[\\040.:#[>+~]))|\$self\b/g;
 const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
 let CLASS_COUNTER = -1;
@@ -1283,7 +1283,7 @@ function createComponentCSS(name, styles, refNames) {
 
   // Re-write $refName(s) in style text to class selector
   for (const refName in refNames) {
-    styles = styles.replace(new RegExp('\\' + refName, 'g'), refNames[refName]);
+    styles = styles.replace(new RegExp("(\\" + refName + "(?=[\\40.:#[>+~]))|\\" + refName + "\b", 'g'), refNames[refName]);
   }
 
   CUE_CSS.compiler.innerHTML = styles;
@@ -2098,13 +2098,13 @@ function collectRouteNodes(root, parts, rest = '') {
     if (!frag || resolveCancelled) {
 
       resolve({
-        value: parts.length && rest.length ? rest + '/' + parts.join('/') : parts.length ? parts.join('/') : rest.length ? rest : '/',
+        value: parts.length && rest.length ? (rest[rest.length - 1] === '/' ? rest : rest + '/') + parts.join('/') : parts.length ? parts.join('/') : rest.length ? rest : '/',
         nextNode: null
       });
 
     } else {
 
-      rest += rest.length === 0 ? currentNodeValue : '/' + currentNodeValue;
+      rest += rest.length === 0 ? currentNodeValue : (rest[rest.length - 1] === '/' ? currentNodeValue : '/' + currentNodeValue);
 
       const nextParts = parts.slice(1);
 

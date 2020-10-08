@@ -28,8 +28,10 @@
       <h2>Other Elements require event listeners:</h2>
       <section class="grid">
         <button $="route1">#route1</button>
+        <button $="jump">Does nothing</button>
         <button $="jump1">#route1/jump1</button>
         <button $="jump2">#route1/jump2</button>
+        <button $="jumpLeft">HotPink</button>
         <button $="infinity">Infinite Loop</button>
       </section>
     `),
@@ -41,6 +43,9 @@
         transform: translateX(-50%);
         padding: 1.5em;
       }
+      $self.visible {
+        background: blue;
+      }
       .grid {
         position: relative;
         display: grid;
@@ -51,6 +56,20 @@
       }
       $firstLink {
         color: hotpink;
+      }
+      $jump {
+        color: red;
+      }
+      $jump2 {
+        color: blue;
+      }
+      $jumpLeft {
+        color: hotpink;
+      }
+      $jumpLeft::before {
+        content: 'AAAAAH ITS WORKING';
+        position: absolute;
+        font-size: 24;
       }
       a {
         border: 1px dotted hotpink;
