@@ -424,8 +424,8 @@ function flushReactionBuffer() {
 
 }
 
-const STORE = new Map();
-const EVENTS$1 = new Map();
+const INTERNAL_STORE = new Map();
+const INTERNAL_EVENTS = new Map();
 
 const Store = {
 
@@ -437,7 +437,7 @@ const Store = {
 
       const entireStore = {};
 
-      for (const tuple of STORE.entries()) {
+      for (const tuple of INTERNAL_STORE.entries()) {
         entireStore[tuple[0]] = deepClone(tuple[1]);
       }
 
@@ -445,7 +445,7 @@ const Store = {
 
     }
 
-    return deepClone(STORE.get(key));
+    return deepClone(INTERNAL_STORE.get(key));
 
   },
 
@@ -453,51 +453,52 @@ const Store = {
 
     if (key && typeof key === 'object') {
 
-      let anyPropChanged = false;
+      let response = RESOLVED_PROMISE;
 
       for (const prop in key) {
-        const thisPropChanged = internalStoreSet(prop, key[prop], true);
-        anyPropChanged = anyPropChanged || thisPropChanged;
+        if (!deepEqual(INTERNAL_STORE.get(prop), key[prop])) {
+          response = internalStoreSet(prop, key[prop]);
+        }
       }
 
-      return anyPropChanged ? Reactor.react() : RESOLVED_PROMISE;
+      return response;
 
     }
 
-    return internalStoreSet(key, value, true) ? Reactor.react() : RESOLVED_PROMISE;
+    return deepEqual(INTERNAL_STORE.get(key), value) ? RESOLVED_PROMISE : internalStoreSet(key, value);
 
   },
 
   has(key) {
-    return STORE.has(key);
+    return INTERNAL_STORE.has(key);
   },
 
   remove(key) {
 
-    if (!STORE.has(key)) {
+    if (!INTERNAL_STORE.has(key)) {
       console.warn(`Can't remove Store entry "${key}" because it doesn't exist.`);
       return RESOLVED_PROMISE;
     }
 
-    STORE.delete(key);
+    INTERNAL_STORE.delete(key);
     return dispatchEvent(key, void 0);
 
   },
 
   clear(silently = false) {
 
-    if (STORE.size === 0) {
+    if (INTERNAL_STORE.size === 0) {
       return RESOLVED_PROMISE;
     }
 
     if (silently === true) {
-      STORE.clear();
+      INTERNAL_STORE.clear();
       return RESOLVED_PROMISE;
     }
 
-    const keys = STORE.keys();
+    const keys = INTERNAL_STORE.keys();
 
-    STORE.clear();
+    INTERNAL_STORE.clear();
 
     const promises = [];
     for (const key of keys) {
@@ -508,11 +509,11 @@ const Store = {
 
   },
 
-  bind(key, defaultValue) {
-    const storeBinding = {id: this.id, path: key};
-    return arguments.length === 1
-      ? storeBinding
-      : Object.assign(storeBinding, {defaultValue});
+  bind(key) {
+    return {
+      id: this.id,
+      key: key
+    };
   },
 
   subscribe(key, handler, options = {}) {
@@ -523,23 +524,23 @@ const Store = {
       handler: options.scope ? handler.bind(options.scope) : handler
     });
 
-    if (EVENTS$1.has(key)) {
-      EVENTS$1.get(key).push(event);
+    if (INTERNAL_EVENTS.has(key)) {
+      INTERNAL_EVENTS.get(key).push(event);
     } else {
-      EVENTS$1.set(key, [event]);
+      INTERNAL_EVENTS.set(key, [event]);
     }
 
     if (event.autorun === true) {
-      if (!STORE.has(key)) {
+      if (!INTERNAL_STORE.has(key)) {
         console.warn(`Can not autorun Store subscription because "${key}" is not set.`);
       } else {
-        dispatchEvent(key, STORE.get(key));
+        dispatchEvent(key, INTERNAL_STORE.get(key));
       }
     }
 
     return {
       unsubscribe: () => {
-        const events = EVENTS$1.get(key);
+        const events = INTERNAL_EVENTS.get(key);
         events.splice(events.indexOf(event), 1);
       }
     }
@@ -548,22 +549,18 @@ const Store = {
 
 };
 
-function internalStoreSet(key, value, deepCompare) {
+function internalStoreGet(key) {
+  return INTERNAL_STORE.get(key);
+}
 
-  if (deepCompare === true && deepEqual(STORE.get(key), value)) {
-    return false;
-  }
-
-  STORE.set(key, value);
-  dispatchEvent(key, value);
-
-  return true;
-
+function internalStoreSet(key, value) {
+  INTERNAL_STORE.set(key, value);
+  return dispatchEvent(key, value);
 }
 
 function dispatchEvent(key, value) {
 
-  const event = EVENTS$1.get(key);
+  const event = INTERNAL_EVENTS.get(key);
 
   if (event) {
 
@@ -788,15 +785,16 @@ function visitDependency(sourceProperty, dependencies, target) {
 
 }
 
-const REF_ID = '$';
-const SELF_REGEXP = /(\$self(?=[\\040.:#[>+~]))|\$self\b/g;
+// Regex matches when $self is:
+// - immediately followed by css child selector (space . : # [ > + ~) OR
+// - immediately followed by opening bracket { OR
+// - not followed by anything (end of line)
+const SELF_REGEXP = /(\$self(?=[\\040{.:#[>+~]))|\$self\b/g;
 const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
 let CLASS_COUNTER = -1;
 
 const INTERNAL = Symbol('Component Data');
-
-const CUE_DATA_EVENT_TYPE = '_cue:data';
 
 const TMP_DIV = document.createElement('div');
 
@@ -823,8 +821,7 @@ const Component = {
       static: {},
       computed: new Map(),
       bindings: {},
-      reactions: {},
-      events: {}
+      reactions: {}
     };
 
     const Template = document.createElement('template');
@@ -847,9 +844,14 @@ const Component = {
           refs: {},
           _data: {},
           initialized: false,
-          hasDataEventListener: false,
-          dataEvents: {}, // what is dispatched
-          dataEventHandlers: new Map(), // what is listened to
+          dataEvent: new CustomEvent('data', {
+            bubbles: true,
+            cancelable: true,
+            detail: {
+              key: '',
+              value: void 0
+            }
+          })
         };
 
         // ---------------------- RUN ONCE ON FIRST CONSTRUCT ----------------------
@@ -902,15 +904,6 @@ const Component = {
                 Data.reactions[k] = v.reaction;
               }
 
-              if (v.event === true) {
-                Data.events[k] = {
-                  bubbles: true,
-                  cancelable: true
-                };
-              } else if (typeof v.event === 'object' && v.event !== null) {
-                Data.events[k] = v.event;
-              }
-
             }
 
           }
@@ -937,10 +930,10 @@ const Component = {
 
           internal.data = new Proxy(data, {
             set: forbiddenProxySet,
-            get(target, key) {
-              if (Data.bindings[key]) return Store.get(Data.bindings[key].path); // does deep clone
-              if (computedProperties.has(key)) return computedProperties.get(key).value(internal.data); // deep by default
-              return deepClone(target[key]); // deep clone
+            get(target, key) { // returns deep clone of bound store data, computed data or local data
+              if (Data.bindings[key]) return deepClone(internalStoreGet(Data.bindings[key].key));
+              if (computedProperties.has(key)) return computedProperties.get(key).value(internal.data);
+              return deepClone(target[key]);
             }
           });
 
@@ -958,16 +951,6 @@ const Component = {
             internal.reactions[key] = value => {
               Data.reactions[key](internal.refs, value, internal.data);
             };
-          }
-
-          // Build reusable customEvent objects for internal use
-          for (const key in Data.events) {
-            internal.dataEvents[key] = new CustomEvent(CUE_DATA_EVENT_TYPE, Object.assign(Data.events[key], {
-              detail: {
-                key: key,
-                value: void 0
-              }
-            }));
           }
 
           // ----------- INSERT DOM AND ASSIGN REFS ----------
@@ -996,26 +979,6 @@ const Component = {
             Object.assign(internal._data, attributeData);
           }
 
-          // ----------------- Bind / Cue Store
-          for (const key in Data.bindings) {
-
-            const storeBinding = Data.bindings[key];
-            const path = storeBinding.path;
-
-            if (Store.has(path)) {
-              if (internal.reactions[key]) {
-                Reactor.cueCallback(internal.reactions[key], Store.get(path));
-              }
-            } else {
-              if (storeBinding.hasOwnProperty('defaultValue')) {
-                Store.set(path, storeBinding.defaultValue);
-              } else {
-                throw new Error(`Component data of "${name}" has property "${key}" bound to Store["${path}"] but Store has no value and component specifies no default.`);
-              }
-            }
-
-          }
-
           // ---------------- Run reactions
           for (const key in internal.reactions) {
             Reactor.cueCallback(internal.reactions[key], internal.data[key]);
@@ -1038,14 +1001,14 @@ const Component = {
 
           // Computation Subscriptions
           internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
-            Data.bindings[key].path,
+            Data.bindings[key].key,
             () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data),
             { autorun: false }
           ));
 
           // Reaction Subscriptions
           internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
-            Data.bindings[key].path,
+            Data.bindings[key].key,
             internal.reactions[key],
             { autorun: false }
           ));
@@ -1075,7 +1038,7 @@ const Component = {
           let key;
 
           for (key in Data.bindings) {
-            dataClone[key] = Store.get(Data.bindings[key].path); // returns deep clone
+            dataClone[key] = Store.get(Data.bindings[key].key); // returns deep clone
           }
 
           for (key in internal._data) {
@@ -1092,46 +1055,15 @@ const Component = {
 
       setData(key, value) {
 
-        if (typeof key === 'object' && key !== null) {
+        if (typeof key === 'object') {
 
-          const internal = this[INTERNAL];
-
-          let anyPropChanged = false;
+          let response = RESOLVED_PROMISE;
 
           for (const prop in key) {
-
-            if (Data.computed.has(prop)) {
-              throw new Error(`Can not set property "${prop}" because it is a computed property.`);
-            }
-
-            const newValue = key[prop];
-
-            if (!deepEqual(internal._data[prop], newValue)) {
-
-              anyPropChanged = true;
-
-              if (Data.bindings[prop]) {
-                internalStoreSet(Data.bindings[prop].path, newValue, false); // do internal store set without another deep comparison
-              } else {
-                internal._data[prop] = newValue;
-                internal.reactions[prop] && Reactor.cueCallback(internal.reactions[prop], newValue);
-                internal.dependencyGraph.has(prop) && Reactor.cueComputations(internal.dependencyGraph, internal.reactions, prop, internal.data);
-              }
-
-              if (internal.dataEvents[prop]) {
-                internal.dataEvents[prop].detail.value = newValue;
-                this.dispatchEvent(internal.dataEvents[prop]);
-              }
-
-            } else {
-
-              anyPropChanged = anyPropChanged || false;
-
-            }
-
+            response = this.setData(prop, key[prop]);
           }
 
-          return anyPropChanged ? Reactor.react() : RESOLVED_PROMISE;
+          return response;
 
         }
 
@@ -1139,55 +1071,38 @@ const Component = {
           throw new Error(`You can not set property "${key}" because it is a computed property.`);
         }
 
-        if (Data.bindings[key]) {
-          return internalStoreSet(Data.bindings[key].path, value, true) ? Reactor.react() : RESOLVED_PROMISE;
-        }
-
         const internal = this[INTERNAL];
 
-        if (deepEqual(internal._data[key], value)) {
-          return RESOLVED_PROMISE;
-        }
+        if (Data.bindings[key] && !deepEqual(internalStoreGet(Data.bindings[key].key), value)) {
 
-        internal._data[key] = value; // skip proxy
+          internal.dataEvent.detail.key = key;
+          internal.dataEvent.detail.value = deepClone(value);
+          this.dispatchEvent(internal.dataEvent);
 
-        if (internal.dataEvents[key]) {
-          internal.dataEvents[key].detail.value = value;
-          this.dispatchEvent(internal.dataEvents[key]);
-        }
+          return internalStoreSet(Data.bindings[key].key, value);
 
-        if (internal.reactions[key]) {
-          Reactor.cueCallback(internal.reactions[key], value);
-        }
+        } else if (!deepEqual(internal._data[key], value)) {
 
-        if (internal.dependencyGraph.has(key)) {
-          Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
-        }
+          internal._data[key] = value;
 
-        return Reactor.react();
+          internal.dataEvent.detail.key = key;
+          internal.dataEvent.detail.value = deepClone(value);
+          this.dispatchEvent(internal.dataEvent);
 
-      }
+          let flush = false;
 
-      onData(key, handler) {
+          if (internal.reactions[key]) {
+            Reactor.cueCallback(internal.reactions[key], value);
+            flush = true;
+          }
 
-        const internal = this[INTERNAL];
+          if (internal.dependencyGraph.has(key)) {
+            Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
+            flush = true;
+          }
 
-        if (internal.hasDataEventListener === false) { // only register one listener
-          internal.hasDataEventListener = true;
-          this.addEventListener(CUE_DATA_EVENT_TYPE, e => {
-            const thisPropListeners = internal.dataEventHandlers.get(e.detail.key);
-            if (thisPropListeners) {
-              for (let i = 0; i < thisPropListeners.length; i++) {
-                thisPropListeners[i](e.detail.value);
-              }
-            }
-          });
-        }
+          return flush ? Reactor.react() : RESOLVED_PROMISE;
 
-        if (internal.dataEventHandlers.has(key)) {
-          internal.dataEventHandlers.get(key).push(handler);
-        } else {
-          internal.dataEventHandlers.set(key, [ handler ]);
         }
 
       }
@@ -1224,22 +1139,24 @@ const Component = {
 
   create(node, data) {
 
+    node = typeof node === 'function' ? node() : node;
     node = node.trim();
 
-    let element;
-
-    if (node[0] === '<') {
-      TMP_DIV.innerHTML = node;
-      element = TMP_DIV.children[0];
-    } else {
-      element = document.createElement(node);
+    if (typeof node !== 'string' || node[0] !== '<') {
+      throw new Error('[Cue.js] - Component.create(node) -> argument "node" is not valid HTML: "' + node + '"');
     }
 
-    const internal = element[INTERNAL];
+    TMP_DIV.innerHTML = node;
+    const element = TMP_DIV.children[0];
 
-    if (internal && data && typeof data === 'object') {
+    if (data) {
       console.warn('[Cue.js] - Component.create(...) [data] parameter will be deprecated in a future version. Pass data object as an attribute to the components factory function instead.');
-      Object.assign(internal._data, deepClone(data));
+      const internal = element[INTERNAL];
+      if (internal) {
+        Object.assign(internal._data, deepClone(data));
+      } else {
+        console.warn('[Cue.js] - Component.create(...) [data] parameter passed to non-cue element will be ignored.');
+      }
     }
 
     return element;
@@ -1257,14 +1174,14 @@ function collectElementReferences(root, refNames) {
 
     child = root.children[i];
 
-    ref = child.getAttribute(REF_ID);
+    ref = child.getAttribute('$');
 
     if (ref) {
       cls1 = child.getAttribute('class');
       cls2 = ref + ++CLASS_COUNTER;
-      refNames[REF_ID + ref] = '.' + cls2;
+      refNames['$' + ref] = '.' + cls2;
       child.setAttribute('class', cls1 ? cls1 + ' ' + cls2 : cls2);
-      child.removeAttribute(REF_ID);
+      child.removeAttribute('$');
     }
 
     collectElementReferences(child, refNames);
@@ -1283,7 +1200,11 @@ function createComponentCSS(name, styles, refNames) {
 
   // Re-write $refName(s) in style text to class selector
   for (const refName in refNames) {
-    styles = styles.replace(new RegExp("(\\" + refName + "(?=[\\40.:#[>+~]))|\\" + refName + "\b", 'g'), refNames[refName]);
+    // replace $refName with internal .class when $refName is:
+    // - immediately followed by css child selector (space . : # [ > + ~) OR
+    // - immediately followed by opening bracket { OR
+    // - not followed by anything (end of line)
+    styles = styles.replace(new RegExp("(\\" + refName + "(?=[\\40{.:#[>+~]))|\\" + refName + "\b", 'g'), refNames[refName]);
   }
 
   CUE_CSS.compiler.innerHTML = styles;

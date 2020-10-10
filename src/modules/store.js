@@ -1,8 +1,8 @@
 import { RESOLVED_PROMISE, deepEqual, deepClone } from "./utils.js";
 import { Reactor } from "./reactor.js";
 
-const STORE = new Map();
-const EVENTS = new Map();
+const INTERNAL_STORE = new Map();
+const INTERNAL_EVENTS = new Map();
 
 export const Store = {
 
@@ -14,7 +14,7 @@ export const Store = {
 
       const entireStore = {};
 
-      for (const tuple of STORE.entries()) {
+      for (const tuple of INTERNAL_STORE.entries()) {
         entireStore[tuple[0]] = deepClone(tuple[1]);
       }
 
@@ -22,7 +22,7 @@ export const Store = {
 
     }
 
-    return deepClone(STORE.get(key));
+    return deepClone(INTERNAL_STORE.get(key));
 
   },
 
@@ -30,51 +30,52 @@ export const Store = {
 
     if (key && typeof key === 'object') {
 
-      let anyPropChanged = false;
+      let response = RESOLVED_PROMISE;
 
       for (const prop in key) {
-        const thisPropChanged = internalStoreSet(prop, key[prop], true);
-        anyPropChanged = anyPropChanged || thisPropChanged;
+        if (!deepEqual(INTERNAL_STORE.get(prop), key[prop])) {
+          response = internalStoreSet(prop, key[prop]);
+        }
       }
 
-      return anyPropChanged ? Reactor.react() : RESOLVED_PROMISE;
+      return response;
 
     }
 
-    return internalStoreSet(key, value, true) ? Reactor.react() : RESOLVED_PROMISE;
+    return deepEqual(INTERNAL_STORE.get(key), value) ? RESOLVED_PROMISE : internalStoreSet(key, value);
 
   },
 
   has(key) {
-    return STORE.has(key);
+    return INTERNAL_STORE.has(key);
   },
 
   remove(key) {
 
-    if (!STORE.has(key)) {
+    if (!INTERNAL_STORE.has(key)) {
       console.warn(`Can't remove Store entry "${key}" because it doesn't exist.`);
       return RESOLVED_PROMISE;
     }
 
-    STORE.delete(key);
+    INTERNAL_STORE.delete(key);
     return dispatchEvent(key, void 0);
 
   },
 
   clear(silently = false) {
 
-    if (STORE.size === 0) {
+    if (INTERNAL_STORE.size === 0) {
       return RESOLVED_PROMISE;
     }
 
     if (silently === true) {
-      STORE.clear();
+      INTERNAL_STORE.clear();
       return RESOLVED_PROMISE;
     }
 
-    const keys = STORE.keys();
+    const keys = INTERNAL_STORE.keys();
 
-    STORE.clear();
+    INTERNAL_STORE.clear();
 
     const promises = [];
     for (const key of keys) {
@@ -85,11 +86,11 @@ export const Store = {
 
   },
 
-  bind(key, defaultValue) {
-    const storeBinding = {id: this.id, path: key};
-    return arguments.length === 1
-      ? storeBinding
-      : Object.assign(storeBinding, {defaultValue});
+  bind(key) {
+    return {
+      id: this.id,
+      key: key
+    };
   },
 
   subscribe(key, handler, options = {}) {
@@ -100,23 +101,23 @@ export const Store = {
       handler: options.scope ? handler.bind(options.scope) : handler
     });
 
-    if (EVENTS.has(key)) {
-      EVENTS.get(key).push(event);
+    if (INTERNAL_EVENTS.has(key)) {
+      INTERNAL_EVENTS.get(key).push(event);
     } else {
-      EVENTS.set(key, [event]);
+      INTERNAL_EVENTS.set(key, [event]);
     }
 
     if (event.autorun === true) {
-      if (!STORE.has(key)) {
+      if (!INTERNAL_STORE.has(key)) {
         console.warn(`Can not autorun Store subscription because "${key}" is not set.`);
       } else {
-        dispatchEvent(key, STORE.get(key));
+        dispatchEvent(key, INTERNAL_STORE.get(key));
       }
     }
 
     return {
       unsubscribe: () => {
-        const events = EVENTS.get(key);
+        const events = INTERNAL_EVENTS.get(key);
         events.splice(events.indexOf(event), 1);
       }
     }
@@ -125,22 +126,18 @@ export const Store = {
 
 };
 
-export function internalStoreSet(key, value, deepCompare) {
+export function internalStoreGet(key) {
+  return INTERNAL_STORE.get(key);
+}
 
-  if (deepCompare === true && deepEqual(STORE.get(key), value)) {
-    return false;
-  }
-
-  STORE.set(key, value);
-  dispatchEvent(key, value);
-
-  return true;
-
+export function internalStoreSet(key, value) {
+  INTERNAL_STORE.set(key, value);
+  return dispatchEvent(key, value);
 }
 
 function dispatchEvent(key, value) {
 
-  const event = EVENTS.get(key);
+  const event = INTERNAL_EVENTS.get(key);
 
   if (event) {
 
