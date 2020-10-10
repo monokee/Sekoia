@@ -369,6 +369,11 @@ function flushReactionBuffer() {
 
         if (computedProperty.hasChanged === true) {
 
+          //TODO:
+          // internal.dataEvent.key = computedProperty.ownPropertyName
+          // internal.dataEvent.value = deepClone(result);
+          // parentComponent.dispatchEvent(internal.dataEvent);
+
           if (callbacks[computedProperty.ownPropertyName]) {
             CALLBACKS.set(callbacks[computedProperty.ownPropertyName], result);
           }
@@ -603,19 +608,19 @@ class ComputedProperty {
     this.sourceProperties = sourceProperties; // property names this computedProperty depends on
 
     // Value Cache
-    this.intermediate = undefined; // intermediate computation result
-    this._value = undefined; // current computation result
+    this.intermediate = void 0; // intermediate computation result
+    this._value = void 0; // current computation result
     this._type = DATA_TYPE_UNDEFINED; // optimization flag
 
     // Optimization flags
-    this.needsUpdate = true; // flag indicating that one or many dependencies have been updated (required by this.value)
-    this.hasChanged = false; // flag indicating that the computation has yielded a new result (required for dependency traversal)
+    this.needsUpdate = true; // flag indicating that one or many dependencies have been updated and value needs re-compute (used by this.value)
+    this.hasChanged = false; // flag indicating that the computation has yielded a new result (used by reactor)
 
   }
 
   value(source) {
 
-    if (this.needsUpdate === true) {
+    if (this.needsUpdate === true) { // re-compute because dependencies have updated
 
       // call computation with this = component.data, first argument = component.data, second argument = current value
       this.intermediate = this.computation.call(source, source, this._value);
