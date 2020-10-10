@@ -805,8 +805,8 @@ const INTERNAL = Symbol('Component Data');
 const TMP_DIV = document.createElement('div');
 
 const CUE_CSS = {
-  compiler: Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::compiler'}),
-  components: Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::components'})
+  compiler: document.getElementById('cue::compiler') || Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::compiler'}),
+  components: document.getElementById('cue::components') || Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::components'})
 };
 
 const Component = {
