@@ -12,28 +12,21 @@
 
 <script type="module">
 
-  import { Component, Store, Router } from "./build/cue.module.js";
+  import { Component, Router } from "./build/cue.module.js";
 
   Component.define('route-component', {
 
     element: (`
       <h2>Links automatically trigger Router.navigate:</h2>
       <section class="grid">
-        <a $="firstLink" href="#route1">#route1</a>
+        <a href="/">root</a>
+        <a href="#route1">#route1</a>
         <a href="#route1/jump1">#route1/jump1</a>
         <a href="#route1/jump2">#route1/jump2</a>
+        <a href="#route1/jump3/4">#route1/jump3/4</a>
         <a href="#route1/infinity">Infinite Loop</a>
       </section>
 
-      <h2>Other Elements require event listeners:</h2>
-      <section class="grid">
-        <button $="route1">#route1</button>
-        <button $="jump">Does nothing</button>
-        <button $="jump1">#route1/jump1</button>
-        <button $="jump2">#route1/jump2</button>
-        <button $="jumpLeft">HotPink</button>
-        <button $="infinity">Infinite Loop</button>
-      </section>
     `),
 
     styles: (`
@@ -76,58 +69,29 @@
       }
     `),
 
-    data: () => ({
-      dummy: {
-        value: true,
-        reaction(refs, val) {
-          console.log(refs, val);
-        }
-      },
-      reverseDummy: {
-        value: ({dummy}) => !dummy,
-        reaction(refs, val) {
-          console.log('computed reverse', val);
-        }
-      },
-      nulli: {
-        value: Store.bind('nulli')
-      }
-    }),
+    initialize() {
 
-    initialize({$route1, $jump1, $jump2, $infinity}) {
+      Router.subscribe('/', {
+        onRoute(path, params) {
+          console.log('"/" - onRoute', path, params);
+        }
+      });
 
       Router.subscribe('#route1', {
-        beforeRoute: (path, params) => this.getPermittedRoute(path, params),
-        onRoute: (path, params) => this.onRoute(path, params)
-      });
-
-      document.addEventListener('click', e => this.setData('dummy', !this.getData('dummy')));
-
-      $route1.addEventListener('click', () => Router.navigate('#route1'));
-      $jump1.addEventListener('click', () => Router.navigate('#route1/jump1'));
-      $jump2.addEventListener('click', () => Router.navigate('#route1/jump2'));
-      $infinity.addEventListener('click', () => Router.navigate('#route1/infinity'));
-
-    },
-
-    getPermittedRoute(path, params) {
-      return new Promise(resolve => {
-        if (path === 'jump1') {
-          resolve('1');
-        } else if (path === 'jump2') {
-          resolve('2')
-        } else if (path === 'infinity') {
-          resolve('repeat');
-        } else if (path === 'repeat') {
-          resolve('infinity');
-        } else {
-          resolve(path);
+        beforeRoute(path, params, resolve) {
+          resolve();
+        },
+        onRoute(path, params) {
+          console.log('"#route1" - onRoute', path, params);
         }
       });
-    },
 
-    onRoute(path, params) {
-      console.log('onRoute', path, params);
+      Router.subscribe('#route1/jump3/4', {
+        beforeRoute(path, params, resolve) {
+          Router.navigate('/');
+        }
+      });
+
     }
 
   });

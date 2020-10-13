@@ -1,176 +1,67 @@
 const ORIGIN = window.location.origin + window.location.pathname;
 const ABSOLUTE_ORIGIN_NAMES = [ORIGIN, window.location.hostname, window.location.hostname + '/', window.location.origin];
-
-if (ORIGIN[ORIGIN.length -1] !== '/') {
-  ABSOLUTE_ORIGIN_NAMES.push(ORIGIN + '/');
-}
-
-if (window.location.pathname && window.location.pathname !== '/') {
-  ABSOLUTE_ORIGIN_NAMES.push(window.location.pathname);
-}
-
+if (ORIGIN[ORIGIN.length -1] !== '/') ABSOLUTE_ORIGIN_NAMES.push(ORIGIN + '/');
+if (window.location.pathname && window.location.pathname !== '/') ABSOLUTE_ORIGIN_NAMES.push(window.location.pathname);
 const ALLOWED_ORIGIN_NAMES = ['/', '#', '/#', '/#/', ...ABSOLUTE_ORIGIN_NAMES];
+const ORIGIN_URL = new URL(ORIGIN);
 
-const ROUTES = new Set();
-const WILDCARD_HANDLERS = new Set();
-const ROUTE_HOOK_HANDLERS = new Map();
-const ON_ROUTE_HANDLER_CACHE = new Map();
+const REGISTERED_ROUTES = new Set();
 const ROUTES_STRUCT = {};
 
 const DEFAULT_TRIGGER_OPTIONS = {
   params: {},
   keepQuery: true,
-  revertible: true,
-  forceReload: false
+  forceReload: false,
+  history: 'pushState'
 };
 
-const DEFAULT_RESPONSE = {
-  then: cb => cb(window.location.href)
-};
-
-let recursions = 0;
-let onRoutesResolved = null;
-let resolveCancelled = false;
-let resolvedBaseNode = null;
-let routesDidResolve = false;
-
-let pendingParams = {};
-let navigationInProgress = false;
-let listenerRegistered = false;
-let currentAbs = '';
-let lastRequestedNavigation = null;
+let HAS_POPSTATE_LISTENER = false;
+let SUBSCRIPTION_SCHEDULER = null;
+let CURRENT_QUERY_PARAMETERS = {};
 
 export const Router = {
 
-  options: {
-    recursionWarningCount: 5,
-    recursionThrowCount: 10,
-    defer: 50 // only execute navigations n milliseconds after the last call to Router.navigate
-  },
-
-  hook(route, handler, scope = null, once = false) {
-
-    const hash = getRouteParts(route).hash;
-
-    if (!ROUTE_HOOK_HANDLERS.has(hash)) {
-      ROUTE_HOOK_HANDLERS.set(hash, []);
-    }
-
-    const hooks = ROUTE_HOOK_HANDLERS.get(hash);
-
-    let _handler;
-
-    if (once === false) {
-      _handler = handler.bind(scope);
-    } else {
-      _handler = params => {
-        handler.call(scope, params);
-        const i = hooks.indexOf(_handler);
-        hooks.splice(i, 1);
-      };
-    }
-
-    hooks.push(_handler);
-
-  },
-
-  trigger(route, options = {}) {
-
-    options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
-
-    const {hash, query} = getRouteParts(route);
-
-    const hooks = ROUTE_HOOK_HANDLERS.get(hash);
-
-    if (hooks && hooks.length) {
-
-      const currentQueryString = !query && options.keepQuery ? window.location.search : query;
-      const params = Object.assign(buildParamsFromQueryString(currentQueryString), options.params);
-
-      for (let i = 0; i < hooks.length; i++) {
-        hooks[i](params);
-      }
-
-    }
-
-  },
-
-  subscribe(baseRoute, options) {
+  subscribe(route, options) {
 
     if (!options) {
-      throw new Error('Router.subscribe requires second parameter to be "options" object or "onRoute" handler function.');
+      throw new Error('[Cue.js] - Router.subscribe() requires second parameter to be "options" object or "onRoute" handler function.');
     } else if (typeof options === 'function') {
       const onRoute = options;
       options = { onRoute };
     } else if (typeof options.beforeRoute !== 'function' && typeof options.onRoute !== 'function') {
-      throw new Error('Router.subscribe requires "options" object with "beforeRoute", "onRoute" or both handler functions.');
+      throw new Error('[Cue.js] - Router.subscribe requires "options" object with "beforeRoute", "onRoute" or both handler functions.');
     }
 
-    if (baseRoute === '*') {
-      WILDCARD_HANDLERS.add(options.onRoute);
-      return;
-    }
-
-    const hash = getRouteParts(baseRoute).hash;
-    const isRoot = hash === '#';
+    const { hash } = getRouteParts(route);
 
     // dont register a route twice (do quick lookup)
-    if (ROUTES.has(hash)) {
-      throw new Error('Router already has an active subscription for "' + isRoot ? 'root' : baseRoute + '".');
+    if (REGISTERED_ROUTES.has(hash)) {
+      throw new Error('[Cue.js] Router already has an active subscription for "' + hash === '#' ? (route + ' (root url)') : route + '".');
     } else {
-      ROUTES.add(hash);
+      REGISTERED_ROUTES.add(hash);
     }
 
-    // create root struct if it doesnt exist
-    const root = (ROUTES_STRUCT[ORIGIN] = ROUTES_STRUCT[ORIGIN] || {
-      beforeRoute: void 0,
-      onRoute: void 0,
-      children: {}
-    });
-
-    // register the baseRoute structurally so that its callbacks can be resolved in order of change
-    if (isRoot) {
-      root.beforeRoute = options.beforeRoute;
-      root.onRoute = options.onRoute;
-    } else {
-      const hashParts = hash.split('/');
-      const leafPart = hashParts[hashParts.length -1];
-      hashParts.reduce((branch, part) => {
-        if (branch[part]) {
-          if (part === leafPart) {
-            branch[part].beforeRoute = options.beforeRoute;
-            branch[part].onRoute = options.onRoute;
-          }
-          return branch[part].children;
-        } else {
-          return (branch[part] = {
-            beforeRoute: part === leafPart ? options.beforeRoute : void 0,
-            onRoute: part === leafPart ? options.onRoute : void 0,
-            children: {}
-          }).children;
-        }
-      }, root.children);
-    }
+    assignHandlersToRouteStruct(hash, options.beforeRoute, options.onRoute);
 
     // Auto-run subscription
-    if (options.autorun !== false) {
-      Router.navigate(window.location.href, {
-        revertible: false,
-        forceReload: true
-      }).then(url => {
-        window.history.replaceState(null, document.title, url);
-      });
+    if (options.autorun !== false) { // run unless explicitly set to false
+      // deferred autorun
+      clearTimeout(SUBSCRIPTION_SCHEDULER);
+      SUBSCRIPTION_SCHEDULER = setTimeout(() => {
+        this.navigate(window.location.href, {
+          history: 'replaceState',
+          forceReload: true
+        });
+      }, 75);
     }
 
     // Add PopState Listeners once
-    if (listenerRegistered === false) {
-      listenerRegistered = true;
+    if (!HAS_POPSTATE_LISTENER) {
+      HAS_POPSTATE_LISTENER = true;
       window.addEventListener('popstate', () => {
-        Router.navigate(window.location.href, {
-          revertible: false,
+        this.navigate(window.location.href, {
+          history: 'replaceState',
           forceReload: false
-        }).then(url => {
-          window.history.replaceState(null, document.title, url)
         });
       });
     }
@@ -181,395 +72,110 @@ export const Router = {
 
     options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
 
-    if (Router.options.defer > 0) {
-      return new Promise(resolve => {
-        clearTimeout(lastRequestedNavigation);
-        lastRequestedNavigation = setTimeout(() => {
-          navigate(route, options).then(res => resolve(res));
-          lastRequestedNavigation = null;
-        }, Router.options.defer);
-      });
-    } else {
-      return navigate(route, options);
+    const { hash, query, rel } = getRouteParts(route);
+
+    const routeFragments = ['/'];
+    if (hash !== '#') {
+      routeFragments.push(...hash.split('/'));
     }
+
+    if (options.keepQuery === true) {
+      Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(query));
+    } else {
+      CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(query);
+    }
+
+    stepOverRouteNodes(ROUTES_STRUCT, routeFragments, rel, () => {
+      ORIGIN_URL.hash = hash;
+      ORIGIN_URL.search = options.keepQuery ? buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS) : query;
+      window.history[options.history](null, document.title, ORIGIN_URL.toString());
+    });
 
   }
 
 };
 
-// --------------------------------------------------------
+function stepOverRouteNodes(currentNode, remainingRouteFragments, rel, onComplete) {
 
-function navigate(route, options) {
+  const nextRouteFragment = remainingRouteFragments.shift();
 
-  const {abs, hash, query} = getRouteParts(route);
+  if (currentNode[nextRouteFragment]) {
 
-  const currentQueryString = !query && options.keepQuery ? window.location.search : query;
-  pendingParams = Object.assign(buildParamsFromQueryString(currentQueryString), options.params);
+    if (currentNode[nextRouteFragment].beforeRoute) {
 
-  const hooks = ROUTE_HOOK_HANDLERS.get(hash);
+      currentNode[nextRouteFragment].beforeRoute(rel, CURRENT_QUERY_PARAMETERS, response => {
 
-  if (hooks) {
-    for (let i = 0; i < hooks.length; i++) {
-      hooks[i](pendingParams);
-    }
-  }
-
-  if (abs === currentAbs && options.forceReload === false) {
-    return DEFAULT_RESPONSE;
-  }
-
-  if (navigationInProgress) {
-    console.warn('Router.navigate to "' + route + '" not executed because another navigation is still in progress.');
-    return DEFAULT_RESPONSE;
-  } else {
-    navigationInProgress = true;
-  }
-
-  return new Promise(resolve => {
-
-    buildRouteStruct(abs).then(resolvedStruct => {
-
-      buildURLFromStruct(resolvedStruct).then(finalAbs => { // finalRoute is absolute
-
-        const url = new URL(finalAbs);
-        url.search = currentQueryString;
-        const urlString = url.toString();
-
-        if (finalAbs === currentAbs && options.forceReload === false) {
-
-          navigationInProgress = false;
-          resolve(urlString);
-
+        if (response === rel) {
+          currentNode[nextRouteFragment].onRoute && currentNode[nextRouteFragment].onRoute(rel, CURRENT_QUERY_PARAMETERS);
+          stepOverRouteNodes(currentNode[nextRouteFragment].children, remainingRouteFragments, rel, onComplete);
         } else {
-
-          gatherRouteCallbacks(resolvedStruct).then(callbacks => {
-
-            for (let i = 0, tuple, handler, path; i < callbacks.length; i++) {
-
-              tuple = callbacks[i]; handler = tuple[0]; path = tuple[1];
-
-              if (options.forceReload === true || !ON_ROUTE_HANDLER_CACHE.has(handler) || ON_ROUTE_HANDLER_CACHE.get(handler) !== path) {
-                handler(path, pendingParams);
-                ON_ROUTE_HANDLER_CACHE.set(handler, path);
-              }
-
-            }
-
-            WILDCARD_HANDLERS.forEach(handler => handler(urlString, pendingParams));
-
-            currentAbs = finalAbs;
-
-            if (options.revertible === true) {
-              window.history.pushState(null, document.title, urlString);
-            }
-
-            navigationInProgress = false;
-            resolve(urlString);
-
+          Router.navigate(response, {
+            history: 'replaceState',
+            forceReload: false
           });
-
         }
 
-      });
-
-    });
-
-  });
-
-}
-
-function buildRouteStruct(absoluteRoute) {
-
-  return new Promise(resolve => {
-
-    recursions = 0;
-    resolveCancelled = false;
-    resolvedBaseNode = null;
-    onRoutesResolved = resolve;
-    routesDidResolve = false;
-
-    if (!ROUTES_STRUCT[ORIGIN]) {
-      onRoutesResolved(null);
-    }
-
-    resolveRouteHandlers(absoluteRoute);
-
-  });
-
-}
-
-function resolveRouteHandlers(route) {
-
-  if (route === ORIGIN) {
-
-    if (resolvedBaseNode !== null) {
-      onRoutesResolved(resolvedBaseNode);
-    } else {
-      collectRouteNodes(ROUTES_STRUCT, [ORIGIN]).then(baseNode => {
-        resolvedBaseNode = baseNode;
-        if (routesDidResolve === false) {
-          routesDidResolve = true;
-          onRoutesResolved(resolvedBaseNode);
-        }
-      });
-    }
-
-  } else if (route.lastIndexOf(ORIGIN, 0) === 0) { // starts with origin (split at hash)
-
-    const hashPart = route.substr(ORIGIN.length);
-
-    if (hashPart[0] !== '#') {
-      throw new Error('Invalid route "' + hashPart + '". Nested routes must be hash based.');
-    }
-
-    if (resolvedBaseNode !== null) {
-
-      collectRouteNodes(ROUTES_STRUCT.children, hashPart.split('/')).then(hashNode => {
-        if (routesDidResolve === false) {
-          routesDidResolve = true;
-          onRoutesResolved(Object.assign(resolvedBaseNode, {
-            nextNode: hashNode
-          }));
-        }
       });
 
     } else {
 
-      collectRouteNodes(ROUTES_STRUCT, [ORIGIN, ...hashPart.split('/')]).then(baseNode => {
-        resolvedBaseNode = baseNode;
-        if (routesDidResolve === false) {
-          routesDidResolve = true;
-          onRoutesResolved(resolvedBaseNode);
-        }
-      });
+      currentNode[nextRouteFragment].onRoute && currentNode[nextRouteFragment].onRoute(rel, CURRENT_QUERY_PARAMETERS);
+      stepOverRouteNodes(currentNode[nextRouteFragment].children, remainingRouteFragments, rel, onComplete);
 
     }
-
-  } else if (route[0] === '#') { // is hash
-
-    collectRouteNodes(ROUTES_STRUCT[ORIGIN].children, route.split('/')).then(hashNode => {
-      if (routesDidResolve === false) {
-        routesDidResolve = true;
-        onRoutesResolved(Object.assign(resolvedBaseNode, {
-          nextNode: hashNode
-        }));
-      }
-    });
-
-  }
-
-}
-
-function collectRouteNodes(root, parts, rest = '') {
-
-  return new Promise(resolve => {
-
-    const currentNodeValue = parts[0];
-    const frag = root[currentNodeValue];
-
-    if (!frag || resolveCancelled) {
-
-      resolve({
-        value: parts.length && rest.length ? (rest[rest.length - 1] === '/' ? rest : rest + '/') + parts.join('/') : parts.length ? parts.join('/') : rest.length ? rest : '/',
-        nextNode: null
-      });
-
-    } else {
-
-      rest += rest.length === 0 ? currentNodeValue : (rest[rest.length - 1] === '/' ? currentNodeValue : '/' + currentNodeValue);
-
-      const nextParts = parts.slice(1);
-
-      if (frag.beforeRoute) {
-
-        const iNextNodeValue = getNextNodeValue(frag.children, nextParts);
-
-        Promise.resolve(frag.beforeRoute(iNextNodeValue, pendingParams)).then(oNextNodeValue => {
-
-          // TODO: oNextNodeValue should be object with {path: string, params: object of query parameters}
-          oNextNodeValue = typeof oNextNodeValue === 'string'
-            ? normalizeAbsoluteOriginPrefix(removeSlashes(oNextNodeValue))
-            : iNextNodeValue;
-
-          if (iNextNodeValue === oNextNodeValue) { // route same, continue
-
-            resolve({
-              value: rest,
-              onRoute: frag.onRoute,
-              nextNode: collectRouteNodes(frag.children, nextParts)
-            });
-
-          } else { // route modified
-
-            if (currentNodeValue === ORIGIN) { // current node is origin
-
-              if (iNextNodeValue !== '/' && iNextNodeValue[0] !== '#') {
-                throw new Error('Invalid Route Setup: "' + iNextNodeValue + '" can not directly follow root url. Routes at this level must start with a #.');
-              }
-
-              if(oNextNodeValue[0] !== '#') {
-                throw new Error('Invalid Route "' + oNextNodeValue + '" returned from beforeRoute. Routes at this level must start with a #.');
-              }
-
-              // Append to self or replace current hash root at origin with new hash root oNextNodeValue
-              resolve({
-                value: rest,
-                onRoute: frag.onRoute,
-                nextNode: collectRouteNodes(frag.children, oNextNodeValue.split('/'))
-              });
-
-            } else if (currentNodeValue[0] === '#') { // current node is hash root
-
-              if (iNextNodeValue === '/') { // next node is self (hash root)
-
-                // if oNextNodeValue[0] == '#': replace currentNodeValue with new hash oNextNodeValue...
-                // else: append oNextValue to current hash root currentNodeValue
-                resolve({
-                  value: rest,
-                  onRoute: frag.onRoute,
-                  nextNode: collectRouteNodes(frag.children, oNextNodeValue.split('/'))
-                });
-
-              } else { // next node is hash firstChild
-
-                if (oNextNodeValue === '/' || oNextNodeValue[0] === '#') {
-
-                  // if (oNextNodeValue === '/'): go from firstChild back to hash root
-                  // if (oNextNodeValue[0] === '#): replace hash root with new hash root
-                  if (tryRecursion(parts)) {
-                    resolve(collectRouteNodes(root, oNextNodeValue.split('/')));
-                  }
-
-                } else {
-
-                  // replace firstChild iNextNodeValue with new firstChild oNextNodeValue
-                  resolve({ // type 1
-                    value: rest,
-                    onRoute: frag.onRoute,
-                    nextNode: collectRouteNodes(frag.children, oNextNodeValue.split('/'))
-                  });
-
-                }
-
-              }
-
-            } else { // current node is nth child
-
-              // rewritten to origin, hash or something that starts with origin
-              if (oNextNodeValue === ORIGIN || oNextNodeValue[0] === '#' || oNextNodeValue.lastIndexOf(ORIGIN, 0) === 0) {
-
-                if (tryRecursion(parts)) {
-                  resolveRouteHandlers(oNextNodeValue);
-                }
-
-              } else { // relative re-write
-
-                resolve({
-                  value: rest,
-                  onRoute: frag.onRoute,
-                  nextNode: collectRouteNodes(frag.children, oNextNodeValue.split('/'))
-                });
-
-              }
-
-            }
-
-          }
-
-        });
-
-      } else if (frag.onRoute) { // no beforeRoute rewrites but onRoute handler (chunk url)
-
-        resolve({
-          value: rest,
-          onRoute: frag.onRoute,
-          nextNode: collectRouteNodes(frag.children, nextParts)
-        });
-
-      } else { // no beforeRoute and no onRoute (continue with rest)
-
-        resolve(collectRouteNodes(frag.children, nextParts, rest));
-
-      }
-
-    }
-
-  });
-
-}
-
-function getNextNodeValue(root, parts, rest = '') {
-
-  const part = parts[0];
-  const frag = root[part];
-
-  if (!frag) {
-    return parts.length && rest.length ? rest + '/' + parts.join('/') : parts.length ? parts.join('/') : rest.length ? rest : '/';
-  }
-
-  rest += rest.length === 0 ? part : '/' + part;
-
-  if (frag.beforeRoute || frag.onRoute) {
-    return rest;
-  }
-
-  return getNextNodeValue(frag.children, parts.slice(1), rest);
-
-}
-
-function gatherRouteCallbacks(routeNode, callbacks = []) {
-
-  return new Promise(resolve => {
-
-    if (routeNode.nextNode === null) {
-      resolve(callbacks);
-    }
-
-    Promise.resolve(routeNode.nextNode).then(nextNode => {
-      if (nextNode !== null) {
-        if (routeNode.onRoute) {
-          callbacks.push([routeNode.onRoute, nextNode.value]);
-        }
-        resolve(gatherRouteCallbacks(nextNode, callbacks));
-      }
-    });
-
-  });
-
-}
-
-function buildURLFromStruct(routeNode, url = '') {
-
-  return new Promise(resolve => {
-    if (routeNode === null || routeNode.value === '/') {
-      resolve(url);
-    } else {
-      Promise.resolve(routeNode.nextNode).then(nextNode => {
-        url += url.length === 0 || routeNode.value === ORIGIN || routeNode.value[0] === '#' ? routeNode.value : '/' + routeNode.value;
-        resolve(buildURLFromStruct(nextNode, url));
-      });
-    }
-
-  });
-
-}
-
-function tryRecursion(parts) {
-
-  recursions++;
-
-  if (recursions === Router.options.recursionThrowCount) {
-
-    resolveCancelled = true;
-    throw new Error('Router.navigate is causing potentially infinite route rewrites at "' + parts.join('/') + '". Stopped execution after ' + Router.options.recursionThrowCount + ' cycles...');
 
   } else {
 
-    if (recursions === Router.options.recursionWarningCount) {
-      console.warn('Router.navigate is causing more than ' + Router.options.recursionWarningCount + ' route rewrites...');
-    }
+    onComplete();
 
-    return true;
+  }
+
+}
+
+function assignHandlersToRouteStruct(hash, beforeRoute, onRoute) {
+
+  const isRoot = hash === '#';
+
+  // create root struct if it doesnt exist
+  const structOrigin = (ROUTES_STRUCT['/'] = ROUTES_STRUCT['/'] || {
+    beforeRoute: void 0,
+    onRoute: void 0,
+    children: {}
+  });
+
+  // register the route structurally so that its callbacks can be resolved in order of change
+  if (isRoot) {
+
+    structOrigin.beforeRoute = beforeRoute;
+    structOrigin.onRoute = onRoute;
+
+  } else {
+
+    const hashParts = hash.split('/');
+    const leafPart = hashParts[hashParts.length - 1];
+
+    hashParts.reduce((branch, part) => {
+
+      if (branch[part]) {
+
+        if (part === leafPart) {
+          branch[part].beforeRoute = beforeRoute;
+          branch[part].onRoute = onRoute;
+        }
+
+        return branch[part].children;
+
+      } else {
+
+        return (branch[part] = {
+          beforeRoute: part === leafPart ? beforeRoute : void 0,
+          onRoute: part === leafPart ? onRoute : void 0,
+          children: {}
+        }).children;
+
+      }
+
+    }, structOrigin.children);
 
   }
 
@@ -579,6 +185,7 @@ function getRouteParts(route) {
 
   if (ALLOWED_ORIGIN_NAMES.indexOf(route) > -1) {
     return {
+      rel: '/',
       abs: ORIGIN,
       hash: '#',
       query: ''
@@ -586,11 +193,12 @@ function getRouteParts(route) {
   }
 
   if (route[0] === '?' || route[0] === '#') {
-    const url = new URL(route, ORIGIN);
+    const {hash, query} = getHashAndQuery(route);
     return {
-      abs: ORIGIN + url.hash,
-      hash: url.hash || '#',
-      query: url.search
+      rel: convertHashToRelativePath(hash),
+      abs: ORIGIN + hash,
+      hash: hash || '#',
+      query: query
     }
   }
 
@@ -600,40 +208,69 @@ function getRouteParts(route) {
     throw new Error('Invalid Route: "' + route + '". Non-root paths must start with ? query or # hash.');
   }
 
-  const url = new URL(route, ORIGIN);
+  const {hash, query} = getHashAndQuery(route);
 
   return {
-    abs: ORIGIN + url.hash,
-    hash: url.hash || '#',
-    query: url.search
+    rel: convertHashToRelativePath(hash),
+    abs: ORIGIN + hash,
+    hash: hash || '#',
+    query: query
   }
 
 }
 
-function removeSlashes(route) {
+function getHashAndQuery(route) {
 
-  // remove leading slash on all routes except single '/'
-  if (route.length > 1 && route[0] === '/') {
-    route = route.substr(1);
+  const indexOfHash = route.indexOf('#');
+  const indexOfQuestion = route.indexOf('?');
+
+  if (indexOfHash === -1) { // url has no hash
+    return {
+      hash: '',
+      query: removeTrailingSlash(new URL(route, ORIGIN).search)
+    }
   }
 
-  // remove trailing slash on all routes except single '/'
-  if (route.length > 1 && route[route.length - 1] === '/') {
-    route = route.slice(0, -1);
+  if (indexOfQuestion === -1) { // url has no query
+    return {
+      hash: removeTrailingSlash(new URL(route, ORIGIN).hash),
+      query: ''
+    }
   }
 
-  return route;
+  const url = new URL(route, ORIGIN);
 
+  if (indexOfQuestion < indexOfHash) { // standard compliant url with query before hash
+    return {
+      hash: removeTrailingSlash(url.hash),
+      query: removeTrailingSlash(url.search)
+    }
+  }
+
+  // non-standard url with hash before query (query is inside the hash)
+  let hash = url.hash;
+  const query = hash.slice(hash.indexOf('?'));
+  hash = hash.replace(query, '');
+
+  return {
+    hash: removeTrailingSlash(hash),
+    query: removeTrailingSlash(query)
+  }
+
+}
+
+function convertHashToRelativePath(hash) {
+  return (hash === '#' ? '/' : hash) || '/';
+}
+
+function removeTrailingSlash(str) {
+  return str[str.length - 1] === '/' ? str.substring(0, str.length - 1) : str;
 }
 
 function removeAllowedOriginPrefix(route) {
   const lop = getLongestOccurringPrefix(route, ALLOWED_ORIGIN_NAMES);
-  return lop ? route.substr(lop.length) : route;
-}
-
-function normalizeAbsoluteOriginPrefix(route) {
-  const lop = getLongestOccurringPrefix(route, ABSOLUTE_ORIGIN_NAMES);
-  return lop ? route.replace(lop, ORIGIN) : route;
+  const hashPart = lop ? route.substr(lop.length) : route;
+  return hashPart.lastIndexOf('/', 0) === 0 ? hashPart.substr(1) : hashPart;
 }
 
 function getLongestOccurringPrefix(s, prefixes) {
@@ -658,5 +295,23 @@ function buildParamsFromQueryString(queryString) {
   }
 
   return params;
+
+}
+
+function buildQueryStringFromParams(params) {
+
+  let querystring = '?';
+
+  for (const key in params) {
+    querystring += encodeURIComponent(key) + '=' + encodeURIComponent(params[key]) + '&';
+  }
+
+  if (querystring === '?') {
+    querystring = '';
+  } else if (querystring[querystring.length - 1] === '&') {
+    querystring = querystring.substring(0, querystring.length - 1);
+  }
+
+  return querystring;
 
 }

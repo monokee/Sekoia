@@ -1,4 +1,4 @@
-import { Store, internalStoreSet, internalStoreGet } from './store.js';
+import { STORE_BINDING_ID } from './store.js';
 import { NOOP, RESOLVED_PROMISE, deepEqual, deepClone } from './utils.js';
 import { ComputedProperty, setupComputedProperties, buildDependencyGraph } from "./computed.js";
 import { Reactor } from "./reactor.js";
@@ -110,7 +110,7 @@ export const Component = {
 
               allProperties[k] = v.value;
 
-              if (v.value && v.value.id === Store.id) {
+              if (v.value && v.value.id === STORE_BINDING_ID) {
                 Data.bindings[k] = v.value;
               } else if (typeof v.value === 'function') {
                 Data.computed.set(k, new ComputedProperty(k, v.value));
@@ -149,7 +149,7 @@ export const Component = {
           internal.data = new Proxy(data, {
             set: forbiddenProxySet,
             get(target, key) { // returns deep clone of bound store data, computed data or local data
-              if (Data.bindings[key]) return deepClone(internalStoreGet(Data.bindings[key].key));
+              if (Data.bindings[key]) return Data.bindings[key].get(true); // true -> get deep clone
               if (computedProperties.has(key)) return computedProperties.get(key).value(internal.data);
               return deepClone(target[key]);
             }
@@ -218,17 +218,15 @@ export const Component = {
         for (const key in Data.bindings) {
 
           // Computation Subscriptions
-          internal.dependencyGraph.has(key) && internal.subscriptions.push(Store.subscribe(
+          internal.dependencyGraph.has(key) && internal.subscriptions.push(Data.bindings[key].store.subscribe(
             Data.bindings[key].key,
-            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data),
-            { autorun: false }
+            () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data)
           ));
 
           // Reaction Subscriptions
-          internal.reactions[key] && internal.subscriptions.push(Store.subscribe(
+          internal.reactions[key] && internal.subscriptions.push(Data.bindings[key].store.subscribe(
             Data.bindings[key].key,
-            internal.reactions[key],
-            { autorun: false }
+            internal.reactions[key]
           ));
 
         }
@@ -256,7 +254,7 @@ export const Component = {
           let key;
 
           for (key in Data.bindings) {
-            dataClone[key] = Store.get(Data.bindings[key].key); // returns deep clone
+            dataClone[key] = Data.bindings[key].get(true); // true -> get deep clone
           }
 
           for (key in internal._data) {
@@ -291,13 +289,13 @@ export const Component = {
 
         const internal = this[INTERNAL];
 
-        if (Data.bindings[key] && !deepEqual(internalStoreGet(Data.bindings[key].key), value)) {
+        if (Data.bindings[key] && !deepEqual(Data.bindings[key].get(false), value)) {
 
           internal.dataEvent.detail.key = key;
           internal.dataEvent.detail.value = deepClone(value);
           this.dispatchEvent(internal.dataEvent);
 
-          return internalStoreSet(Data.bindings[key].key, value);
+          return Data.bindings[key].set(value);
 
         } else if (!deepEqual(internal._data[key], value)) {
 

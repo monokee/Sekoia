@@ -1,15 +1,36 @@
 import { hashString } from "./utils.js";
 
-const LocalStorage = window.localStorage;
-const pendingCalls = new Map();
+const CACHE_STORAGE = window.localStorage;
+const PENDING_CALLS = new Map();
+const REQUEST_START_EVENTS = [];
+const REQUEST_STOP_EVENTS = [];
 const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
 const EMPTY_CACHE_STORAGE_KEY = Symbol();
 
+let PENDING_REQUEST_EVENT = null;
+
+const fireRequestStartEvents = () => {
+  clearTimeout(PENDING_REQUEST_EVENT);
+  for (let i = 0; i < REQUEST_START_EVENTS.length; i++) {
+    REQUEST_START_EVENTS[i]();
+  }
+};
+
+const fireRequestStopEvents = () => {
+  PENDING_REQUEST_EVENT = setTimeout(() => {
+    for (let i = 0; i < REQUEST_STOP_EVENTS.length; i++) {
+      REQUEST_STOP_EVENTS[i]();
+    }
+  }, 100);
+};
+
 export const Server = {
 
-  fetch(url, expires = 0, token) {
+  get(url, expires = 0, token) {
 
     return new Promise((resolve, reject) => {
+
+      fireRequestStartEvents();
 
       const hash = hashString(url);
       const data = getCache(hash);
@@ -20,8 +41,9 @@ export const Server = {
           resolve(response);
         }).catch(error => {
           reject(error);
-        });
+        }).finally(fireRequestStopEvents);
       } else {
+        fireRequestStopEvents();
         resolve(data);
       }
 
@@ -29,36 +51,70 @@ export const Server = {
 
   },
 
-  get(url, expires = 0, token) {
-    return this.fetch(url, expires, token);
-  },
-
   post(url, data, token) {
     return new Promise((resolve, reject) => {
+      fireRequestStartEvents();
       makeCall(url, 'POST', token, data)
         .then(response => resolve(response))
-        .catch(error => reject(error));
+        .catch(error => reject(error))
+        .finally(fireRequestStopEvents);
     });
   },
 
   put(url, data, token) {
     return new Promise((resolve, reject) => {
+      fireRequestStartEvents();
       makeCall(url, 'PUT', token, data)
         .then(response => resolve(response))
-        .catch(error => reject(error));
+        .catch(error => reject(error))
+        .finally(fireRequestStopEvents);
     });
   },
 
   delete(url, data, token) {
     return new Promise((resolve, reject) => {
+      fireRequestStartEvents();
       makeCall(url, 'DELETE', token, data)
         .then(response => resolve(response))
-        .catch(error => reject(error));
+        .catch(error => reject(error))
+        .finally(fireRequestStopEvents);
     });
   },
 
   clearCache(url) {
     clearCache(hashString(url));
+  },
+
+  onRequestStart(handler) {
+
+    if (REQUEST_START_EVENTS.indexOf(handler) > -1) {
+      throw new Error('[Cue.js] Server.onRequestStart(handler) - the provided handler is already registered.');
+    }
+
+    REQUEST_START_EVENTS.push(handler);
+
+    return {
+      unsubscribe() {
+        REQUEST_START_EVENTS.splice(REQUEST_START_EVENTS.indexOf(handler), 1);
+      }
+    }
+
+  },
+
+  onRequestStop(handler) {
+
+    if (REQUEST_STOP_EVENTS.indexOf(handler) > -1) {
+      throw new Error('[Cue.js] Server.onRequestStop(handler) - the provided handler is already registered.');
+    }
+
+    REQUEST_STOP_EVENTS.push(handler);
+
+    return {
+      unsubscribe() {
+        REQUEST_STOP_EVENTS.splice(REQUEST_STOP_EVENTS.indexOf(handler), 1);
+      }
+    }
+
   }
 
 };
@@ -73,23 +129,23 @@ function setCache(hash, value, expires) {
   if (typeof value === 'object') value = JSON.stringify(value);
 
   const url_stamped = `${hash}::ts`;
-  LocalStorage.setItem(hash, value);
-  LocalStorage.setItem(url_stamped, `${schedule}`);
+  CACHE_STORAGE.setItem(hash, value);
+  CACHE_STORAGE.setItem(url_stamped, `${schedule}`);
 
-  let allKeys = LocalStorage.getItem(ALL_KEYS);
+  let allKeys = CACHE_STORAGE.getItem(ALL_KEYS);
   if (allKeys === null) {
     allKeys = `${hash},${url_stamped},`;
   } else if (allKeys.indexOf(`${hash},`) === -1) {
     allKeys = `${allKeys}${hash},${url_stamped},`;
   }
 
-  LocalStorage.setItem(ALL_KEYS, allKeys);
+  CACHE_STORAGE.setItem(ALL_KEYS, allKeys);
 
 }
 
 function getCache(hash) {
 
-  const timestamp = LocalStorage.getItem(`${hash}::ts`);
+  const timestamp = CACHE_STORAGE.getItem(`${hash}::ts`);
 
   if (timestamp === null) {
     return EMPTY_CACHE_STORAGE_KEY;
@@ -98,7 +154,7 @@ function getCache(hash) {
       clearCache(hash);
       return EMPTY_CACHE_STORAGE_KEY;
     } else {
-      return JSON.parse(LocalStorage.getItem(hash));
+      return JSON.parse(CACHE_STORAGE.getItem(hash));
     }
   }
 
@@ -106,35 +162,35 @@ function getCache(hash) {
 
 function clearCache(hash) {
   if (hash) {
-    if (LocalStorage.getItem(hash) !== null) {
+    if (CACHE_STORAGE.getItem(hash) !== null) {
       const url_stamped = `${hash}::ts`;
-      LocalStorage.removeItem(hash);
-      LocalStorage.removeItem(url_stamped);
-      const _allKeys = LocalStorage.getItem(ALL_KEYS);
+      CACHE_STORAGE.removeItem(hash);
+      CACHE_STORAGE.removeItem(url_stamped);
+      const _allKeys = CACHE_STORAGE.getItem(ALL_KEYS);
       if (_allKeys !== null) {
         const allKeys = _allKeys.split(',');
         allKeys.splice(allKeys.indexOf(hash), 1);
         allKeys.splice(allKeys.indexOf(url_stamped), 1);
-        LocalStorage.setItem(ALL_KEYS, `${allKeys.join(',')},`);
+        CACHE_STORAGE.setItem(ALL_KEYS, `${allKeys.join(',')},`);
       }
     }
   } else {
-    const _allKeys = LocalStorage.getItem(ALL_KEYS);
+    const _allKeys = CACHE_STORAGE.getItem(ALL_KEYS);
     if (_allKeys !== null) {
       const allKeys = _allKeys.split(',');
       for (let i = 0; i < allKeys.length; i++) {
-        LocalStorage.removeItem(allKeys[i]);
+        CACHE_STORAGE.removeItem(allKeys[i]);
       }
-      LocalStorage.removeItem(ALL_KEYS);
+      CACHE_STORAGE.removeItem(ALL_KEYS);
     }
   }
 }
 
 function makeCall(url, method, token, data = {}) {
 
-  if (pendingCalls.has(url)) {
+  if (PENDING_CALLS.has(url)) {
 
-    return pendingCalls.get(url);
+    return PENDING_CALLS.get(url);
 
   } else {
 
@@ -146,7 +202,7 @@ function makeCall(url, method, token, data = {}) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    pendingCalls.set(url, new Promise((resolve, reject) => {
+    PENDING_CALLS.set(url, new Promise((resolve, reject) => {
 
       fetch(url, {
         method: method,
@@ -170,12 +226,12 @@ function makeCall(url, method, token, data = {}) {
       }).catch(error => {
         reject(error)
       }).finally(() => {
-        pendingCalls.delete(url)
+        PENDING_CALLS.delete(url)
       });
 
     }));
 
-    return pendingCalls.get(url);
+    return PENDING_CALLS.get(url);
 
   }
 
