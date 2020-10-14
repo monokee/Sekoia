@@ -21,7 +21,7 @@
       <section class="grid">
         <a href="/">root</a>
         <a href="#route1">#route1</a>
-        <a href="#route1/jump1">#route1/jump1</a>
+        <a href="#route2">#route2 - redirects to #route1/jump3/4</a>
         <a href="#route1/jump2">#route1/jump2</a>
         <a href="#route1/jump3/4">#route1/jump3/4</a>
         <a href="#route1/infinity">Infinite Loop</a>
@@ -71,25 +71,22 @@
 
     initialize() {
 
-      Router.subscribe('/', {
-        onRoute(path, params) {
-          console.log('"/" - onRoute', path, params);
-        }
+      //TODO: everything seems to be working except root navigation.
+      Router.onRoute('/', (path, params) => {
+        console.log('"/"', path);
       });
 
-      Router.subscribe('#route1', {
-        beforeRoute(path, params, resolve) {
-          resolve();
-        },
-        onRoute(path, params) {
-          console.log('"#route1" - onRoute', path, params);
-        }
+      Router.onRoute('#route1', (path, params) => {
+        console.log('"#route1"', path);
       });
 
-      Router.subscribe('#route1/jump3/4', {
-        beforeRoute(path, params, resolve) {
-          Router.navigate('/');
-        }
+      Router.beforeRoute('#route2', (path, params, respondWith) => {
+        console.log('redirecting #route2', path);
+        respondWith('#route1/jump3/4');
+      });
+
+      Router.onRoute('#route1/jump3/4', (path, params) => {
+        console.log('"#route1/jump3/4', path);
       });
 
     }

@@ -115,6 +115,35 @@ export function hashString(str) {
   return hash + '';
 }
 
+export function getArrayIntersection(a, b) {
+
+  const intersection = [];
+
+  for (let x = 0; x < a.length; x++) {
+    for (let y = 0; y < b.length; y++) {
+      if (a[x] === b[y]) {
+        intersection.push(a[x]);
+        break;
+      }
+    }
+  }
+
+  return intersection;
+
+}
+
+export function getArrayTail(a, b) {
+
+  const tail = [];
+
+  for (let i = a.length; i < b.length; i++) {
+    tail.push(b[i]);
+  }
+
+  return tail;
+
+}
+
 // ------------------------------------
 
 function deepClonePlainObject(o) {

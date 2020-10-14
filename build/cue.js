@@ -116,6 +116,35 @@ function hashString(str) {
   return hash + '';
 }
 
+function getArrayIntersection(a, b) {
+
+  const intersection = [];
+
+  for (let x = 0; x < a.length; x++) {
+    for (let y = 0; y < b.length; y++) {
+      if (a[x] === b[y]) {
+        intersection.push(a[x]);
+        break;
+      }
+    }
+  }
+
+  return intersection;
+
+}
+
+function getArrayTail(a, b) {
+
+  const tail = [];
+
+  for (let i = a.length; i < b.length; i++) {
+    tail.push(b[i]);
+  }
+
+  return tail;
+
+}
+
 const CACHE_STORAGE = window.localStorage;
 const PENDING_CALLS = new Map();
 const REQUEST_START_EVENTS = [];
@@ -1808,7 +1837,9 @@ if (window.location.pathname && window.location.pathname !== '/') ABSOLUTE_ORIGI
 const ALLOWED_ORIGIN_NAMES = ['/', '#', '/#', '/#/', ...ABSOLUTE_ORIGIN_NAMES];
 const ORIGIN_URL = new URL(ORIGIN);
 
-const REGISTERED_ROUTES = new Set();
+const REGISTERED_FILTERS = new Map();
+const REGISTERED_ACTIONS = new Set();
+
 const ROUTES_STRUCT = {};
 
 const DEFAULT_TRIGGER_OPTIONS = {
@@ -1821,66 +1852,49 @@ const DEFAULT_TRIGGER_OPTIONS = {
 let HAS_POPSTATE_LISTENER = false;
 let SUBSCRIPTION_SCHEDULER = null;
 let CURRENT_QUERY_PARAMETERS = {};
+let CURRENT_ROUTE_FRAGMENTS = [];
 
 const Router = {
 
-  subscribe(route, options) {
-
-    if (!options) {
-      throw new Error('[Cue.js] - Router.subscribe() requires second parameter to be "options" object or "onRoute" handler function.');
-    } else if (typeof options === 'function') {
-      const onRoute = options;
-      options = { onRoute };
-    } else if (typeof options.beforeRoute !== 'function' && typeof options.onRoute !== 'function') {
-      throw new Error('[Cue.js] - Router.subscribe requires "options" object with "beforeRoute", "onRoute" or both handler functions.');
-    }
+  beforeRoute(route, filter) {
 
     const { hash } = getRouteParts(route);
 
-    // dont register a route twice (do quick lookup)
-    if (REGISTERED_ROUTES.has(hash)) {
-      throw new Error('[Cue.js] Router already has an active subscription for "' + hash === '#' ? (route + ' (root url)') : route + '".');
-    } else {
-      REGISTERED_ROUTES.add(hash);
+    if (REGISTERED_FILTERS.has(hash)) {
+      throw new Error('[Cue.js] Router.beforeRoute() already has a filter for "' + hash === '#' ? (route + ' (root url)') : route + '".');
     }
 
-    assignHandlersToRouteStruct(hash, options.beforeRoute, options.onRoute);
+    REGISTERED_FILTERS.set(hash, filter);
 
-    // Auto-run subscription
-    if (options.autorun !== false) { // run unless explicitly set to false
-      // deferred autorun
-      clearTimeout(SUBSCRIPTION_SCHEDULER);
-      SUBSCRIPTION_SCHEDULER = setTimeout(() => {
-        this.navigate(window.location.href, {
-          history: 'replaceState',
-          forceReload: true
-        });
-      }, 75);
+    deferredAutoRun();
+
+    addPopStateListenerOnce();
+
+  },
+
+  onRoute(route, action) {
+
+    const { hash } = getRouteParts(route);
+
+    if (REGISTERED_ACTIONS.has(hash)) {
+      throw new Error('[Cue.js] Router.onRoute() already has a action for "' + hash === '#' ? (route + ' (root url)') : route + '".');
     }
 
-    // Add PopState Listeners once
-    if (!HAS_POPSTATE_LISTENER) {
-      HAS_POPSTATE_LISTENER = true;
-      window.addEventListener('popstate', () => {
-        this.navigate(window.location.href, {
-          history: 'replaceState',
-          forceReload: false
-        });
-      });
-    }
+    REGISTERED_ACTIONS.add(hash);
+
+    assignActionToRouteStruct(hash, action);
+
+    deferredAutoRun();
+
+    addPopStateListenerOnce();
 
   },
 
   navigate(route, options = {}) {
 
-    options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
-
     const { hash, query, rel } = getRouteParts(route);
 
-    const routeFragments = ['/'];
-    if (hash !== '#') {
-      routeFragments.push(...hash.split('/'));
-    }
+    options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
 
     if (options.keepQuery === true) {
       Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(query));
@@ -1888,69 +1902,147 @@ const Router = {
       CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(query);
     }
 
-    stepOverRouteNodes(ROUTES_STRUCT, routeFragments, rel, () => {
-      ORIGIN_URL.hash = hash;
-      ORIGIN_URL.search = options.keepQuery ? buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS) : query;
-      window.history[options.history](null, document.title, ORIGIN_URL.toString());
-    });
+    // Apply route filter
+    if (REGISTERED_FILTERS.has(hash)) {
 
-  }
+      REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
 
-};
+        if (response !== rel) { // if filter returns different path re-route
 
-function stepOverRouteNodes(currentNode, remainingRouteFragments, rel, onComplete) {
-
-  const nextRouteFragment = remainingRouteFragments.shift();
-
-  if (currentNode[nextRouteFragment]) {
-
-    if (currentNode[nextRouteFragment].beforeRoute) {
-
-      currentNode[nextRouteFragment].beforeRoute(rel, CURRENT_QUERY_PARAMETERS, response => {
-
-        if (response === rel) {
-          currentNode[nextRouteFragment].onRoute && currentNode[nextRouteFragment].onRoute(rel, CURRENT_QUERY_PARAMETERS);
-          stepOverRouteNodes(currentNode[nextRouteFragment].children, remainingRouteFragments, rel, onComplete);
-        } else {
           Router.navigate(response, {
             history: 'replaceState',
             forceReload: false
           });
+
+        } else {
+
+          performNavigation(hash, query, options.keepQuery, options.history);
+
         }
 
       });
 
     } else {
 
-      currentNode[nextRouteFragment].onRoute && currentNode[nextRouteFragment].onRoute(rel, CURRENT_QUERY_PARAMETERS);
-      stepOverRouteNodes(currentNode[nextRouteFragment].children, remainingRouteFragments, rel, onComplete);
+      performNavigation(hash, query, options.keepQuery, options.history);
 
     }
 
-  } else {
+  }
 
-    onComplete();
+};
+
+function addPopStateListenerOnce() {
+
+  if (!HAS_POPSTATE_LISTENER) {
+
+    HAS_POPSTATE_LISTENER = true;
+
+    window.addEventListener('popstate', () => {
+      Router.navigate(window.location.href, {
+        history: 'replaceState',
+        forceReload: false
+      });
+    });
 
   }
 
 }
 
-function assignHandlersToRouteStruct(hash, beforeRoute, onRoute) {
+function deferredAutoRun() {
 
-  const isRoot = hash === '#';
+  // called whenever a new filter or action is registered.
+  // because it is expected that an application performs many registrations during setup
+  // we defer the execution of this initial run until 50ms after its last called
+
+  clearTimeout(SUBSCRIPTION_SCHEDULER);
+
+  SUBSCRIPTION_SCHEDULER = setTimeout(() => {
+    Router.navigate(window.location.href, {
+      history: 'replaceState',
+      forceReload: true
+    });
+  }, 50);
+
+}
+
+function performNavigation(hash, query, keepQuery, historyMode) {
+  executeRouteActions(hash);
+  ORIGIN_URL.hash = hash;
+  ORIGIN_URL.search = keepQuery ? buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS) : query;
+  window.history[historyMode](null, document.title, ORIGIN_URL.toString());
+}
+
+function executeRouteActions(hash) {
+
+  const routeFragments = ['/'];
+
+  if (hash !== '#') {
+    routeFragments.push(...hash.split('/'));
+  }
+
+  // find the intersection between the last route and the next route
+  const intersection = getArrayIntersection(CURRENT_ROUTE_FRAGMENTS, routeFragments);
+
+  // recompute the last intersecting fragment + any tail that might have been added
+  const fragmentsToRecompute = [intersection[intersection.length - 1]];
+
+  if (routeFragments.length > intersection.length) {
+    fragmentsToRecompute.push(...getArrayTail(intersection, routeFragments));
+  }
+
+  // find the first node that needs to be recomputed
+  let currentRouteNode = ROUTES_STRUCT;
+  let fragment;
+
+  for (let i = 0; i < intersection.length; i ++) {
+
+    fragment = intersection[i];
+
+    if (fragment === fragmentsToRecompute[0]) { // detect overlap
+      fragment = fragmentsToRecompute.shift(); // remove first element (only there for overlap detection)
+      break;
+    } else {
+      currentRouteNode = currentRouteNode[fragment].children;
+    }
+
+  }
+
+  // execute actions
+  while (currentRouteNode[fragment] && fragmentsToRecompute.length) {
+
+    // call action with joined remaining fragments as "path" argument
+    if (currentRouteNode[fragment].action) {
+      currentRouteNode[fragment].action(fragmentsToRecompute.join('/'), CURRENT_QUERY_PARAMETERS);
+    }
+
+    currentRouteNode = currentRouteNode[fragment].children;
+    fragment = fragmentsToRecompute.shift();
+
+  }
+
+  // execute last action with single trailing slash as "path" argument
+  if (currentRouteNode[fragment] && currentRouteNode[fragment].action) {
+    currentRouteNode[fragment].action('/', CURRENT_QUERY_PARAMETERS);
+  }
+
+  // update current route fragments
+  CURRENT_ROUTE_FRAGMENTS = routeFragments;
+
+}
+
+function assignActionToRouteStruct(hash, action) {
 
   // create root struct if it doesnt exist
-  const structOrigin = (ROUTES_STRUCT['/'] = ROUTES_STRUCT['/'] || {
-    beforeRoute: void 0,
-    onRoute: void 0,
+  const structOrigin = ROUTES_STRUCT['/'] || (ROUTES_STRUCT['/'] = {
+    action: void 0,
     children: {}
   });
 
   // register the route structurally so that its callbacks can be resolved in order of change
-  if (isRoot) {
+  if (hash === '#') { // is root
 
-    structOrigin.beforeRoute = beforeRoute;
-    structOrigin.onRoute = onRoute;
+    structOrigin.action = action;
 
   } else {
 
@@ -1962,8 +2054,7 @@ function assignHandlersToRouteStruct(hash, beforeRoute, onRoute) {
       if (branch[part]) {
 
         if (part === leafPart) {
-          branch[part].beforeRoute = beforeRoute;
-          branch[part].onRoute = onRoute;
+          branch[part].action = action;
         }
 
         return branch[part].children;
@@ -1971,8 +2062,7 @@ function assignHandlersToRouteStruct(hash, beforeRoute, onRoute) {
       } else {
 
         return (branch[part] = {
-          beforeRoute: part === leafPart ? beforeRoute : void 0,
-          onRoute: part === leafPart ? onRoute : void 0,
+          action: part === leafPart ? action : void 0,
           children: {}
         }).children;
 
