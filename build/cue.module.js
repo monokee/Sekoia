@@ -39,7 +39,7 @@ function deepEqual(a, b) {
 
   }
 
-  return a!==a && b!== b;
+  return a !== a && b !== b;
 
 }
 
@@ -1855,7 +1855,7 @@ let CURRENT_ROUTE_FRAGMENTS = [];
 
 const Router = {
 
-  beforeRoute(route, filter) {
+  before(route, filter) {
 
     const { hash } = getRouteParts(route);
 
@@ -1871,7 +1871,7 @@ const Router = {
 
   },
 
-  onRoute(route, action) {
+  on(route, action) {
 
     const { hash } = getRouteParts(route);
 
@@ -1887,6 +1887,14 @@ const Router = {
 
     addPopStateListenerOnce();
 
+  },
+
+  hasFilter(route) {
+    return REGISTERED_FILTERS.has(route);
+  },
+
+  hasAction(route) {
+    return REGISTERED_ACTIONS.has(route);
   },
 
   navigate(route, options = {}) {

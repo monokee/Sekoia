@@ -72,20 +72,20 @@
     initialize() {
 
       //TODO: everything seems to be working except root navigation.
-      Router.onRoute('/', (path, params) => {
+      Router.on('/', (path, params) => {
         console.log('"/"', path);
       });
 
-      Router.onRoute('#route1', (path, params) => {
+      Router.on('#route1', (path, params) => {
         console.log('"#route1"', path);
       });
 
-      Router.beforeRoute('#route2', (path, params, respondWith) => {
+      Router.before('#route2', (path, params, goTo) => {
         console.log('redirecting #route2', path);
-        respondWith('#route1/jump3/4');
+        goTo('#route1/jump3/4');
       });
 
-      Router.onRoute('#route1/jump3/4', (path, params) => {
+      Router.on('#route1/jump3/4', (path, params) => {
         console.log('"#route1/jump3/4', path);
       });
 

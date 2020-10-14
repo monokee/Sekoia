@@ -26,7 +26,7 @@ let CURRENT_ROUTE_FRAGMENTS = [];
 
 export const Router = {
 
-  beforeRoute(route, filter) {
+  before(route, filter) {
 
     const { hash } = getRouteParts(route);
 
@@ -42,7 +42,7 @@ export const Router = {
 
   },
 
-  onRoute(route, action) {
+  on(route, action) {
 
     const { hash } = getRouteParts(route);
 
@@ -58,6 +58,14 @@ export const Router = {
 
     addPopStateListenerOnce();
 
+  },
+
+  hasFilter(route) {
+    return REGISTERED_FILTERS.has(route);
+  },
+
+  hasAction(route) {
+    return REGISTERED_ACTIONS.has(route);
   },
 
   navigate(route, options = {}) {
