@@ -1831,13 +1831,15 @@ function longestIncreasingSubsequence(ns, newStart) {
 
 const ORIGIN = window.location.origin + window.location.pathname;
 const ABSOLUTE_ORIGIN_NAMES = [ORIGIN, window.location.hostname, window.location.hostname + '/', window.location.origin];
-if (ORIGIN[ORIGIN.length -1] !== '/') ABSOLUTE_ORIGIN_NAMES.push(ORIGIN + '/');
+if (ORIGIN[ORIGIN.length - 1] !== '/') ABSOLUTE_ORIGIN_NAMES.push(ORIGIN + '/');
 if (window.location.pathname && window.location.pathname !== '/') ABSOLUTE_ORIGIN_NAMES.push(window.location.pathname);
 const ALLOWED_ORIGIN_NAMES = ['/', '#', '/#', '/#/', ...ABSOLUTE_ORIGIN_NAMES];
 const ORIGIN_URL = new URL(ORIGIN);
+const CLEAN_ORIGIN = removeTrailingSlash(ORIGIN);
 
 const REGISTERED_FILTERS = new Map();
 const REGISTERED_ACTIONS = new Set();
+const WILDCARD_ACTIONS = [];
 
 const ROUTES_STRUCT = {};
 
@@ -1851,7 +1853,10 @@ const DEFAULT_TRIGGER_OPTIONS = {
 let HAS_POPSTATE_LISTENER = false;
 let SUBSCRIPTION_SCHEDULER = null;
 let CURRENT_QUERY_PARAMETERS = {};
-let CURRENT_ROUTE_FRAGMENTS = [];
+let CURRENT_ROUTE_FRAGMENTS = ['/'];
+if (window.location.hash) {
+  CURRENT_ROUTE_FRAGMENTS.push(...window.location.hash.split('/'));
+}
 
 const Router = {
 
@@ -1873,15 +1878,25 @@ const Router = {
 
   on(route, action) {
 
-    const { hash } = getRouteParts(route);
+    if (route === '*') {
 
-    if (REGISTERED_ACTIONS.has(hash)) {
-      throw new Error('[Cue.js] Router.onRoute() already has a action for "' + hash === '#' ? (route + ' (root url)') : route + '".');
+      if (WILDCARD_ACTIONS.indexOf(action) === -1) {
+        WILDCARD_ACTIONS.push(action);
+      }
+
+    } else {
+
+      const { hash } = getRouteParts(route);
+
+      if (REGISTERED_ACTIONS.has(hash)) {
+        throw new Error('[Cue.js] Router.onRoute() already has a action for "' + hash === '#' ? (route + ' (root url)') : route + '".');
+      }
+
+      REGISTERED_ACTIONS.add(hash);
+
+      assignActionToRouteStruct(hash, action);
+
     }
-
-    REGISTERED_ACTIONS.add(hash);
-
-    assignActionToRouteStruct(hash, action);
 
     deferredAutoRun();
 
@@ -1894,7 +1909,7 @@ const Router = {
   },
 
   hasAction(route) {
-    return REGISTERED_ACTIONS.has(route);
+    return route === '*' ? WILDCARD_ACTIONS.length > 0 : REGISTERED_ACTIONS.has(route);
   },
 
   navigate(route, options = {}) {
@@ -1974,10 +1989,25 @@ function deferredAutoRun() {
 }
 
 function performNavigation(hash, query, keepQuery, historyMode) {
+
+  executeWildCardActions(hash);
   executeRouteActions(hash);
+
   ORIGIN_URL.hash = hash;
   ORIGIN_URL.search = keepQuery ? buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS) : query;
   window.history[historyMode](null, document.title, ORIGIN_URL.toString());
+
+}
+
+function executeWildCardActions(hash) {
+
+  hash = hash === '#' ? '' : hash;
+  const completePath =  CLEAN_ORIGIN + hash;
+
+  for (let i = 0; i < WILDCARD_ACTIONS.length; i++) {
+    WILDCARD_ACTIONS[i](completePath, CURRENT_QUERY_PARAMETERS);
+  }
+
 }
 
 function executeRouteActions(hash) {
