@@ -1,8 +1,6 @@
 (function(window) {
 const NOOP = (() => {});
 
-const RESOLVED_PROMISE = Promise.resolve();
-
 function deepEqual(a, b) {
 
   if (a === b) {
@@ -382,15 +380,13 @@ function makeCall(url, method, token, data = {}) {
 
 }
 
-let PENDING_PROMISE = null;
-let CURRENT_RESOLVE = null;
-let FLUSHING_BUFFER = false;
-
 const EVENTS = new Map();
 const CALLBACKS = new Map();
 const COMPUTED_PROPERTIES = new Map();
 const DEPENDENCIES = new Map();
 const RESOLVED = [];
+
+let SCHEDULED_REACTION = null;
 
 const Reactor = {
 
@@ -411,23 +407,15 @@ const Reactor = {
   },
 
   react() {
-    return PENDING_PROMISE || (PENDING_PROMISE = new Promise(reactionResolver));
+    cancelAnimationFrame(SCHEDULED_REACTION);
+    SCHEDULED_REACTION = requestAnimationFrame(flushReactionBuffer);
   }
 
 };
 
 // ----------------------------------------
 
-function reactionResolver(resolve) {
-  if (FLUSHING_BUFFER === false) {
-    CURRENT_RESOLVE = resolve;
-    requestAnimationFrame(flushReactionBuffer);
-  }
-}
-
 function flushReactionBuffer() {
-
-  FLUSHING_BUFFER = true;
 
   let i, tuple, deps, computedProperty, context, callbacks, dependencyGraph, result;
 
@@ -506,13 +494,6 @@ function flushReactionBuffer() {
     RESOLVED.pop();
   }
 
-  FLUSHING_BUFFER = false;
-
-  CURRENT_RESOLVE();
-
-  CURRENT_RESOLVE = null;
-  PENDING_PROMISE = null;
-
 }
 
 const getStorageKey = (name, key) => hashString('cs-' + name + key);
@@ -539,7 +520,7 @@ class CueStoreBinding {
 
   set(value) {
     this.store[INTERNAL].data[this.key] = value;
-    return this.store[INTERNAL_STORE_DISPATCH](this.key, value);
+    this.store[INTERNAL_STORE_DISPATCH](this.key, value);
   }
 
 }
@@ -564,10 +545,11 @@ class CueStore {
         const storageKey = getStorageKey(name, key);
 
         // attempt to populate data from storage
-        internal.data[key] = JSON.parse(storage.getItem(storageKey)) || internal.data[path];
+        internal.data[key] = JSON.parse(storage.getItem(storageKey)) || internal.data[key];
 
         // bind event listeners to update storage when store changes
         internal.events.set(key, [newValue => {
+          if (newValue === void 0) newValue = null; // convert undefined to null
           storage.setItem(storageKey, JSON.stringify(newValue));
         }]);
 
@@ -583,7 +565,7 @@ class CueStore {
 
   [INTERNAL_STORE_SET](key, value) {
     this[INTERNAL].data[key] = value;
-    return this[INTERNAL_STORE_DISPATCH](key, value);
+    this[INTERNAL_STORE_DISPATCH](key, value);
   }
 
   [INTERNAL_STORE_DISPATCH](key, value) {
@@ -593,14 +575,10 @@ class CueStore {
     if (event) {
 
       for (let i = 0; i < event.length; i++) {
-        Reactor.cueEvent(event[i].handler, value);
+        Reactor.cueEvent(event[i], value);
       }
 
-      return Reactor.react();
-
-    } else {
-
-      return RESOLVED_PROMISE;
+      Reactor.react();
 
     }
 
@@ -622,28 +600,28 @@ class CueStore {
 
     if (key && typeof key === 'object') {
 
-      let response = RESOLVED_PROMISE, prop, val;
+      let prop, val;
 
       for (prop in key) {
         val = key[prop];
         if (!deepEqual(data[prop], val)) {
-          response = this[INTERNAL_STORE_SET](prop, val);
+          this[INTERNAL_STORE_SET](prop, val);
         }
       }
 
-      return response;
-
     }
 
-    return deepEqual(data[key], value) ? RESOLVED_PROMISE : this[INTERNAL_STORE_SET](key, value);
+    if (!deepEqual(data[key], value)) {
+      this[INTERNAL_STORE_SET](key, value);
+    }
 
   }
 
   reset(key) {
     if (!key) {
-      return this.set(deepClone(this[INTERNAL].defaultData));
+      this.set(deepClone(this[INTERNAL].defaultData));
     } else {
-      return this.set(key, deepClone(this[INTERNAL].defaultData[key]));
+      this.set(key, deepClone(this[INTERNAL].defaultData[key]));
     }
   }
 
@@ -661,10 +639,8 @@ class CueStore {
 
     if (internal.data.hasOwnProperty(key)) {
       delete internal.data[key];
-      return this[INTERNAL_STORE_DISPATCH](key, void 0);
+      this[INTERNAL_STORE_DISPATCH](key, void 0);
     }
-
-    return RESOLVED_PROMISE;
 
   }
 
@@ -680,18 +656,13 @@ class CueStore {
 
     if (silently === true) {
       internal.data = {};
-      return RESOLVED_PROMISE;
     }
 
-    let response = RESOLVED_PROMISE;
-
     for (const key in internal.data) {
-      response = this[INTERNAL_STORE_DISPATCH](key, void 0);
+      this[INTERNAL_STORE_DISPATCH](key, void 0);
     }
 
     internal.data = {};
-
-    return response;
 
   }
 
@@ -1170,10 +1141,9 @@ const Component = {
           }
 
           // ---------------- Trigger First Render
-          Reactor.react().then(() => {
-            Lifecycle.initialize.call(this, internal.refs);
-            Lifecycle.connected.call(this, internal.refs);
-          });
+          Reactor.react();
+          Lifecycle.initialize.call(this, internal.refs);
+          Lifecycle.connected.call(this, internal.refs);
 
         } else {
 
@@ -1239,15 +1209,9 @@ const Component = {
       setData(key, value) {
 
         if (typeof key === 'object') {
-
-          let response = RESOLVED_PROMISE;
-
           for (const prop in key) {
-            response = this.setData(prop, key[prop]);
+            this.setData(prop, key[prop]);
           }
-
-          return response;
-
         }
 
         if (Data.computed.has(key)) {
@@ -1262,7 +1226,7 @@ const Component = {
           internal.dataEvent.detail.value = deepClone(value);
           this.dispatchEvent(internal.dataEvent);
 
-          return Data.bindings[key].set(value);
+          Data.bindings[key].set(value);
 
         } else if (!deepEqual(internal._data[key], value)) {
 
@@ -1272,19 +1236,15 @@ const Component = {
           internal.dataEvent.detail.value = deepClone(value);
           this.dispatchEvent(internal.dataEvent);
 
-          let flush = false;
-
           if (internal.reactions[key]) {
             Reactor.cueCallback(internal.reactions[key], value);
-            flush = true;
           }
 
           if (internal.dependencyGraph.has(key)) {
             Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
-            flush = true;
           }
 
-          return flush ? Reactor.react() : RESOLVED_PROMISE;
+          Reactor.react();
 
         }
 
@@ -1866,7 +1826,7 @@ const Router = {
     const { hash } = getRouteParts(route);
 
     if (REGISTERED_FILTERS.has(hash)) {
-      throw new Error('[Cue.js] Router.beforeRoute() already has a filter for "' + hash === '#' ? (route + ' (root url)') : route + '".');
+      throw new Error(`[Cue.js] Router.beforeRoute() already has a filter for ${hash === '#' ? `${route} (root url)` : route}`);
     }
 
     REGISTERED_FILTERS.set(hash, filter);
@@ -1906,11 +1866,17 @@ const Router = {
   },
 
   hasFilter(route) {
-    return REGISTERED_FILTERS.has(route);
+    const { hash } = getRouteParts(route);
+    return REGISTERED_FILTERS.has(hash);
   },
 
   hasAction(route) {
-    return route === '*' ? WILDCARD_ACTIONS.length > 0 : REGISTERED_ACTIONS.has(route);
+    if (route === '*') {
+      return WILDCARD_ACTIONS.length > 0;
+    } else {
+      const { hash } = getRouteParts(route);
+      return REGISTERED_ACTIONS.has(hash);
+    }
   },
 
   navigate(route, options = {}) {
@@ -1950,6 +1916,51 @@ const Router = {
       performNavigation(hash, query, options.keepQuery, options.history);
 
     }
+
+  },
+
+  getQueryParameters(key) {
+    if (!key) {
+      return Object.assign({}, CURRENT_QUERY_PARAMETERS);
+    } else {
+      return CURRENT_QUERY_PARAMETERS[key];
+    }
+  },
+
+  addQueryParameters(key, value) {
+
+    if (typeof value === 'undefined' && typeof key === 'object') {
+      for (const k in key) {
+        CURRENT_QUERY_PARAMETERS[k] = key[k];
+      }
+    } else {
+      CURRENT_QUERY_PARAMETERS[key] = value;
+    }
+
+    updateQueryString();
+
+  },
+
+  setQueryParameters(params) {
+    CURRENT_QUERY_PARAMETERS = deepClone(params);
+    updateQueryString();
+  },
+
+  removeQueryParameters(key) {
+
+    if (!key) {
+      CURRENT_QUERY_PARAMETERS = {};
+    } else if (Array.isArray(key)) {
+      key.forEach(k => {
+        if (CURRENT_QUERY_PARAMETERS[k]) {
+          delete CURRENT_QUERY_PARAMETERS[k];
+        }
+      });
+    } else if (CURRENT_QUERY_PARAMETERS[key]) {
+      delete CURRENT_QUERY_PARAMETERS[key];
+    }
+
+    updateQueryString();
 
   }
 
@@ -1998,6 +2009,11 @@ function performNavigation(hash, query, keepQuery, historyMode) {
   ORIGIN_URL.search = keepQuery ? buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS) : query;
   window.history[historyMode](null, document.title, ORIGIN_URL.toString());
 
+}
+
+function updateQueryString() {
+  ORIGIN_URL.search = buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS);
+  window.history.replaceState(null, document.title, ORIGIN_URL.toString());
 }
 
 function executeWildCardActions(hash) {

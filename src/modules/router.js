@@ -1,4 +1,4 @@
-import { getArrayIntersection, getArrayTail, areArraysShallowEqual } from "./utils.js";
+import { deepClone, getArrayIntersection, getArrayTail } from "./utils.js";
 
 const ORIGIN = window.location.origin + window.location.pathname;
 const ABSOLUTE_ORIGIN_NAMES = [ORIGIN, window.location.hostname, window.location.hostname + '/', window.location.origin];
@@ -36,7 +36,7 @@ export const Router = {
     const { hash } = getRouteParts(route);
 
     if (REGISTERED_FILTERS.has(hash)) {
-      throw new Error('[Cue.js] Router.beforeRoute() already has a filter for "' + hash === '#' ? (route + ' (root url)') : route + '".');
+      throw new Error(`[Cue.js] Router.beforeRoute() already has a filter for ${hash === '#' ? `${route} (root url)` : route}`);
     }
 
     REGISTERED_FILTERS.set(hash, filter);
@@ -76,11 +76,17 @@ export const Router = {
   },
 
   hasFilter(route) {
-    return REGISTERED_FILTERS.has(route);
+    const { hash } = getRouteParts(route);
+    return REGISTERED_FILTERS.has(hash);
   },
 
   hasAction(route) {
-    return route === '*' ? WILDCARD_ACTIONS.length > 0 : REGISTERED_ACTIONS.has(route);
+    if (route === '*') {
+      return WILDCARD_ACTIONS.length > 0;
+    } else {
+      const { hash } = getRouteParts(route);
+      return REGISTERED_ACTIONS.has(hash);
+    }
   },
 
   navigate(route, options = {}) {
@@ -120,6 +126,51 @@ export const Router = {
       performNavigation(hash, query, options.keepQuery, options.history);
 
     }
+
+  },
+
+  getQueryParameters(key) {
+    if (!key) {
+      return Object.assign({}, CURRENT_QUERY_PARAMETERS);
+    } else {
+      return CURRENT_QUERY_PARAMETERS[key];
+    }
+  },
+
+  addQueryParameters(key, value) {
+
+    if (typeof value === 'undefined' && typeof key === 'object') {
+      for (const k in key) {
+        CURRENT_QUERY_PARAMETERS[k] = key[k];
+      }
+    } else {
+      CURRENT_QUERY_PARAMETERS[key] = value;
+    }
+
+    updateQueryString();
+
+  },
+
+  setQueryParameters(params) {
+    CURRENT_QUERY_PARAMETERS = deepClone(params);
+    updateQueryString();
+  },
+
+  removeQueryParameters(key) {
+
+    if (!key) {
+      CURRENT_QUERY_PARAMETERS = {};
+    } else if (Array.isArray(key)) {
+      key.forEach(k => {
+        if (CURRENT_QUERY_PARAMETERS[k]) {
+          delete CURRENT_QUERY_PARAMETERS[k];
+        }
+      });
+    } else if (CURRENT_QUERY_PARAMETERS[key]) {
+      delete CURRENT_QUERY_PARAMETERS[key];
+    }
+
+    updateQueryString();
 
   }
 
@@ -168,6 +219,11 @@ function performNavigation(hash, query, keepQuery, historyMode) {
   ORIGIN_URL.search = keepQuery ? buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS) : query;
   window.history[historyMode](null, document.title, ORIGIN_URL.toString());
 
+}
+
+function updateQueryString() {
+  ORIGIN_URL.search = buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS);
+  window.history.replaceState(null, document.title, ORIGIN_URL.toString());
 }
 
 function executeWildCardActions(hash) {

@@ -1,12 +1,10 @@
-let PENDING_PROMISE = null;
-let CURRENT_RESOLVE = null;
-let FLUSHING_BUFFER = false;
-
 const EVENTS = new Map();
 const CALLBACKS = new Map();
 const COMPUTED_PROPERTIES = new Map();
 const DEPENDENCIES = new Map();
 const RESOLVED = [];
+
+let SCHEDULED_REACTION = null;
 
 export const Reactor = {
 
@@ -27,23 +25,15 @@ export const Reactor = {
   },
 
   react() {
-    return PENDING_PROMISE || (PENDING_PROMISE = new Promise(reactionResolver));
+    cancelAnimationFrame(SCHEDULED_REACTION);
+    SCHEDULED_REACTION = requestAnimationFrame(flushReactionBuffer);
   }
 
 };
 
 // ----------------------------------------
 
-function reactionResolver(resolve) {
-  if (FLUSHING_BUFFER === false) {
-    CURRENT_RESOLVE = resolve;
-    requestAnimationFrame(flushReactionBuffer);
-  }
-}
-
 function flushReactionBuffer() {
-
-  FLUSHING_BUFFER = true;
 
   let i, tuple, deps, computedProperty, context, callbacks, dependencyGraph, result;
 
@@ -121,12 +111,5 @@ function flushReactionBuffer() {
   while(RESOLVED.length > 0) {
     RESOLVED.pop();
   }
-
-  FLUSHING_BUFFER = false;
-
-  CURRENT_RESOLVE();
-
-  CURRENT_RESOLVE = null;
-  PENDING_PROMISE = null;
 
 }

@@ -1,5 +1,5 @@
 import { STORE_BINDING_ID } from './store.js';
-import { NOOP, RESOLVED_PROMISE, deepEqual, deepClone } from './utils.js';
+import { NOOP, deepEqual, deepClone } from './utils.js';
 import { ComputedProperty, setupComputedProperties, buildDependencyGraph } from "./computed.js";
 import { Reactor } from "./reactor.js";
 
@@ -203,10 +203,9 @@ export const Component = {
           }
 
           // ---------------- Trigger First Render
-          Reactor.react().then(() => {
-            Lifecycle.initialize.call(this, internal.refs);
-            Lifecycle.connected.call(this, internal.refs);
-          });
+          Reactor.react();
+          Lifecycle.initialize.call(this, internal.refs);
+          Lifecycle.connected.call(this, internal.refs);
 
         } else {
 
@@ -272,15 +271,9 @@ export const Component = {
       setData(key, value) {
 
         if (typeof key === 'object') {
-
-          let response = RESOLVED_PROMISE;
-
           for (const prop in key) {
-            response = this.setData(prop, key[prop]);
+            this.setData(prop, key[prop]);
           }
-
-          return response;
-
         }
 
         if (Data.computed.has(key)) {
@@ -295,7 +288,7 @@ export const Component = {
           internal.dataEvent.detail.value = deepClone(value);
           this.dispatchEvent(internal.dataEvent);
 
-          return Data.bindings[key].set(value);
+          Data.bindings[key].set(value);
 
         } else if (!deepEqual(internal._data[key], value)) {
 
@@ -305,19 +298,15 @@ export const Component = {
           internal.dataEvent.detail.value = deepClone(value);
           this.dispatchEvent(internal.dataEvent);
 
-          let flush = false;
-
           if (internal.reactions[key]) {
             Reactor.cueCallback(internal.reactions[key], value);
-            flush = true;
           }
 
           if (internal.dependencyGraph.has(key)) {
             Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
-            flush = true;
           }
 
-          return flush ? Reactor.react() : RESOLVED_PROMISE;
+          Reactor.react();
 
         }
 

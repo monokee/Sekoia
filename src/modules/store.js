@@ -1,4 +1,4 @@
-import { deepClone, hashString, deepEqual, RESOLVED_PROMISE } from "./utils.js";
+import { deepClone, hashString, deepEqual } from "./utils.js";
 import { Reactor } from "./reactor";
 
 const getStorageKey = (name, key) => hashString('cs-' + name + key);
@@ -25,7 +25,7 @@ class CueStoreBinding {
 
   set(value) {
     this.store[INTERNAL].data[this.key] = value;
-    return this.store[INTERNAL_STORE_DISPATCH](this.key, value);
+    this.store[INTERNAL_STORE_DISPATCH](this.key, value);
   }
 
 }
@@ -50,10 +50,11 @@ class CueStore {
         const storageKey = getStorageKey(name, key);
 
         // attempt to populate data from storage
-        internal.data[key] = JSON.parse(storage.getItem(storageKey)) || internal.data[path];
+        internal.data[key] = JSON.parse(storage.getItem(storageKey)) || internal.data[key];
 
         // bind event listeners to update storage when store changes
         internal.events.set(key, [newValue => {
+          if (newValue === void 0) newValue = null; // convert undefined to null
           storage.setItem(storageKey, JSON.stringify(newValue));
         }]);
 
@@ -69,7 +70,7 @@ class CueStore {
 
   [INTERNAL_STORE_SET](key, value) {
     this[INTERNAL].data[key] = value;
-    return this[INTERNAL_STORE_DISPATCH](key, value);
+    this[INTERNAL_STORE_DISPATCH](key, value);
   }
 
   [INTERNAL_STORE_DISPATCH](key, value) {
@@ -79,14 +80,10 @@ class CueStore {
     if (event) {
 
       for (let i = 0; i < event.length; i++) {
-        Reactor.cueEvent(event[i].handler, value);
+        Reactor.cueEvent(event[i], value);
       }
 
-      return Reactor.react();
-
-    } else {
-
-      return RESOLVED_PROMISE;
+      Reactor.react();
 
     }
 
@@ -108,28 +105,28 @@ class CueStore {
 
     if (key && typeof key === 'object') {
 
-      let response = RESOLVED_PROMISE, prop, val;
+      let prop, val;
 
       for (prop in key) {
         val = key[prop];
         if (!deepEqual(data[prop], val)) {
-          response = this[INTERNAL_STORE_SET](prop, val);
+          this[INTERNAL_STORE_SET](prop, val);
         }
       }
 
-      return response;
-
     }
 
-    return deepEqual(data[key], value) ? RESOLVED_PROMISE : this[INTERNAL_STORE_SET](key, value);
+    if (!deepEqual(data[key], value)) {
+      this[INTERNAL_STORE_SET](key, value);
+    }
 
   }
 
   reset(key) {
     if (!key) {
-      return this.set(deepClone(this[INTERNAL].defaultData));
+      this.set(deepClone(this[INTERNAL].defaultData));
     } else {
-      return this.set(key, deepClone(this[INTERNAL].defaultData[key]));
+      this.set(key, deepClone(this[INTERNAL].defaultData[key]));
     }
   }
 
@@ -147,10 +144,8 @@ class CueStore {
 
     if (internal.data.hasOwnProperty(key)) {
       delete internal.data[key];
-      return this[INTERNAL_STORE_DISPATCH](key, void 0);
+      this[INTERNAL_STORE_DISPATCH](key, void 0);
     }
-
-    return RESOLVED_PROMISE;
 
   }
 
@@ -166,18 +161,13 @@ class CueStore {
 
     if (silently === true) {
       internal.data = {};
-      return RESOLVED_PROMISE;
     }
 
-    let response = RESOLVED_PROMISE;
-
     for (const key in internal.data) {
-      response = this[INTERNAL_STORE_DISPATCH](key, void 0);
+      this[INTERNAL_STORE_DISPATCH](key, void 0);
     }
 
     internal.data = {};
-
-    return response;
 
   }
 
