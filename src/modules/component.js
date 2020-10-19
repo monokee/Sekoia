@@ -6,8 +6,9 @@ import { Reactor } from "./reactor.js";
 // Regex matches when $self is:
 // - immediately followed by css child selector (space . : # [ > + ~) OR
 // - immediately followed by opening bracket { OR
+// - immediately followed by chaining comma ,
 // - not followed by anything (end of line)
-const SELF_REGEXP = /(\$self(?=[\\040{.:#[>+~]))|\$self\b/g;
+const SELF_REGEXP = /(\$self(?=[\\040,{.:#[>+~]))|\$self\b/g;
 const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
 let CLASS_COUNTER = -1;
@@ -204,8 +205,12 @@ export const Component = {
 
           // ---------------- Trigger First Render
           Reactor.react();
-          Lifecycle.initialize.call(this, internal.refs);
-          Lifecycle.connected.call(this, internal.refs);
+
+          // ---------------- Initialize after First Render
+          requestAnimationFrame(() => {
+            Lifecycle.initialize.call(this, internal.refs);
+            Lifecycle.connected.call(this, internal.refs);
+          });
 
         } else {
 
@@ -408,8 +413,9 @@ function createComponentCSS(name, styles, refNames) {
     // replace $refName with internal .class when $refName is:
     // - immediately followed by css child selector (space . : # [ > + ~) OR
     // - immediately followed by opening bracket { OR
+    // - immediately followed by chaining comma ,
     // - not followed by anything (end of line)
-    styles = styles.replace(new RegExp("(\\" + refName + "(?=[\\40{.:#[>+~]))|\\" + refName + "\b", 'g'), refNames[refName]);
+    styles = styles.replace(new RegExp("(\\" + refName + "(?=[\\40{,.:#[>+~]))|\\" + refName + "\b", 'g'), refNames[refName]);
   }
 
   CUE_CSS.compiler.innerHTML = styles;
