@@ -1817,7 +1817,6 @@ const DEFAULT_TRIGGER_OPTIONS = {
 };
 
 let HAS_POPSTATE_LISTENER = false;
-let SUBSCRIPTION_SCHEDULER = null;
 let CURRENT_QUERY_PARAMETERS = {};
 let CURRENT_ROUTE_FRAGMENTS = ['/'];
 if (window.location.hash) {
@@ -1828,6 +1827,8 @@ const Router = {
 
   before(route, filter) {
 
+    addPopStateListenerOnce();
+
     const { hash } = getRouteParts(route);
 
     if (REGISTERED_FILTERS.has(hash)) {
@@ -1836,19 +1837,42 @@ const Router = {
 
     REGISTERED_FILTERS.set(hash, filter);
 
-    deferredAutoRun();
+    // Auto apply filter
+    const currentURLParts = getRouteParts(window.location.href);
 
-    addPopStateListenerOnce();
+    if (currentURLParts.hash === hash) {
+
+      Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(currentURLParts.query));
+
+      filter(currentURLParts.rel, CURRENT_QUERY_PARAMETERS, response => {
+        if (response !== currentURLParts.rel) {
+          if (response.lastIndexOf('http', 0) === 0) {
+            window.location.href = response;
+          } else {
+            Router.navigate(response, {
+              history: 'replaceState',
+              forceReload: false
+            });
+          }
+        }
+      });
+
+    }
 
   },
 
   on(route, action) {
+
+    addPopStateListenerOnce();
 
     if (route === '*') {
 
       if (WILDCARD_ACTIONS.indexOf(action) === -1) {
         WILDCARD_ACTIONS.push(action);
       }
+
+      // auto-run wildcard action
+      action(CLEAN_ORIGIN + window.location.hash, Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(window.location.search)));
 
     } else {
 
@@ -1862,11 +1886,21 @@ const Router = {
 
       assignActionToRouteStruct(hash, action);
 
+      // auto-run action
+      const currentURLParts = getRouteParts(window.location.href);
+
+      // the current url starts with or is the registered hash -> do auto-run
+      if (currentURLParts.hash.lastIndexOf(hash, 0) === 0) {
+
+        let path = currentURLParts.hash.slice(hash.length);
+        path = path[0] === '/' ? path.slice(1) : path;
+        path = path === '' ? '/' : removeTrailingSlash(path);
+
+        action(path, Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(currentURLParts.query)));
+
+      }
+
     }
-
-    deferredAutoRun();
-
-    addPopStateListenerOnce();
 
   },
 
@@ -1903,10 +1937,14 @@ const Router = {
 
         if (response !== rel) { // if filter returns different path re-route
 
-          Router.navigate(response, {
-            history: 'replaceState',
-            forceReload: false
-          });
+          if (response.lastIndexOf('http', 0) === 0) {
+            window.location.href = response;
+          } else {
+            Router.navigate(response, {
+              history: 'replaceState',
+              forceReload: false
+            });
+          }
 
         } else {
 
@@ -1985,23 +2023,6 @@ function addPopStateListenerOnce() {
     });
 
   }
-
-}
-
-function deferredAutoRun() {
-
-  // called whenever a new filter or action is registered.
-  // because it is expected that an application performs many registrations during setup
-  // we defer the execution of this initial run until 50ms after its last called
-
-  clearTimeout(SUBSCRIPTION_SCHEDULER);
-
-  SUBSCRIPTION_SCHEDULER = setTimeout(() => {
-    Router.navigate(window.location.href, {
-      history: 'replaceState',
-      forceReload: true
-    });
-  }, 50);
 
 }
 
