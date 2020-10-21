@@ -206,6 +206,10 @@ class CueStore {
 
   }
 
+  getStorageKey(key) {
+    return getStorageKey(this[INTERNAL].name, key);
+  }
+
 }
 
 export const Store = {
