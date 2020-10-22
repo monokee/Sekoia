@@ -1,7 +1,8 @@
-import { deepClone, hashString, deepEqual } from "./utils.js";
+import { deepClone, deepEqual } from "./utils.js";
 import { Reactor } from "./reactor";
 
-const getStorageKey = (name, key) => hashString('cs-' + name + key);
+const getStorageKey = (name, key) =>  name + '.' + key + '::CueStore';
+const jsonReplacer = (key, value) => value === undefined ? null : value;
 
 const ALL_STORES = new Map();
 const INTERNAL = Symbol('Cue.Store.internals');
@@ -37,28 +38,57 @@ class CueStore {
     const internal = this[INTERNAL] = {
       name: name,
       defaultData: deepClone(data),
-      data: deepClone(data),
       events: new Map(),
       bindings: new Map(),
       storage: storage,
     };
 
-    if (storage !== null) {
+    if (storage === null) {
 
-      for (const key in internal.data) {
+      // flag
+      internal.usesStorage = false;
+
+      // in-memory store
+      internal.data = deepClone(data);
+
+    } else {
+
+      // flag
+      internal.usesStorage = true;
+
+      // cache storage keys
+      const storageKeys = internal.storageKeys = {};
+
+      // populate storage if its not yet populated
+      for (const key in data) {
 
         const storageKey = getStorageKey(name, key);
 
-        // attempt to populate data from storage
-        internal.data[key] = JSON.parse(storage.getItem(storageKey)) || internal.data[key];
+        storageKeys[key] = storageKey;
 
-        // bind event listeners to update storage when store changes
-        internal.events.set(key, [newValue => {
-          if (newValue === void 0) newValue = null; // convert undefined to null
-          storage.setItem(storageKey, JSON.stringify(newValue));
-        }]);
+        if (storage.getItem(storageKey) === null) {
+          storage.setItem(storageKey, JSON.stringify(internal.defaultData[key], jsonReplacer));
+        }
 
       }
+
+      // create a disc-storage proxy wrapper so we can use internal.data like a regular object while writing to and reading from disc storage
+      internal.data = new Proxy({}, {
+        get(target, key) {
+          return JSON.parse(storage.getItem(storageKeys[key] || getStorageKey(name, key)))
+        },
+        set(target, key, value) {
+          storage.setItem(storageKeys[key] || getStorageKey(name, key), JSON.stringify(value, jsonReplacer));
+          return true;
+        },
+        has(target, key) {
+          return storage.getItem(storageKeys[key] || getStorageKey(name, key)) !== null;
+        },
+        deleteProperty(target, key) {
+          storage.removeItem(storageKeys[key] || getStorageKey(name, key));
+          return true;
+        }
+      });
 
     }
 
@@ -91,11 +121,33 @@ class CueStore {
 
   get(key) {
 
-    if (!key) {
-      return deepClone(this[INTERNAL].data);
+    const internal = this[INTERNAL];
+
+    // storage already does deep clone via stringify
+    if (internal.usesStorage) {
+
+      if (!key) {
+
+        const entireStore = {};
+
+        for (const key in internal.defaultData) {
+          entireStore[key] = internal.data[key];
+        }
+
+        return entireStore;
+
+      }
+
+      return internal.data[key];
+
     }
 
-    return deepClone(this[INTERNAL].data[key]);
+    // clone memory objects
+    if (!key) {
+      return deepClone(internal.data);
+    }
+
+    return deepClone(internal.data[key]);
 
   }
 
@@ -114,10 +166,10 @@ class CueStore {
         }
       }
 
-    }
+    } else if (!deepEqual(data[key], value)) {
 
-    if (!deepEqual(data[key], value)) {
       this[INTERNAL_STORE_SET](key, value);
+
     }
 
   }
@@ -131,44 +183,20 @@ class CueStore {
   }
 
   has(key) {
-    return this[INTERNAL].data.hasOwnProperty(key);
-  }
-
-  remove(key) {
 
     const internal = this[INTERNAL];
 
-    if (internal.storage !== null) {
-      internal.storage.removeItem(getStorageKey(internal.name, key));
-    }
-
-    if (internal.data.hasOwnProperty(key)) {
-      delete internal.data[key];
-      this[INTERNAL_STORE_DISPATCH](key, void 0);
+    if (internal.usesStorage) {
+      return internal.storage.getItem(internal.storageKeys[key] || getStorageKey(internal.name, key)) !== null;
+    } else {
+      return this[INTERNAL].data.hasOwnProperty(key);
     }
 
   }
 
-  clear(silently = false) {
-
-    const internal = this[INTERNAL];
-
-    if (internal.storage !== null) {
-      for (const key in internal.data) {
-        internal.storage.removeItem(getStorageKey(internal.name, key));
-      }
-    }
-
-    if (silently === true) {
-      internal.data = {};
-    }
-
-    for (const key in internal.data) {
-      this[INTERNAL_STORE_DISPATCH](key, void 0);
-    }
-
-    internal.data = {};
-
+  remove(key) {
+    delete this[INTERNAL].data[key];
+    this[INTERNAL_STORE_DISPATCH](key, void 0);
   }
 
   bind(key) {
@@ -204,10 +232,6 @@ class CueStore {
       }
     }
 
-  }
-
-  getStorageKey(key) {
-    return getStorageKey(this[INTERNAL].name, key);
   }
 
 }
