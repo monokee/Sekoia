@@ -11,6 +11,7 @@ const CLEAN_ORIGIN = removeTrailingSlash(ORIGIN);
 const REGISTERED_FILTERS = new Map();
 const REGISTERED_ACTIONS = new Set();
 const WILDCARD_ACTIONS = [];
+let WILDCARD_FILTER = null;
 
 const ROUTES_STRUCT = {};
 
@@ -34,33 +35,23 @@ export const Router = {
 
     addPopStateListenerOnce();
 
-    const { hash } = getRouteParts(route);
+    if (route === '*') {
 
-    if (REGISTERED_FILTERS.has(hash)) {
-      throw new Error(`[Cue.js] Router.beforeRoute() already has a filter for ${hash === '#' ? `${route} (root url)` : route}`);
-    }
+      if (WILDCARD_FILTER !== null) {
+        console.warn('[Cue.js] - Router.before(*, filter) - overwriting previously registered wildcard filter (*)');
+      }
 
-    REGISTERED_FILTERS.set(hash, filter);
+      WILDCARD_FILTER = filter;
 
-    // Auto apply filter
-    const currentURLParts = getRouteParts(window.location.href);
+    } else {
 
-    if (currentURLParts.hash === hash) {
+      const { hash } = getRouteParts(route);
 
-      Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(currentURLParts.query));
+      if (REGISTERED_FILTERS.has(hash)) {
+        throw new Error(`[Cue.js] Router.beforeRoute() already has a filter for ${hash === '#' ? `${route} (root url)` : route}`);
+      }
 
-      filter(currentURLParts.rel, CURRENT_QUERY_PARAMETERS, response => {
-        if (response !== currentURLParts.rel) {
-          if (response.lastIndexOf('http', 0) === 0) {
-            window.location.href = response;
-          } else {
-            Router.navigate(response, {
-              history: 'replaceState',
-              forceReload: false
-            });
-          }
-        }
-      });
+      REGISTERED_FILTERS.set(hash, filter);
 
     }
 
@@ -76,9 +67,6 @@ export const Router = {
         WILDCARD_ACTIONS.push(action);
       }
 
-      // auto-run wildcard action
-      action(CLEAN_ORIGIN + window.location.hash, Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(window.location.search)));
-
     } else {
 
       const { hash } = getRouteParts(route);
@@ -91,27 +79,17 @@ export const Router = {
 
       assignActionToRouteStruct(hash, action);
 
-      // auto-run action
-      const currentURLParts = getRouteParts(window.location.href);
-
-      // the current url starts with or is the registered hash -> do auto-run
-      if (currentURLParts.hash.lastIndexOf(hash, 0) === 0) {
-
-        let path = currentURLParts.hash.slice(hash.length);
-        path = path[0] === '/' ? path.slice(1) : path;
-        path = path === '' ? '/' : removeTrailingSlash(path);
-
-        action(path, Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(currentURLParts.query)));
-
-      }
-
     }
 
   },
 
   hasFilter(route) {
-    const { hash } = getRouteParts(route);
-    return REGISTERED_FILTERS.has(hash);
+    if (route === '*') {
+      return WILDCARD_FILTER !== null;
+    } else {
+      const { hash } = getRouteParts(route);
+      return REGISTERED_FILTERS.has(hash);
+    }
   },
 
   hasAction(route) {
@@ -135,36 +113,32 @@ export const Router = {
       CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(query);
     }
 
-    // Apply route filter
-    if (REGISTERED_FILTERS.has(hash)) {
-
-      REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
-
-        if (response !== rel) { // if filter returns different path re-route
-
-          if (response.lastIndexOf('http', 0) === 0) {
-            window.location.href = response;
-          } else {
-            Router.navigate(response, {
-              history: 'replaceState',
-              forceReload: false
-            });
-          }
-
-        } else {
-
-          performNavigation(hash, query, options.keepQuery, options.history);
-
+    // 1. Apply wildcard filter
+    if (WILDCARD_FILTER) {
+      WILDCARD_FILTER(rel, CURRENT_QUERY_PARAMETERS, response => {
+        if (response !== rel) { // if filter returns different path
+          return reRoute(response); // re-route and exit early
         }
-
       });
-
-    } else {
-
-      performNavigation(hash, query, options.keepQuery, options.history);
-
     }
 
+    // 2. Apply route filter
+    if (REGISTERED_FILTERS.has(hash)) {
+      REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
+        if (response !== rel) {
+          return reRoute(response);
+        }
+      });
+    }
+
+    // 3. All filters passed -> navigate
+    performNavigation(hash, query, options.keepQuery, options.history);
+
+  },
+
+  resolve(options = {}) {
+    // should be called once after all filters and actions are registered
+    this.navigate(window.location.href, options);
   },
 
   getQueryParameters(key) {
@@ -220,6 +194,7 @@ function addPopStateListenerOnce() {
 
     HAS_POPSTATE_LISTENER = true;
 
+    // never fired on initial page load in all up-to-date browsers
     window.addEventListener('popstate', () => {
       Router.navigate(window.location.href, {
         history: 'replaceState',
@@ -245,6 +220,17 @@ function performNavigation(hash, query, keepQuery, historyMode) {
 function updateQueryString() {
   ORIGIN_URL.search = buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS);
   window.history.replaceState(null, document.title, ORIGIN_URL.toString());
+}
+
+function reRoute(newRoute) {
+  if (newRoute.lastIndexOf('http', 0) === 0) {
+    return window.location.href = newRoute;
+  } else {
+    return Router.navigate(newRoute, {
+      history: 'replaceState',
+      forceReload: false
+    });
+  }
 }
 
 function executeWildCardActions(hash) {
