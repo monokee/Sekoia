@@ -1927,6 +1927,10 @@ const Router = {
 
   navigate(route, options = {}) {
 
+    if (route.lastIndexOf('http', 0) === 0) {
+      return window.location.href = route;
+    }
+
     const { hash, query, rel } = getRouteParts(route);
 
     options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
