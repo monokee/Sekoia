@@ -215,12 +215,12 @@ function makeCall(url, method, token, data = {}) {
         body: method === 'GET' ? null : typeof data === 'string' ? data : JSON.stringify(data)
       }).then(res => {
         if (!res.ok) {
-          res.json().then(error => reject(error));
+          handleAsTextOrJSON(res, reject);
         } else {
           if (res.status === 204) {
             resolve({});
           } else {
-            res.json().then(data => resolve(data));
+            handleAsTextOrJSON(res, resolve);
           }
         }
       }).catch(error => {
@@ -235,4 +235,10 @@ function makeCall(url, method, token, data = {}) {
 
   }
 
+}
+
+function handleAsTextOrJSON(res, next) {
+  res.text().then(text => {
+    try { next(JSON.parse(text)) } catch (_) { next(text) }
+  });
 }
