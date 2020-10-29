@@ -103,7 +103,7 @@ export const Router = {
 
   navigate(route, options = {}) {
 
-    if (route.lastIndexOf('http', 0) === 0) {
+    if (route.lastIndexOf('http', 0) === 0 && route !== window.location.href) {
       return window.location.href = route;
     }
 
