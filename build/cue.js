@@ -297,7 +297,11 @@ function getCache(hash) {
       clearCache(hash);
       return EMPTY_CACHE_STORAGE_KEY;
     } else {
-      return JSON.parse(CACHE_STORAGE.getItem(hash));
+      try {
+        return JSON.parse(CACHE_STORAGE.getItem(hash));
+      } catch (e) {
+        return CACHE_STORAGE.getItem(hash);
+      }
     }
   }
 
