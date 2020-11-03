@@ -12,6 +12,9 @@ const SELF_REGEXP = /(\$self(?=[\\040,{.:#[>+~]))|\$self\b/g;
 const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
 let CLASS_COUNTER = -1;
+let COMP_DATA_COUNTER = -1;
+
+const COMP_DATA_CACHE = new Map();
 
 const INTERNAL = Symbol('Component Data');
 
@@ -192,10 +195,16 @@ export const Component = {
           internal.refs['$self'] = this; // this === $self for completeness
 
           // ----------------- Parse attribute data into internal data model
-          if (this.hasAttribute('data')) {
-            const attributeData = JSON.parse(this.getAttribute('data'));
-            this.removeAttribute('data');
-            Object.assign(internal._data, attributeData);
+          if (this.hasAttribute('cue-data')) {
+
+            const dataKey = parseInt(this.getAttribute('cue-data'));
+            const compData = COMP_DATA_CACHE.get(dataKey);
+
+            Object.assign(internal._data, compData);
+
+            this.removeAttribute('cue-data');
+            COMP_DATA_CACHE.delete(dataKey);
+
           }
 
           // ---------------- Run reactions
@@ -334,20 +343,39 @@ export const Component = {
 
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
     const openTag = '<'+name, closeTag = '</'+name+'>';
+
     return attributes => {
+
       let htmlString = openTag, att, val;
+
       for (att in attributes) {
+
         val = attributes[att];
-        val = val && typeof val === 'object' ? JSON.stringify(val) : val;
-        htmlString += ` ${att}='${val}'`;
+
+        if (att === 'data' && val && typeof val === 'object') {
+
+          ++COMP_DATA_COUNTER;
+          COMP_DATA_CACHE.set(COMP_DATA_COUNTER, val);
+
+          htmlString += ' cue-data="' + COMP_DATA_COUNTER + '"';
+
+        } else {
+
+          htmlString += ' att="' + val + '"';
+
+        }
+
       }
+
       htmlString += '>' + Template.innerHTML + closeTag;
+
       return htmlString
+
     };
 
   },
 
-  create(node, data) {
+  create(node) {
 
     node = typeof node === 'function' ? node() : node;
     node = node.trim();
@@ -357,19 +385,7 @@ export const Component = {
     }
 
     TMP_DIV.innerHTML = node;
-    const element = TMP_DIV.children[0];
-
-    if (data) {
-      console.warn('[Cue.js] - Component.create(...) [data] parameter will be deprecated in a future version. Pass data object as an attribute to the components factory function instead.');
-      const internal = element[INTERNAL];
-      if (internal) {
-        Object.assign(internal._data, deepClone(data));
-      } else {
-        console.warn('[Cue.js] - Component.create(...) [data] parameter passed to non-cue element will be ignored.');
-      }
-    }
-
-    return element;
+    return TMP_DIV.children[0];
 
   }
 
