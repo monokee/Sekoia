@@ -361,7 +361,7 @@ export const Component = {
 
         } else {
 
-          htmlString += ' att="' + val + '"';
+          htmlString += ' ' + att + '="' + val + '"';
 
         }
 
