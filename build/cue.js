@@ -2028,26 +2028,64 @@ const Router = {
       CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(query);
     }
 
-    // 1. Apply wildcard filter
-    if (WILDCARD_FILTER) {
+    // Filters
+    if (WILDCARD_FILTER) { // 1.0 - Apply wildcard filter
+
       WILDCARD_FILTER(rel, CURRENT_QUERY_PARAMETERS, response => {
-        if (response !== rel) { // if filter returns different path
-          return reRoute(response); // re-route and exit early
-        }
-      });
-    }
 
-    // 2. Apply route filter
-    if (REGISTERED_FILTERS.has(hash)) {
-      REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
         if (response !== rel) {
-          return reRoute(response);
-        }
-      });
-    }
 
-    // 3. All filters passed -> navigate
-    performNavigation(hash, query, options.keepQuery, options.history);
+          reRoute(response);
+
+        } else {
+
+          if (REGISTERED_FILTERS.has(hash)) { // 1.1 - Apply route filters
+
+            REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
+
+              if (response !== rel) {
+
+                reRoute(response);
+
+              } else {
+
+                performNavigation(hash, query, options.keepQuery, options.history);
+
+              }
+
+            });
+
+          } else {
+
+            performNavigation(hash, query, options.keepQuery, options.history);
+
+          }
+
+        }
+
+      });
+
+    } else if (REGISTERED_FILTERS.has(hash)) { // 2.0 - Apply route filters
+
+      REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
+
+        if (response !== rel) {
+
+          reRoute(response);
+
+        } else {
+
+          performNavigation(hash, query, options.keepQuery, options.history);
+
+        }
+
+      });
+
+    } else {
+
+      performNavigation(hash, query, options.keepQuery, options.history);
+
+    }
 
   },
 
