@@ -9,28 +9,13 @@ const EMPTY_CACHE_STORAGE_KEY = Symbol();
 
 let PENDING_REQUEST_EVENT = null;
 
-const fireRequestStartEvents = () => {
-  clearTimeout(PENDING_REQUEST_EVENT);
-  for (let i = 0; i < REQUEST_START_EVENTS.length; i++) {
-    REQUEST_START_EVENTS[i]();
-  }
-};
-
-const fireRequestStopEvents = () => {
-  PENDING_REQUEST_EVENT = setTimeout(() => {
-    for (let i = 0; i < REQUEST_STOP_EVENTS.length; i++) {
-      REQUEST_STOP_EVENTS[i]();
-    }
-  }, 100);
-};
-
 export const Server = {
 
   get(url, expires = 0, token) {
 
     return new Promise((resolve, reject) => {
 
-      fireRequestStartEvents();
+      fireRequestStart();
 
       const hash = hashString(url);
       const data = getCache(hash);
@@ -41,9 +26,9 @@ export const Server = {
           resolve(response);
         }).catch(error => {
           reject(error);
-        }).finally(fireRequestStopEvents);
+        }).finally(fireRequestStop);
       } else {
-        fireRequestStopEvents();
+        fireRequestStop();
         resolve(data);
       }
 
@@ -53,31 +38,31 @@ export const Server = {
 
   post(url, data, token) {
     return new Promise((resolve, reject) => {
-      fireRequestStartEvents();
+      fireRequestStart();
       makeCall(url, 'POST', token, data)
         .then(response => resolve(response))
         .catch(error => reject(error))
-        .finally(fireRequestStopEvents);
+        .finally(fireRequestStop);
     });
   },
 
   put(url, data, token) {
     return new Promise((resolve, reject) => {
-      fireRequestStartEvents();
+      fireRequestStart();
       makeCall(url, 'PUT', token, data)
         .then(response => resolve(response))
         .catch(error => reject(error))
-        .finally(fireRequestStopEvents);
+        .finally(fireRequestStop);
     });
   },
 
   delete(url, data, token) {
     return new Promise((resolve, reject) => {
-      fireRequestStartEvents();
+      fireRequestStart();
       makeCall(url, 'DELETE', token, data)
         .then(response => resolve(response))
         .catch(error => reject(error))
-        .finally(fireRequestStopEvents);
+        .finally(fireRequestStop);
     });
   },
 
@@ -85,36 +70,12 @@ export const Server = {
     clearCache(hashString(url));
   },
 
-  onRequestStart(handler) {
-
-    if (REQUEST_START_EVENTS.indexOf(handler) > -1) {
-      throw new Error('[Cue.js] Server.onRequestStart(handler) - the provided handler is already registered.');
-    }
-
-    REQUEST_START_EVENTS.push(handler);
-
-    return {
-      unsubscribe() {
-        REQUEST_START_EVENTS.splice(REQUEST_START_EVENTS.indexOf(handler), 1);
-      }
-    }
-
+  onRequestStart() {
+    // overwrite externally
   },
 
   onRequestStop(handler) {
-
-    if (REQUEST_STOP_EVENTS.indexOf(handler) > -1) {
-      throw new Error('[Cue.js] Server.onRequestStop(handler) - the provided handler is already registered.');
-    }
-
-    REQUEST_STOP_EVENTS.push(handler);
-
-    return {
-      unsubscribe() {
-        REQUEST_STOP_EVENTS.splice(REQUEST_STOP_EVENTS.indexOf(handler), 1);
-      }
-    }
-
+    // overwrite externally
   }
 
 };
@@ -245,4 +206,15 @@ function handleAsTextOrJSON(res, next) {
   res.text().then(text => {
     try { next(JSON.parse(text)) } catch (_) { next(text) }
   });
+}
+
+function fireRequestStart() {
+  clearTimeout(PENDING_REQUEST_EVENT);
+  Server.onRequestStart();
+}
+
+function fireRequestStop() {
+  PENDING_REQUEST_EVENT = setTimeout(() => {
+    Server.onRequestStop();
+  }, 100);
 }

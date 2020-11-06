@@ -11,10 +11,13 @@ import { Reactor } from "./reactor.js";
 const SELF_REGEXP = /(\$self(?=[\\040,{.:#[>+~]))|\$self\b/g;
 const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
-let CLASS_COUNTER = -1;
-let COMP_DATA_COUNTER = -1;
+let UID = -1;
 
+const ALL_REGISTERED_COMPONENTS = new Set();
 const COMP_DATA_CACHE = new Map();
+const COMP_INIT_CACHE = new Map();
+const COMP_METHOD_CACHE = new Map();
+const SLOT_MARKUP_CACHE = new Map();
 
 const INTERNAL = Symbol('Component Data');
 
@@ -35,7 +38,6 @@ export const Component = {
 
     const Lifecycle = {
       initialize: NOOP,
-      connected: NOOP,
       disconnected: NOOP
     };
 
@@ -48,6 +50,16 @@ export const Component = {
 
     const Template = document.createElement('template');
     Template.innerHTML = config.element || '';
+
+    Template.__slots = {};
+    Template.__hasSlots = false;
+    const slots = Template.content.querySelectorAll('slot');
+
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      Template.__slots[slot.getAttribute('name')] = slot.outerHTML;
+      Template.__hasSlots = true;
+    }
 
     const RefNames = collectElementReferences(Template.content, {});
 
@@ -88,7 +100,6 @@ export const Component = {
 
           // ---------------------- LIFECYCLE ----------------------
           if (typeof config.initialize === 'function') Lifecycle.initialize = config.initialize;
-          if (typeof config.connectedCallback === 'function') Lifecycle.connected = config.connectedCallback;
           if (typeof config.disconnectedCallback === 'function') Lifecycle.disconnected = config.disconnectedCallback;
 
         }
@@ -105,8 +116,6 @@ export const Component = {
           const allProperties = {};
 
           if (config.data) {
-
-            config.data = typeof config.data === 'function' ? config.data() : config.data;
 
             for (const k in config.data) {
 
@@ -131,11 +140,14 @@ export const Component = {
           }
 
           // ---------------------- COMPUTED PROPERTIES ----------------------
-          if (Data.computed.size > 0) {
+          if (Data.computed.size) {
             Data.computed = setupComputedProperties(allProperties, Data.computed);
           }
 
         }
+
+        // when this element is a slotted element, wait until it is composed
+        if (this.hasAttribute('slot')) return;
 
         const internal = this[INTERNAL];
 
@@ -160,9 +172,11 @@ export const Component = {
           });
 
           // Clone Computed Properties
-          for (const tuple of Data.computed.entries()) {
-            const val = tuple[1];
-            computedProperties.set(tuple[0], new ComputedProperty(val.ownPropertyName, val.computation, val.sourceProperties));
+          if (Data.computed.size) {
+            for (const tuple of Data.computed.entries()) {
+              const val = tuple[1];
+              computedProperties.set(tuple[0], new ComputedProperty(val.ownPropertyName, val.computation, val.sourceProperties));
+            }
           }
 
           // Build Dependency Graph
@@ -176,8 +190,49 @@ export const Component = {
           }
 
           // ----------- INSERT DOM AND ASSIGN REFS ----------
-          if (this.innerHTML.length === 0) {
+          if (Template.__hasSlots) {
+
+            // find slotted children in this instance
+            let slots = null;
+
+            if (this.hasAttribute('cue-slot')) {
+              const uid = this.getAttribute('cue-slot');
+              slots = SLOT_MARKUP_CACHE.get(uid);
+            } else if (this.innerHTML) {
+              const slottedChildren = this.querySelectorAll('[slot]');
+              for (let i = 0; i < slottedChildren.length; i++) {
+                const slottedChild = slottedChildren[i];
+                slots || (slots = {});
+                slots[slottedChild.getAttribute('slot')] = slottedChild.outerHTML;
+              }
+            }
+
+            // insert slotted children into template
+            if (slots) {
+
+              let templateHTML = Template.innerHTML;
+              let hasSlottedChildren = false;
+
+              for (const slotName in slots) {
+                if (Template.__slots[slotName]) {
+                  hasSlottedChildren = true;
+                  templateHTML = templateHTML.replace(Template.__slots[slotName], slots[slotName]);
+                }
+              }
+
+              this.innerHTML = templateHTML;
+
+              // collect refs from composed slots
+              if (hasSlottedChildren) {
+                collectElementReferences(this, RefNames);
+              }
+
+            }
+
+          } else {
+
             this.innerHTML = Template.innerHTML;
+
           }
 
           // ---------------- ASSIGN REF ELEMENTS
@@ -194,17 +249,19 @@ export const Component = {
 
           internal.refs['$self'] = this; // this === $self for completeness
 
-          // ----------------- Parse attribute data into internal data model
+          // ----------------- Compose attribute data into internal data model
           if (this.hasAttribute('cue-data')) {
+            const uid = this.getAttribute('cue-data');
+            Object.assign(internal._data, COMP_DATA_CACHE.get(uid));
+          }
 
-            const dataKey = parseInt(this.getAttribute('cue-data'));
-            const compData = COMP_DATA_CACHE.get(dataKey);
-
-            Object.assign(internal._data, compData);
-
-            this.removeAttribute('cue-data');
-            COMP_DATA_CACHE.delete(dataKey);
-
+          // ---------------- Add Composed Methods to Prototype (if any)
+          if (this.hasAttribute('cue-func')) {
+            const uid = this.getAttribute('cue-func');
+            const methods = COMP_METHOD_CACHE.get(uid);
+            for (const method in  methods) {
+              CueElement.prototype[method] = methods[method];
+            }
           }
 
           // ---------------- Run reactions
@@ -217,13 +274,17 @@ export const Component = {
 
           // ---------------- Initialize after First Render
           requestAnimationFrame(() => {
+
             Lifecycle.initialize.call(this, internal.refs);
-            Lifecycle.connected.call(this, internal.refs);
+
+            // ---------------- Call Inherited Initialize Functions (if any)
+            if (this.hasAttribute('cue-init')) {
+              const uid = this.getAttribute('cue-init');
+              const initialize = COMP_INIT_CACHE.get(uid);
+              initialize.call(this, internal.refs);
+            }
+
           });
-
-        } else {
-
-          Lifecycle.connected.call(this, internal.refs); // runs whenever instance is (re-) inserted into DOM
 
         }
 
@@ -341,38 +402,17 @@ export const Component = {
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
     customElements.define(name, CueElement);
 
+    ALL_REGISTERED_COMPONENTS.add(name.toUpperCase());
+
     // ----------------------- RETURN HTML STRING FACTORY FOR EMBEDDING THE ELEMENT WITH ATTRIBUTES -----------------------
     const openTag = '<'+name, closeTag = '</'+name+'>';
 
-    return attributes => {
+    return (attributes = {}) => createComponentMarkup(openTag, Template.innerHTML, closeTag, attributes);
 
-      let htmlString = openTag, att, val;
+  },
 
-      for (att in attributes) {
-
-        val = attributes[att];
-
-        if (att === 'data' && val && typeof val === 'object') {
-
-          ++COMP_DATA_COUNTER;
-          COMP_DATA_CACHE.set(COMP_DATA_COUNTER, val);
-
-          htmlString += ' cue-data="' + COMP_DATA_COUNTER + '"';
-
-        } else {
-
-          htmlString += ' ' + att + '="' + val + '"';
-
-        }
-
-      }
-
-      htmlString += '>' + Template.innerHTML + closeTag;
-
-      return htmlString
-
-    };
-
+  extend(component, config) {
+    return (attributes = {}) => component(Object.assign(config, attributes));
   },
 
   create(node) {
@@ -404,17 +444,68 @@ function collectElementReferences(root, refNames) {
 
     if (ref) {
       cls1 = child.getAttribute('class');
-      cls2 = ref + ++CLASS_COUNTER;
+      cls2 = ref + ++UID;
       refNames['$' + ref] = '.' + cls2;
       child.setAttribute('class', cls1 ? cls1 + ' ' + cls2 : cls2);
       child.removeAttribute('$');
     }
 
-    collectElementReferences(child, refNames);
+    if (!ALL_REGISTERED_COMPONENTS.has(child.tagName)) {
+      collectElementReferences(child, refNames);
+    }
 
   }
 
   return refNames;
+
+}
+
+function createComponentMarkup(openTag, innerHTML, closeTag, attributes) {
+
+  let htmlString = openTag;
+  let instanceMethods = null;
+
+  for (const att in attributes) {
+
+    const val = attributes[att];
+
+    if (typeof val === 'string') {
+
+      htmlString += ' ' + att + '="' + val + '"';
+
+    } else {
+
+      ++UID;
+      const uid = '' + UID;
+
+      if (att === 'data') {
+        COMP_DATA_CACHE.set(uid, val);
+        htmlString += ' cue-data="' + uid + '"';
+      } else if (att === 'slots') {
+        SLOT_MARKUP_CACHE.set(uid, val);
+        htmlString += ' cue-slot="' + uid + '"';
+      } else if (att === 'initialize') {
+        COMP_INIT_CACHE.set(uid, val);
+        htmlString += ' cue-init="' + uid + '"';
+      } else if (typeof val === 'function') {
+        instanceMethods || (instanceMethods = {});
+        instanceMethods[att] = val;
+      }
+
+    }
+
+  }
+
+  if (instanceMethods) {
+    ++UID;
+    const uid = '' + UID;
+    COMP_METHOD_CACHE.set(uid, instanceMethods);
+    htmlString += ' cue-func="' + uid + '"';
+  }
+
+  htmlString += '>' + innerHTML + closeTag;
+
+  return htmlString;
 
 }
 
