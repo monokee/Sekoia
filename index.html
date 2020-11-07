@@ -6,7 +6,11 @@
 </head>
 <body>
 
-<route-component></route-component>
+<div id="cue-sandbox">
+  <defined-composition-component>
+    <span slot="highLevel">High Level SLOT!!!</span>
+  </defined-composition-component>
+</div>
 
 <script src="build/cue.module.js" type="module"></script>
 
@@ -14,84 +18,58 @@
 
   import { Component, Router } from "./build/cue.module.js";
 
-  Component.define('route-component', {
+  const Root = document.getElementById('cue-sandbox');
+
+  const MyParentComponent = Component.define('my-parent-component', {
+    element: (`
+      <h1><slot name="heading"></slot></h1>
+      <p><slot name="paragraph"></slot></p>
+      <slot name="footer"></slot>
+    `)
+  });
+
+  const InsertedComponent = Component.define('inserted-component', {
+    element: '<button class="secondary"><slot name="callToAction"></slot></button>'
+  });
+
+  const FirstComponent = Component.extend(MyParentComponent, {
+    slots: {
+      heading: 'My First Component',
+      paragraph: 'Sätze, die alle Buchstaben des Alphabets enthalten, heißen Pangramme (von griechisch πᾶν γράμμα: "jeder Buchstabe").',
+      footer: InsertedComponent({
+        slots: {
+          callToAction: 'InsertedComponent from FirstComponent'
+        }
+      })
+    }
+  });
+
+  const DefinedCompositionComponent = Component.define('defined-composition-component', {
 
     element: (`
-      <h2>Links automatically trigger Router.navigate:</h2>
-      <section class="grid">
-        <a href="/">root</a>
-        <a href="#route1">#route1</a>
-        <a href="#route2">#route2 - redirects to #route1/jump3/4</a>
-        <a href="#route1/jump2">#route1/jump2</a>
-        <a href="#route1/jump3/4">#route1/jump3/4</a>
-        <a href="#route1/infinity">Infinite Loop</a>
-      </section>
-
-    `),
-
-    styles: (`
-      $self {
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 1.5em;
-      }
-      $self.visible {
-        background: blue;
-      }
-      .grid {
-        position: relative;
-        display: grid;
-        width: 500px;
-        height: 500px;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        grid-gap: 1.5em;
-      }
-      $firstLink {
-        color: hotpink;
-      }
-      $jump {
-        color: red;
-      }
-      $jump2 {
-        color: blue;
-      }
-      $jumpLeft {
-        color: hotpink;
-      }
-      $jumpLeft::before {
-        content: 'AAAAAH ITS WORKING';
-        position: absolute;
-        font-size: 24;
-      }
-      a {
-        border: 1px dotted hotpink;
-      }
-    `),
-
-    initialize() {
-
-      //TODO: everything seems to be working except root navigation.
-      Router.on('/', (path, params) => {
-        console.log('"/"', path);
-      });
-
-      Router.on('#route1', (path, params) => {
-        console.log('"#route1"', path);
-      });
-
-      Router.before('#route2', (path, params, goTo) => {
-        console.log('redirecting #route2', path);
-        goTo('#route1/jump3/4');
-      });
-
-      Router.on('#route1/jump3/4', (path, params) => {
-        console.log('"#route1/jump3/4', path);
-      });
-
-    }
+      <h1>Cue Sandbox - Slot Tests</h1>
+      ${FirstComponent()}
+      <br>
+      <div>
+        ${InsertedComponent({
+          slots: {
+            callToAction: 'InsertedComponent from DefinedCompositionComponent'
+          }
+        })}
+      </div>
+      <div>
+        <slot name="highLevel"></slot>
+      </div>
+    `)
 
   });
+
+  setTimeout(() => {
+    //Root.appendChild(Component.create('<defined-composition-component></defined-composition-component>'))
+  }, 2000)
+
+
+
 
 </script>
 </body>

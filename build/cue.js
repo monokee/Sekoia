@@ -1010,7 +1010,10 @@ const Component = {
     const RefNames = collectElementReferences(Template.content, {});
 
     // ---------------------- CUSTOM ELEMENT INSTANCE ----------------------
-    const CueElement = class CueElement extends HTMLElement {
+    //TODO: dont re-create the entire component class for every define. CueElement should be an inheritable base class extending html element
+    // and setup internal data and cue element specific methods.
+
+    class CueElement extends HTMLElement {
 
       constructor() {
 
@@ -1040,8 +1043,9 @@ const Component = {
           isConstructed = true;
 
           // ---------------------- CREATE SCOPED STYLES ----------------------
-          if (typeof config.styles === 'string' && config.styles.length) {
-            createComponentCSS(name, config.styles, RefNames);
+          const style = config.style || config.styles; // allow both style and styles
+          if (style && typeof style === 'string') {
+            createComponentCSS(name, style, RefNames);
           }
 
           // ---------------------- LIFECYCLE ----------------------
@@ -1142,15 +1146,20 @@ const Component = {
             let slots = null;
 
             if (this.hasAttribute('cue-slot')) {
+
               const uid = this.getAttribute('cue-slot');
               slots = SLOT_MARKUP_CACHE.get(uid);
+
             } else if (this.innerHTML) {
+
               const slottedChildren = this.querySelectorAll('[slot]');
+
               for (let i = 0; i < slottedChildren.length; i++) {
                 const slottedChild = slottedChildren[i];
                 slots || (slots = {});
                 slots[slottedChild.getAttribute('slot')] = slottedChild.outerHTML;
               }
+
             }
 
             // insert slotted children into template
@@ -1173,9 +1182,13 @@ const Component = {
                 collectElementReferences(this, RefNames);
               }
 
+            } else { // No slotted children found - render template only (keep empty slots in markup)
+
+              this.innerHTML = Template.innerHTML;
+
             }
 
-          } else {
+          } else { // Template has no Slots - render template only
 
             this.innerHTML = Template.innerHTML;
 
@@ -1333,7 +1346,7 @@ const Component = {
 
       }
 
-    };
+    }
 
     // ---------------------- ADD METHODS TO PROTOTYPE ----------------------
     for (const k in config) {
