@@ -495,8 +495,8 @@ class CueStoreBinding {
     this.key = key;
   }
 
-  get(deep = false) {
-    return deep === true ? deepClone(this.store[INTERNAL].data[this.key]) : this.store[INTERNAL].data[this.key];
+  get() {
+    return this.store[INTERNAL].data[this.key];
   }
 
   set(value) {
@@ -524,7 +524,7 @@ class CueStore {
       internal.usesStorage = false;
 
       // in-memory store
-      internal.data = deepClone(data);
+      internal.data = data;
 
     } else {
 
@@ -619,10 +619,10 @@ class CueStore {
 
     // clone memory objects
     if (!key) {
-      return deepClone(internal.data);
+      return internal.data;
     }
 
-    return deepClone(internal.data[key]);
+    return internal.data[key];
 
   }
 
@@ -1109,15 +1109,15 @@ const Component = {
           internal.initialized = true;
 
           // ------------- Create Data Model
-          const data = internal._data = Object.assign(deepClone(Data.static), internal._data);
+          internal._data = Object.assign(deepClone(Data.static), internal._data);
           const computedProperties = internal.computedProperties;
 
-          internal.data = new Proxy(data, {
+          internal.data = new Proxy({}, {
             set: forbiddenProxySet,
-            get(target, key) { // returns deep clone of bound store data, computed data or local data
-              if (Data.bindings[key]) return Data.bindings[key].get(true); // true -> get deep clone
+            get(_, key) {
+              if (Data.bindings[key]) return Data.bindings[key].get();
               if (computedProperties.has(key)) return computedProperties.get(key).value(internal.data);
-              return deepClone(target[key]);
+              return internal._data[key];
             }
           });
 
@@ -1211,7 +1211,11 @@ const Component = {
           // ----------------- Compose attribute data into internal data model
           if (this.hasAttribute('cue-data')) {
             const uid = this.getAttribute('cue-data');
-            Object.assign(internal._data, COMP_DATA_CACHE.get(uid));
+            const providedData = COMP_DATA_CACHE.get(uid);
+            const internalClone = deepClone(internal._data);
+            const providedDataClone = deepClone(providedData);
+            internal._data = providedData; // switch pointer
+            Object.assign(internal._data, internalClone, providedDataClone);
           }
 
           // ---------------- Add Composed Methods to Prototype (if any)
@@ -1287,18 +1291,18 @@ const Component = {
           let key;
 
           for (key in Data.bindings) {
-            dataClone[key] = Data.bindings[key].get(true); // true -> get deep clone
+            dataClone[key] = Data.bindings[key].get();
           }
 
           for (key in internal._data) {
-            dataClone[key] = deepClone(internal._data[key]); // make deep clone
+            dataClone[key] = internal._data[key];
           }
 
           return dataClone;
 
         }
 
-        return this[INTERNAL$1].data[key]; // proxy returns deep clone
+        return this[INTERNAL$1].data[key];
 
       }
 

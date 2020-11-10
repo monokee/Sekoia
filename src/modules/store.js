@@ -20,8 +20,8 @@ class CueStoreBinding {
     this.key = key;
   }
 
-  get(deep = false) {
-    return deep === true ? deepClone(this.store[INTERNAL].data[this.key]) : this.store[INTERNAL].data[this.key];
+  get() {
+    return this.store[INTERNAL].data[this.key];
   }
 
   set(value) {
@@ -49,7 +49,7 @@ class CueStore {
       internal.usesStorage = false;
 
       // in-memory store
-      internal.data = deepClone(data);
+      internal.data = data;
 
     } else {
 
@@ -144,10 +144,10 @@ class CueStore {
 
     // clone memory objects
     if (!key) {
-      return deepClone(internal.data);
+      return internal.data;
     }
 
-    return deepClone(internal.data[key]);
+    return internal.data[key];
 
   }
 
