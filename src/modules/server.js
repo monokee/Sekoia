@@ -1,9 +1,27 @@
 import { hashString } from "./utils.js";
 
-const CACHE_STORAGE = window.localStorage;
+const CACHE_STORAGE = (() => {
+  try {
+    window.localStorage.setItem('CUE_CACHE::TEST', '1');
+    window.localStorage.removeItem('CUE_CACHE::TEST');
+    return window.localStorage;
+  } catch (e) {
+    return {
+      _data: {},
+      setItem(key, val) {
+        this._data[key] = val;
+      },
+      getItem(key) {
+        return this._data[key] || null;
+      },
+      removeItem(key) {
+        delete this._data[key];
+      }
+    };
+  }
+})();
+
 const PENDING_CALLS = new Map();
-const REQUEST_START_EVENTS = [];
-const REQUEST_STOP_EVENTS = [];
 const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
 const EMPTY_CACHE_STORAGE_KEY = Symbol();
 

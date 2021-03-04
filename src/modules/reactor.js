@@ -60,11 +60,6 @@ function flushReactionBuffer() {
 
         if (computedProperty.hasChanged === true) {
 
-          //TODO:
-          // internal.dataEvent.key = computedProperty.ownPropertyName
-          // internal.dataEvent.value = deepClone(result);
-          // parentComponent.dispatchEvent(internal.dataEvent);
-
           if (callbacks[computedProperty.ownPropertyName]) {
             CALLBACKS.set(callbacks[computedProperty.ownPropertyName], result);
           }

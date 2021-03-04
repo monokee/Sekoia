@@ -415,6 +415,7 @@ export const Component = {
 
     // ---------------------- ADD SPECIAL METHODS TO PROTOTYPE ----------------------
     CueElement.prototype.renderEach = renderEach;
+    CueElement.prototype.autoBind = autoBind;
 
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
     customElements.define(name, CueElement);
@@ -451,6 +452,26 @@ export const Component = {
 // -----------------------------------
 
 // html
+function queryInElementBoundary(root, selector, collection = []) {
+
+  for (let i = 0, child; i < root.children.length; i++) {
+
+    child = root.children[i];
+
+    if (child.hasAttribute(selector)) {
+      collection.push(child);
+    }
+
+    if (!ALL_REGISTERED_COMPONENTS.has(child.tagName)) {
+      queryInElementBoundary(child, selector, collection);
+    }
+
+  }
+
+  return collection;
+
+}
+
 function collectElementReferences(root, refNames) {
 
   for (let i = 0, child, ref, cls1, cls2; i < root.children.length; i++) {
@@ -677,6 +698,26 @@ function renderEach(dataArray, createElement, updateElement = NOOP) {
     }
   } else {
     reconcile(this, previousData, dataArray, createElement, updateElement);
+  }
+
+}
+
+function autoBind(attribute = 'data-bind') {
+
+  const bindableElements = queryInElementBoundary(this, attribute);
+
+  if (bindableElements.length) {
+    this.addEventListener('input', e => {
+      if (bindableElements.indexOf(e.target) > -1) {
+        if (e.target.matches('input[type="checkbox"]')) {
+          this.setData(e.target.getAttribute(attribute), e.target.checked ? 1 : 0);
+        } else if (e.target.matches('select[multiple]')) {
+          this.setData(e.target.getAttribute(attribute), Array.from(e.target.selectedOptions).map(el => el.value));
+        } else {
+          this.setData(e.target.getAttribute(attribute), e.target.value);
+        }
+      }
+    });
   }
 
 }

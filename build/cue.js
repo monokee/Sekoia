@@ -143,7 +143,27 @@ function getArrayTail(a, b) {
 
 }
 
-const CACHE_STORAGE = window.localStorage;
+const CACHE_STORAGE = (() => {
+  try {
+    window.localStorage.setItem('CUE_CACHE::TEST', '1');
+    window.localStorage.removeItem('CUE_CACHE::TEST');
+    return window.localStorage;
+  } catch (e) {
+    return {
+      _data: {},
+      setItem(key, val) {
+        this._data[key] = val;
+      },
+      getItem(key) {
+        return this._data[key] || null;
+      },
+      removeItem(key) {
+        delete this._data[key];
+      }
+    };
+  }
+})();
+
 const PENDING_CALLS = new Map();
 const ALL_KEYS = 'CUE_SERVER_CACHE::KEYS';
 const EMPTY_CACHE_STORAGE_KEY = Symbol();
@@ -421,11 +441,6 @@ function flushReactionBuffer() {
         result = computedProperty.value(context[2]); // context[2] === dataSource
 
         if (computedProperty.hasChanged === true) {
-
-          //TODO:
-          // internal.dataEvent.key = computedProperty.ownPropertyName
-          // internal.dataEvent.value = deepClone(result);
-          // parentComponent.dispatchEvent(internal.dataEvent);
 
           if (callbacks[computedProperty.ownPropertyName]) {
             CALLBACKS.set(callbacks[computedProperty.ownPropertyName], result);
@@ -1361,6 +1376,7 @@ const Component = {
 
     // ---------------------- ADD SPECIAL METHODS TO PROTOTYPE ----------------------
     CueElement.prototype.renderEach = renderEach;
+    CueElement.prototype.autoBind = autoBind;
 
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
     customElements.define(name, CueElement);
@@ -1397,6 +1413,26 @@ const Component = {
 // -----------------------------------
 
 // html
+function queryInElementBoundary(root, selector, collection = []) {
+
+  for (let i = 0, child; i < root.children.length; i++) {
+
+    child = root.children[i];
+
+    if (child.hasAttribute(selector)) {
+      collection.push(child);
+    }
+
+    if (!ALL_REGISTERED_COMPONENTS.has(child.tagName)) {
+      queryInElementBoundary(child, selector, collection);
+    }
+
+  }
+
+  return collection;
+
+}
+
 function collectElementReferences(root, refNames) {
 
   for (let i = 0, child, ref, cls1, cls2; i < root.children.length; i++) {
@@ -1623,6 +1659,26 @@ function renderEach(dataArray, createElement, updateElement = NOOP) {
     }
   } else {
     reconcile(this, previousData, dataArray, createElement, updateElement);
+  }
+
+}
+
+function autoBind(attribute = 'data-bind') {
+
+  const bindableElements = queryInElementBoundary(this, attribute);
+
+  if (bindableElements.length) {
+    this.addEventListener('input', e => {
+      if (bindableElements.indexOf(e.target) > -1) {
+        if (e.target.matches('input[type="checkbox"]')) {
+          this.setData(e.target.getAttribute(attribute), e.target.checked ? 1 : 0);
+        } else if (e.target.matches('select[multiple]')) {
+          this.setData(e.target.getAttribute(attribute), Array.from(e.target.selectedOptions).map(el => el.value));
+        } else {
+          this.setData(e.target.getAttribute(attribute), e.target.value);
+        }
+      }
+    });
   }
 
 }
