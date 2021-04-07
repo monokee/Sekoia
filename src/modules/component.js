@@ -1,7 +1,9 @@
 import { STORE_BINDING_ID } from './store.js';
-import { NOOP, deepEqual, deepClone } from './utils.js';
+import { NOOP, forbiddenProxySet, deepEqual, deepClone, reconcile } from './utils.js';
 import { ComputedProperty, setupComputedProperties, buildDependencyGraph } from "./computed.js";
 import { Reactor } from "./reactor.js";
+
+// --------------- COMPONENT GLOBALS -------------
 
 // Regex matches when $self is:
 // - immediately followed by css child selector (space . : # [ > + ~) OR
@@ -13,7 +15,7 @@ const CHILD_SELECTORS = [' ','.',':','#','[','>','+','~'];
 
 let UID = -1;
 
-const DEFINED_COMPONENTS = new Map();
+const DEFINED_COMPONENTS = new Set();
 const COMP_DATA_CACHE = new Map();
 const COMP_INIT_CACHE = new Map();
 const COMP_METHOD_CACHE = new Map();
@@ -28,76 +30,190 @@ const CUE_CSS = {
   components: document.getElementById('cue::components') || Object.assign(document.head.appendChild(document.createElement('style')), {id: 'cue::components'})
 };
 
+// --------------- HTML UTILITIES -------------
+
+const queryInElementBoundary = (root, selector, collection = []) => {
+
+  for (let i = 0, child; i < root.children.length; i++) {
+
+    child = root.children[i];
+
+    if (child.hasAttribute(selector)) {
+      collection.push(child);
+    }
+
+    if (!DEFINED_COMPONENTS.has(child.tagName)) {
+      queryInElementBoundary(child, selector, collection);
+    }
+
+  }
+
+  return collection;
+
+};
+
+const collectElementReferences = (root, refNames) => {
+
+  for (let i = 0, child, ref, cls1, cls2; i < root.children.length; i++) {
+
+    child = root.children[i];
+
+    ref = child.getAttribute('$');
+
+    if (ref) {
+      cls1 = child.getAttribute('class');
+      cls2 = ref + ++UID;
+      refNames['$' + ref] = '.' + cls2;
+      child.setAttribute('class', cls1 ? cls1 + ' ' + cls2 : cls2);
+      child.removeAttribute('$');
+    }
+
+    if (!DEFINED_COMPONENTS.has(child.tagName)) {
+      collectElementReferences(child, refNames);
+    }
+
+  }
+
+  return refNames;
+
+};
+
+const createComponentMarkup = (openTag, innerHTML, closeTag, attributes) => {
+
+  let htmlString = openTag;
+  let instanceMethods = null;
+
+  for (const att in attributes) {
+
+    const val = attributes[att];
+
+    if (typeof val === 'string') {
+
+      htmlString += ' ' + att + '="' + val + '"';
+
+    } else {
+
+      ++UID;
+      const uid = '' + UID;
+
+      if (att === 'data') {
+        COMP_DATA_CACHE.set(uid, val);
+        htmlString += ' cue-data="' + uid + '"';
+      } else if (att === 'slots') {
+        SLOT_MARKUP_CACHE.set(uid, val);
+        htmlString += ' cue-slot="' + uid + '"';
+      } else if (att === 'initialize') {
+        COMP_INIT_CACHE.set(uid, val);
+        htmlString += ' cue-init="' + uid + '"';
+      } else if (typeof val === 'function') {
+        instanceMethods || (instanceMethods = {});
+        instanceMethods[att] = val;
+      }
+
+    }
+
+  }
+
+  if (instanceMethods) {
+    ++UID;
+    const uid = '' + UID;
+    COMP_METHOD_CACHE.set(uid, instanceMethods);
+    htmlString += ' cue-func="' + uid + '"';
+  }
+
+  htmlString += '>' + innerHTML + closeTag;
+
+  return htmlString;
+
+};
+
+// --------------- CUSTOM ELEMENT BASE CLASSES -------------
+
 class CueModule {
 
   constructor(name, config) {
 
     this.name = name;
+    this.ready = false;
 
-    // --------------- ELEMENT TEMPLATE --------------
+    // --------------- PREPARE ELEMENT TEMPLATE --------------
+    // this has to be done early so that ref-ready template.innerHTML
+    // can be composed via string factory returned from Component.define
     this.template = document.createElement('template');
     this.template.innerHTML = config.element || '';
     this.refNames = collectElementReferences(this.template.content, {});
-    this.template.__slots = {};
-    this.template.__hasSlots = false;
 
-    const slots = this.template.content.querySelectorAll('slot');
-    for (let i = 0; i < slots.length; i++) {
-      const slot = slots[i];
-      this.template.__slots[slot.getAttribute('name')] = slot.outerHTML;
-      this.template.__hasSlots = true;
-    }
+  }
 
-    // ------------------ SCOPED CSS ------------------
-    config.style = config.style || config.styles; // allow both names
-    if (config.style) {
-      this.style = this.createScopedStyles(config.style);
-      CUE_CSS.components.innerHTML += this.style;
-    }
+  setupOnce(config) {
 
-    // ----------------- DATA, COMPUTED, REACTIONS --------------
+    if (this.ready === false) {
 
-    this.data = {
-      static: {},
-      computed: new Map(),
-      bindings: {},
-      reactions: {}
-    };
+      this.ready = true;
 
-    // Assign Data from Config
-    const allProperties = {};
+      // ------------------ COMPLETE TEMPLATE -----------------
+      this.template.__slots = {};
+      this.template.__hasSlots = false;
 
-    if (config.data) {
+      const slots = this.template.content.querySelectorAll('slot');
+      for (let i = 0; i < slots.length; i++) {
+        const slot = slots[i];
+        this.template.__slots[slot.getAttribute('name')] = slot.outerHTML;
+        this.template.__hasSlots = true;
+      }
 
-      for (const k in config.data) {
+      // ------------------ CREATE SCOPED CSS ------------------
+      config.style = config.style || config.styles; // allow both names
+      if (config.style) {
+        this.style = this.createScopedStyles(config.style);
+        CUE_CSS.components.innerHTML += this.style;
+      }
 
-        const v = config.data[k];
+      // ----------------- SETUP DATA, COMPUTED & REACTIONS --------------
 
-        allProperties[k] = v.value;
+      this.data = {
+        static: {},
+        computed: new Map(),
+        bindings: {},
+        reactions: {}
+      };
 
-        if (v.value && v.value.id === STORE_BINDING_ID) {
-          this.data.bindings[k] = v.value;
-        } else if (typeof v.value === 'function') {
-          this.data.computed.set(k, new ComputedProperty(k, v.value));
-        } else {
-          this.data.static[k] = v.value;
-        }
+      // Assign Data from Config
+      const allProperties = {};
 
-        if (typeof v.reaction === 'function') {
-          this.data.reactions[k] = v.reaction;
+      if (config.data) {
+
+        for (const k in config.data) {
+
+          const v = config.data[k];
+
+          allProperties[k] = v.value;
+
+          if (v.value && v.value.id === STORE_BINDING_ID) {
+            this.data.bindings[k] = v.value;
+          } else if (typeof v.value === 'function') {
+            this.data.computed.set(k, new ComputedProperty(k, v.value));
+          } else {
+            this.data.static[k] = v.value;
+          }
+
+          if (typeof v.reaction === 'function') {
+            this.data.reactions[k] = v.reaction;
+          }
+
         }
 
       }
 
-    }
+      // Setup Computed Properties if assigned
+      if (this.data.computed.size) {
+        this.data.computed = setupComputedProperties(allProperties, this.data.computed);
+      }
 
-    // Setup Computed Properties if assigned
-    if (this.data.computed.size) {
-      this.data.computed = setupComputedProperties(allProperties, this.data.computed);
-    }
+      // ---------------------- LIFECYCLE METHODS ----------------------
+      this.initialize = typeof config.initialize === 'function' ? config.initialize : NOOP;
 
-    // ---------------------- LIFECYCLE METHODS ----------------------
-    this.initialize = typeof config.initialize === 'function' ? config.initialize : NOOP;
+    }
 
   }
 
@@ -234,12 +350,12 @@ class CueModule {
 
 class CueElement extends HTMLElement {
 
-  constructor() {
+  constructor(module, config) {
 
     super();
 
-    const component = DEFINED_COMPONENTS.get(this.tagName);
-    const module = component.module;
+    // Setup base module the first time this component is built
+    module.setupOnce(config);
 
     // ---------------------- INSTANCE INTERNALS ----------------------
 
@@ -371,7 +487,7 @@ class CueElement extends HTMLElement {
         if (el) {
           if (!el[INTERNAL]) {
             el[INTERNAL] = {};
-            el.renderEach = renderEach; // give every ref element fast list rendering method
+            el.renderEach = this.renderEach; // give every ref element fast list rendering method
           }
           internal.refs[refName] = el; // makes ref available as $refName in js
         }
@@ -520,20 +636,62 @@ class CueElement extends HTMLElement {
 
   }
 
+  autoBind(attribute = 'data-bind') {
+
+    const bindableElements = queryInElementBoundary(this, attribute);
+
+    if (bindableElements.length) {
+      this.addEventListener('input', e => {
+        if (bindableElements.indexOf(e.target) > -1) {
+          if (e.target.matches('input[type="checkbox"]')) {
+            this.setData(e.target.getAttribute(attribute), e.target.checked ? 1 : 0);
+          } else if (e.target.matches('select[multiple]')) {
+            this.setData(e.target.getAttribute(attribute), Array.from(e.target.selectedOptions).map(el => el.value));
+          } else {
+            this.setData(e.target.getAttribute(attribute), e.target.value);
+          }
+        }
+      });
+    }
+
+  }
+
+  renderEach(dataArray, createElement, updateElement = NOOP) {
+
+    // accept arrays, convert plain objects to arrays, convert null or undefined to array
+    dataArray = Array.isArray(dataArray) ? dataArray : Object.values(dataArray || {});
+
+    // this function is attached directly to dom elements. "this" refers to the element
+    const previousData = this[INTERNAL].childData || [];
+    this[INTERNAL].childData = dataArray;
+
+    if (dataArray.length === 0) {
+      this.innerHTML = '';
+    } else if (previousData.length === 0) {
+      for (let i = 0; i < dataArray.length; i++) {
+        this.appendChild(createElement(dataArray[i], i, dataArray));
+      }
+    } else {
+      reconcile(this, previousData, dataArray, createElement, updateElement);
+    }
+
+  }
+
 }
 
-CueElement.prototype.renderEach = renderEach;
-CueElement.prototype.autoBind = autoBind;
+// --------------- PUBLIC API -------------
 
 export const Component = {
 
   define(name, config) {
 
-    const module = new CueModule(name, config);
+    const Module = new CueModule(name, config);
 
     // ---------------------- SETUP COMPONENT ----------------------
     class CueComponent extends CueElement {
-      constructor() { super() }
+      constructor() {
+        super(Module, config);
+      }
     }
 
     // ---------------------- ADD METHODS TO PROTOTYPE ----------------------
@@ -544,13 +702,13 @@ export const Component = {
     }
 
     // ---------------------- DEFINE CUSTOM ELEMENT ----------------------
-    DEFINED_COMPONENTS.set(name.toUpperCase(), {config, module});
+    DEFINED_COMPONENTS.add(name.toUpperCase());
     customElements.define(name, CueComponent);
 
     // ----------------------- RETURN HTML FACTORY FOR EMBEDDING ELEMENT WITH ATTRIBUTES -----------------------
     const openTag = '<'+name, closeTag = '</'+name+'>';
 
-    return (attributes = {}) => createComponentMarkup(openTag, module.template.innerHTML, closeTag, attributes);
+    return (attributes = {}) => createComponentMarkup(openTag, Module.template.innerHTML, closeTag, attributes);
 
   },
 
@@ -573,448 +731,3 @@ export const Component = {
   }
 
 };
-
-// -----------------------------------
-
-// html
-function queryInElementBoundary(root, selector, collection = []) {
-
-  for (let i = 0, child; i < root.children.length; i++) {
-
-    child = root.children[i];
-
-    if (child.hasAttribute(selector)) {
-      collection.push(child);
-    }
-
-    if (!DEFINED_COMPONENTS.has(child.tagName)) {
-      queryInElementBoundary(child, selector, collection);
-    }
-
-  }
-
-  return collection;
-
-}
-
-function collectElementReferences(root, refNames) {
-
-  for (let i = 0, child, ref, cls1, cls2; i < root.children.length; i++) {
-
-    child = root.children[i];
-
-    ref = child.getAttribute('$');
-
-    if (ref) {
-      cls1 = child.getAttribute('class');
-      cls2 = ref + ++UID;
-      refNames['$' + ref] = '.' + cls2;
-      child.setAttribute('class', cls1 ? cls1 + ' ' + cls2 : cls2);
-      child.removeAttribute('$');
-    }
-
-    if (!DEFINED_COMPONENTS.has(child.tagName)) {
-      collectElementReferences(child, refNames);
-    }
-
-  }
-
-  return refNames;
-
-}
-
-function createComponentMarkup(openTag, innerHTML, closeTag, attributes) {
-
-  let htmlString = openTag;
-  let instanceMethods = null;
-
-  for (const att in attributes) {
-
-    const val = attributes[att];
-
-    if (typeof val === 'string') {
-
-      htmlString += ' ' + att + '="' + val + '"';
-
-    } else {
-
-      ++UID;
-      const uid = '' + UID;
-
-      if (att === 'data') {
-        COMP_DATA_CACHE.set(uid, val);
-        htmlString += ' cue-data="' + uid + '"';
-      } else if (att === 'slots') {
-        SLOT_MARKUP_CACHE.set(uid, val);
-        htmlString += ' cue-slot="' + uid + '"';
-      } else if (att === 'initialize') {
-        COMP_INIT_CACHE.set(uid, val);
-        htmlString += ' cue-init="' + uid + '"';
-      } else if (typeof val === 'function') {
-        instanceMethods || (instanceMethods = {});
-        instanceMethods[att] = val;
-      }
-
-    }
-
-  }
-
-  if (instanceMethods) {
-    ++UID;
-    const uid = '' + UID;
-    COMP_METHOD_CACHE.set(uid, instanceMethods);
-    htmlString += ' cue-func="' + uid + '"';
-  }
-
-  htmlString += '>' + innerHTML + closeTag;
-
-  return htmlString;
-
-}
-
-// utils
-function forbiddenProxySet(target, key, value) {
-  throw new Error(`Can not change data in reactions: this.${key} = ${value} has been ignored.`);
-}
-
-function renderEach(dataArray, createElement, updateElement = NOOP) {
-
-  // accept arrays, convert plain objects to arrays, convert null or undefined to array
-  dataArray = Array.isArray(dataArray) ? dataArray : Object.values(dataArray || {});
-
-  // this function is attached directly to dom elements. "this" refers to the element
-  const previousData = this[INTERNAL].childData || [];
-  this[INTERNAL].childData = dataArray;
-
-  if (dataArray.length === 0) {
-    this.innerHTML = '';
-  } else if (previousData.length === 0) {
-    for (let i = 0; i < dataArray.length; i++) {
-      this.appendChild(createElement(dataArray[i], i, dataArray));
-    }
-  } else {
-    reconcile(this, previousData, dataArray, createElement, updateElement);
-  }
-
-}
-
-function autoBind(attribute = 'data-bind') {
-
-  const bindableElements = queryInElementBoundary(this, attribute);
-
-  if (bindableElements.length) {
-    this.addEventListener('input', e => {
-      if (bindableElements.indexOf(e.target) > -1) {
-        if (e.target.matches('input[type="checkbox"]')) {
-          this.setData(e.target.getAttribute(attribute), e.target.checked ? 1 : 0);
-        } else if (e.target.matches('select[multiple]')) {
-          this.setData(e.target.getAttribute(attribute), Array.from(e.target.selectedOptions).map(el => el.value));
-        } else {
-          this.setData(e.target.getAttribute(attribute), e.target.value);
-        }
-      }
-    });
-  }
-
-}
-
-function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
-
-  // optimized array reconciliation algorithm based on the following implementations
-  // https://github.com/localvoid/ivi
-  // https://github.com/adamhaile/surplus
-  // https://github.com/Freak613/stage0
-
-  // important: reconcile does not currently work with dynamically adding or removing elements that have $refAttributes
-
-  let prevStart = 0, newStart = 0;
-  let loop = true;
-  let prevEnd = currentArray.length - 1, newEnd = newArray.length - 1;
-  let a, b;
-  let prevStartNode = parentElement.firstChild, newStartNode = prevStartNode;
-  let prevEndNode = parentElement.lastChild, newEndNode = prevEndNode;
-  let afterNode;
-
-  // scan over common prefixes, suffixes, and simple reversals
-  outer : while (loop) {
-
-    loop = false;
-
-    let _node;
-
-    // Skip prefix
-    a = currentArray[prevStart];
-    b = newArray[newStart];
-
-    while (a === b) {
-
-      updateFn(prevStartNode, b);
-
-      prevStart++;
-      newStart++;
-
-      newStartNode = prevStartNode = prevStartNode.nextSibling;
-
-      if (prevEnd < prevStart || newEnd < newStart) {
-        break outer;
-      }
-
-      a = currentArray[prevStart];
-      b = newArray[newStart];
-
-    }
-
-    // Skip suffix
-    a = currentArray[prevEnd];
-    b = newArray[newEnd];
-
-    while (a === b) {
-
-      updateFn(prevEndNode, b);
-
-      prevEnd--;
-      newEnd--;
-
-      afterNode = prevEndNode;
-      newEndNode = prevEndNode = prevEndNode.previousSibling;
-
-      if (prevEnd < prevStart || newEnd < newStart) {
-        break outer;
-      }
-
-      a = currentArray[prevEnd];
-      b = newArray[newEnd];
-
-    }
-
-    // Swap backward
-    a = currentArray[prevEnd];
-    b = newArray[newStart];
-
-    while (a === b) {
-
-      loop = true;
-      updateFn(prevEndNode, b);
-
-      _node = prevEndNode.previousSibling;
-      parentElement.insertBefore(prevEndNode, newStartNode);
-      newEndNode = prevEndNode = _node;
-
-      newStart++;
-      prevEnd--;
-
-      if (prevEnd < prevStart || newEnd < newStart) {
-        break outer;
-      }
-
-      a = currentArray[prevEnd];
-      b = newArray[newStart];
-
-    }
-
-    // Swap forward
-    a = currentArray[prevStart];
-    b = newArray[newEnd];
-
-    while (a === b) {
-
-      loop = true;
-
-      updateFn(prevStartNode, b);
-
-      _node = prevStartNode.nextSibling;
-      parentElement.insertBefore(prevStartNode, afterNode);
-      afterNode = newEndNode = prevStartNode;
-      prevStartNode = _node;
-
-      prevStart++;
-      newEnd--;
-
-      if (prevEnd < prevStart || newEnd < newStart) {
-        break outer;
-      }
-
-      a = currentArray[prevStart];
-      b = newArray[newEnd];
-
-    }
-
-  }
-
-  // Remove Node(s)
-  if (newEnd < newStart) {
-    if (prevStart <= prevEnd) {
-      let next;
-      while (prevStart <= prevEnd) {
-        if (prevEnd === 0) {
-          parentElement.removeChild(prevEndNode);
-        } else {
-          next = prevEndNode.previousSibling;
-          parentElement.removeChild(prevEndNode);
-          prevEndNode = next;
-        }
-        prevEnd--;
-      }
-    }
-    return;
-  }
-
-  // Add Node(s)
-  if (prevEnd < prevStart) {
-    if (newStart <= newEnd) {
-      while (newStart <= newEnd) {
-        afterNode
-          ? parentElement.insertBefore(createFn(newArray[newStart], newStart, newArray), afterNode)
-          : parentElement.appendChild(createFn(newArray[newStart], newStart, newArray));
-        newStart++
-      }
-    }
-    return;
-  }
-
-  // Simple cases don't apply. Prepare full reconciliation:
-
-  // Collect position index of nodes in current DOM
-  const positions = new Array(newEnd + 1 - newStart);
-  // Map indices of current DOM nodes to indices of new DOM nodes
-  const indices = new Map();
-
-  let i;
-
-  for (i = newStart; i <= newEnd; i++) {
-    positions[i] = -1;
-    indices.set(newArray[i], i);
-  }
-
-  let reusable = 0, toRemove = [];
-
-  for (i = prevStart; i <= prevEnd; i++) {
-
-    if (indices.has(currentArray[i])) {
-      positions[indices.get(currentArray[i])] = i;
-      reusable++;
-    } else {
-      toRemove.push(i);
-    }
-
-  }
-
-  // Full Replace
-  if (reusable === 0) {
-
-    parentElement.textContent = '';
-
-    for (i = newStart; i <= newEnd; i++) {
-      parentElement.appendChild(createFn(newArray[i], i, newArray));
-    }
-
-    return;
-
-  }
-
-  // Full Patch around longest increasing sub-sequence
-  const snake = longestIncreasingSubsequence(positions, newStart);
-
-  // gather nodes
-  const nodes = [];
-  let tmpC = prevStartNode;
-
-  for (i = prevStart; i <= prevEnd; i++) {
-    nodes[i] = tmpC;
-    tmpC = tmpC.nextSibling
-  }
-
-  for (i = 0; i < toRemove.length; i++) {
-    parentElement.removeChild(nodes[toRemove[i]]);
-  }
-
-  let snakeIndex = snake.length - 1, tempNode;
-  for (i = newEnd; i >= newStart; i--) {
-
-    if (snake[snakeIndex] === i) {
-
-      afterNode = nodes[positions[snake[snakeIndex]]];
-      updateFn(afterNode, newArray[i]);
-      snakeIndex--;
-
-    } else {
-
-      if (positions[i] === -1) {
-        tempNode = createFn(newArray[i], i, newArray);
-      } else {
-        tempNode = nodes[positions[i]];
-        updateFn(tempNode, newArray[i]);
-      }
-
-      parentElement.insertBefore(tempNode, afterNode);
-      afterNode = tempNode;
-
-    }
-
-  }
-
-}
-
-function longestIncreasingSubsequence(ns, newStart) {
-
-  // inline-optimized implementation of longest-positive-increasing-subsequence algorithm
-  // https://en.wikipedia.org/wiki/Longest_increasing_subsequence
-
-  const seq = [];
-  const is = [];
-  const pre = new Array(ns.length);
-
-  let l = -1, i, n, j;
-
-  for (i = newStart; i < ns.length; i++) {
-
-    n = ns[i];
-
-    if (n < 0) continue;
-
-    let lo = -1, hi = seq.length, mid;
-
-    if (hi > 0 && seq[hi - 1] <= n) {
-
-      j = hi - 1;
-
-    } else {
-
-      while (hi - lo > 1) {
-
-        mid = Math.floor((lo + hi) / 2);
-
-        if (seq[mid] > n) {
-          hi = mid;
-        } else {
-          lo = mid;
-        }
-
-      }
-
-      j = lo;
-
-    }
-
-    if (j !== -1) {
-      pre[i] = is[j];
-    }
-
-    if (j === l) {
-      l++;
-      seq[l] = n;
-      is[l] = i;
-    } else if (n < seq[j + 1]) {
-      seq[j + 1] = n;
-      is[j + 1] = i;
-    }
-
-  }
-
-  for (i = is[l]; l >= 0; i = pre[i], l--) {
-    seq[l] = i;
-  }
-
-  return seq;
-
-}
