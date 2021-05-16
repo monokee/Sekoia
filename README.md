@@ -56,7 +56,7 @@ export const MyComponent = Component.define('my-component', {
   `),
 
   data: {
-    users: { // reads/writes from a global, persistent store. provides empty array as default value (if store has no value)
+    users: {
       value: [
         {firstName: 'John', lastName: 'Williams'}, 
         {firstName: 'Hans', lastName: 'Zimmer'}
