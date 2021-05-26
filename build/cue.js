@@ -2027,7 +2027,7 @@ const DEFAULT_TRIGGER_OPTIONS = {
 };
 
 let HAS_POPSTATE_LISTENER = false;
-let CURRENT_QUERY_PARAMETERS = {};
+let CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(window.location.search);
 let CURRENT_ROUTE_FRAGMENTS = ['/'];
 if (window.location.hash) {
   CURRENT_ROUTE_FRAGMENTS.push(...window.location.hash.split('/'));
