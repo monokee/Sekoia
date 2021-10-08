@@ -238,6 +238,43 @@ export const getArrayTail = (a, b) => {
 
 };
 
+export const buildParamsFromQueryString = queryString => {
+
+  const params = {};
+
+  if (queryString.length > 1) {
+    const queries = queryString.substring(1).replace(/\+/g, ' ').replace(/;/g, '&').split('&');
+    for (let i = 0, kv, key; i < queries.length; i++) {
+      kv = queries[i].split('=', 2);
+      key = decodeURIComponent(kv[0]);
+      if (key) {
+        params[key] = kv.length > 1 ? decodeURIComponent(kv[1]) : true;
+      }
+    }
+  }
+
+  return params;
+
+};
+
+export const buildQueryStringFromParams = params => {
+
+  let querystring = '?';
+
+  for (const key in params) {
+    querystring += encodeURIComponent(key) + '=' + encodeURIComponent(params[key]) + '&';
+  }
+
+  if (querystring === '?') {
+    querystring = '';
+  } else if (querystring[querystring.length - 1] === '&') {
+    querystring = querystring.substring(0, querystring.length - 1);
+  }
+
+  return querystring;
+
+};
+
 // ---------- Functions (require this) ----------
 
 export function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {

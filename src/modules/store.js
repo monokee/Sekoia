@@ -33,7 +33,7 @@ class CueStoreBinding {
 
 class CueStore {
 
-  constructor(name, data, storage) {
+  constructor(name, data, storage = null) {
 
     const internal = this[INTERNAL] = {
       name: name,
@@ -149,6 +149,14 @@ class CueStore {
 
     return internal.data[key];
 
+  }
+
+  getInitial(key) {
+    if (!key) {
+      return deepClone(this[INTERNAL].defaultData);
+    } else {
+      return deepClone(this[INTERNAL].defaultData[key]);
+    }
   }
 
   set(key, value) {

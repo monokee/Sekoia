@@ -211,6 +211,43 @@ const getArrayTail = (a, b) => {
 
 };
 
+const buildParamsFromQueryString = queryString => {
+
+  const params = {};
+
+  if (queryString.length > 1) {
+    const queries = queryString.substring(1).replace(/\+/g, ' ').replace(/;/g, '&').split('&');
+    for (let i = 0, kv, key; i < queries.length; i++) {
+      kv = queries[i].split('=', 2);
+      key = decodeURIComponent(kv[0]);
+      if (key) {
+        params[key] = kv.length > 1 ? decodeURIComponent(kv[1]) : true;
+      }
+    }
+  }
+
+  return params;
+
+};
+
+const buildQueryStringFromParams = params => {
+
+  let querystring = '?';
+
+  for (const key in params) {
+    querystring += encodeURIComponent(key) + '=' + encodeURIComponent(params[key]) + '&';
+  }
+
+  if (querystring === '?') {
+    querystring = '';
+  } else if (querystring[querystring.length - 1] === '&') {
+    querystring = querystring.substring(0, querystring.length - 1);
+  }
+
+  return querystring;
+
+};
+
 // ---------- Functions (require this) ----------
 
 function reconcile(parentElement, currentArray, newArray, createFn, updateFn) {
@@ -834,7 +871,7 @@ class CueStoreBinding {
 
 class CueStore {
 
-  constructor(name, data, storage) {
+  constructor(name, data, storage = null) {
 
     const internal = this[INTERNAL] = {
       name: name,
@@ -950,6 +987,14 @@ class CueStore {
 
     return internal.data[key];
 
+  }
+
+  getInitial(key) {
+    if (!key) {
+      return deepClone(this[INTERNAL].defaultData);
+    } else {
+      return deepClone(this[INTERNAL].defaultData[key]);
+    }
   }
 
   set(key, value) {
@@ -1524,7 +1569,7 @@ class CueModule {
 
     }
 
-    // write queries to the end of the rules AFTER the other rules (issue #13)
+    // write queries to the end of the rules AFTER the other rules for specificity (issue #13)
     styleNodeInnerHTML += styleQueries;
 
     // Empty Compiler styleSheet
@@ -2015,6 +2060,7 @@ const CLEAN_ORIGIN = removeTrailingSlash(ORIGIN);
 const REGISTERED_FILTERS = new Map();
 const REGISTERED_ACTIONS = new Set();
 const WILDCARD_ACTIONS = [];
+
 let WILDCARD_FILTER = null;
 
 const ROUTES_STRUCT = {};
@@ -2487,43 +2533,6 @@ function getLongestOccurringPrefix(s, prefixes) {
   return prefixes
     .filter(x => s.lastIndexOf(x, 0) === 0)
     .sort((a, b) => b.length - a.length)[0];
-}
-
-function buildParamsFromQueryString(queryString) {
-
-  const params = {};
-
-  if (queryString.length > 1) {
-    const queries = queryString.substring(1).replace(/\+/g, ' ').replace(/;/g, '&').split('&');
-    for (let i = 0, kv, key; i < queries.length; i++) {
-      kv = queries[i].split('=', 2);
-      key = decodeURIComponent(kv[0]);
-      if (key) {
-        params[key] = kv.length > 1 ? decodeURIComponent(kv[1]) : true;
-      }
-    }
-  }
-
-  return params;
-
-}
-
-function buildQueryStringFromParams(params) {
-
-  let querystring = '?';
-
-  for (const key in params) {
-    querystring += encodeURIComponent(key) + '=' + encodeURIComponent(params[key]) + '&';
-  }
-
-  if (querystring === '?') {
-    querystring = '';
-  } else if (querystring[querystring.length - 1] === '&') {
-    querystring = querystring.substring(0, querystring.length - 1);
-  }
-
-  return querystring;
-
 }
 
 //removeIf(esModule)

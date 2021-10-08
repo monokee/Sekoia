@@ -252,7 +252,7 @@ class CueModule {
 
     }
 
-    // write queries to the end of the rules AFTER the other rules (issue #13)
+    // write queries to the end of the rules AFTER the other rules for specificity (issue #13)
     styleNodeInnerHTML += styleQueries;
 
     // Empty Compiler styleSheet
