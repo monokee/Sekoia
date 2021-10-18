@@ -123,7 +123,7 @@ class CueStore {
 
     const internal = this[INTERNAL];
 
-    // storage already does deep clone via stringify
+    // storage does deep clone via stringify
     if (internal.usesStorage) {
 
       if (!key) {
@@ -207,6 +207,18 @@ class CueStore {
     this[INTERNAL_STORE_DISPATCH](key, void 0);
   }
 
+  clear(silent = false) {
+    const internal = this[INTERNAL];
+    for (const key in internal.data) {
+      if (internal.data.hasOwnProperty(key)) {
+        delete internal.data[key];
+        if (silent === false) {
+          this[INTERNAL_STORE_DISPATCH](key, void 0);
+        }
+      }
+    }
+  }
+
   bind(key) {
 
     const internal = this[INTERNAL];
@@ -242,6 +254,14 @@ class CueStore {
 
   }
 
+  destroy() {
+    const internal = this[INTERNAL];
+    this.clear(true);
+    internal.events.clear();
+    internal.bindings.clear();
+    ALL_STORES.delete(internal.name);
+  }
+
 }
 
 export const Store = {
@@ -261,16 +281,11 @@ export const Store = {
   },
 
   destroy(name) {
-
-    if (!ALL_STORES.has(name)) {
+    if (ALL_STORES.has(name)) {
+      ALL_STORES.get(name).destroy();
+    } else {
       throw new Error('Can not destroy Store "' + name + '". Store does not exist.');
     }
-
-    const store = ALL_STORES.get(name);
-    store.clear(true);
-    store[INTERNAL].events.clear();
-    ALL_STORES.delete(name);
-
   }
 
 };

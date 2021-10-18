@@ -7,69 +7,36 @@
 <body>
 
 <div id="cue-sandbox">
-  <defined-composition-component>
-    <span slot="highLevel">High Level SLOT!!!</span>
-  </defined-composition-component>
+
 </div>
 
 <script src="build/cue.module.js" type="module"></script>
 
 <script type="module">
 
-  import { Component, Router } from "./build/cue.module.js";
+  import { Component } from "./build/cue.module.js";
 
   const Root = document.getElementById('cue-sandbox');
 
-  const MyParentComponent = Component.define('my-parent-component', {
+  Component.define('test-component', {
     element: (`
-      <h1><slot name="heading"></slot></h1>
-      <p><slot name="paragraph"></slot></p>
-      <slot name="footer"></slot>
-    `)
-  });
-
-  const InsertedComponent = Component.define('inserted-component', {
-    element: '<button class="secondary"><slot name="callToAction"></slot></button>'
-  });
-
-  const FirstComponent = Component.extend(MyParentComponent, {
-    slots: {
-      heading: 'My First Component',
-      paragraph: 'Sätze, die alle Buchstaben des Alphabets enthalten, heißen Pangramme (von griechisch πᾶν γράμμα: "jeder Buchstabe").',
-      footer: InsertedComponent({
-        slots: {
-          callToAction: 'InsertedComponent from FirstComponent'
+      <h1 $="heading">Heading</h1>
+      <b $="subHeading">Subheading</b>
+      <p $="content">Lorem Ipsum Dorothee</p>
+    `),
+    style: (`
+      $self, $heading, $subHeading, $content {
+        font-family: Poppins, Roboto, sans-serif;
+      }
+      @media (max-width: 600px) {
+        $self, $heading, $subHeading, $content {
+          font-family: Comic-sans;
         }
-      })
-    }
-  });
-
-  const DefinedCompositionComponent = Component.define('defined-composition-component', {
-
-    element: (`
-      <h1>Cue Sandbox - Slot Tests</h1>
-      ${FirstComponent()}
-      <br>
-      <div>
-        ${InsertedComponent({
-          slots: {
-            callToAction: 'InsertedComponent from DefinedCompositionComponent'
-          }
-        })}
-      </div>
-      <div>
-        <slot name="highLevel"></slot>
-      </div>
+      }
     `)
-
   });
 
-  setTimeout(() => {
-    //Root.appendChild(Component.create('<defined-composition-component></defined-composition-component>'))
-  }, 2000)
-
-
-
+  Root.appendChild(Component.create('<test-component></test-component>'));
 
 </script>
 </body>

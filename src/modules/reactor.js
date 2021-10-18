@@ -16,11 +16,10 @@ export const Reactor = {
     CALLBACKS.set(handler, value);
   },
 
-  cueComputations(dependencyGraph, callbacks, key, dataSource) {
-    const computedProperties = dependencyGraph.get(key);
-    const context = [dependencyGraph, callbacks, dataSource];
+  cueComputations(key, componentInternals) {
+    const computedProperties = componentInternals.dependencyGraph.get(key);
     for (let i = 0; i < computedProperties.length; i++) {
-      COMPUTED_PROPERTIES.set(computedProperties[i], context);
+      COMPUTED_PROPERTIES.set(computedProperties[i], componentInternals);
     }
   },
 
@@ -35,8 +34,9 @@ export const Reactor = {
 
 function flushReactionBuffer() {
 
-  let i, tuple, deps, computedProperty, context, callbacks, dependencyGraph, result;
+  let i, tuple, deps, computedProperty, internals, callbacks, dependencyGraph, result;
 
+  // STORE EVENTS ------------>
   for (tuple of EVENTS.entries()) {
     tuple[0](tuple[1]);
   }
@@ -46,25 +46,30 @@ function flushReactionBuffer() {
 
     for (tuple of COMPUTED_PROPERTIES.entries()) {
 
-      computedProperty = tuple[0];
+      computedProperty = tuple[0]; // key
 
       if (RESOLVED.indexOf(computedProperty) === -1) {
 
-        context = tuple[1];
+        internals = tuple[1];
 
-        dependencyGraph = context[0];
-        callbacks = context[1];
+        dependencyGraph = internals.dependencyGraph;
+        callbacks = internals.reactions;
 
         computedProperty.needsUpdate = true;
-        result = computedProperty.value(context[2]); // context[2] === dataSource
+        result = computedProperty.value(internals.data);
 
         if (computedProperty.hasChanged === true) {
+
+          // Dispatch Data Event on Component Instance
+          internals.dataEvent.detail.key = computedProperty.ownPropertyName;
+          internals.dataEvent.detail.value = result;
+          internals.self.dispatchEvent(internals.dataEvent);
 
           if (callbacks[computedProperty.ownPropertyName]) {
             CALLBACKS.set(callbacks[computedProperty.ownPropertyName], result);
           }
 
-          DEPENDENCIES.set(computedProperty, context);
+          DEPENDENCIES.set(computedProperty, internals);
 
         }
 
@@ -79,12 +84,12 @@ function flushReactionBuffer() {
     for (tuple of DEPENDENCIES.entries()) {
 
       computedProperty = tuple[0];
-      context = tuple[1];
-      deps = context[0].get(computedProperty.ownPropertyName); // context[0] === dependencyGraph
+      internals = tuple[1];
+      deps = internals.dependencyGraph.get(computedProperty.ownPropertyName); // context[0] === dependencyGraph
 
       if (deps) {
         for (i = 0; i < deps.length; i++) {
-          COMPUTED_PROPERTIES.set(deps[i], context);
+          COMPUTED_PROPERTIES.set(deps[i], internals);
         }
       }
 
@@ -94,7 +99,7 @@ function flushReactionBuffer() {
 
   }
 
-  // CALLBACKS ----------->
+  // REACTION CALLBACKS ----------->
   for (tuple of CALLBACKS.entries()) {
     tuple[0](tuple[1]);
   }

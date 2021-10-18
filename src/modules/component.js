@@ -360,6 +360,7 @@ class CueElement extends HTMLElement {
     // ---------------------- INSTANCE INTERNALS ----------------------
 
     const internal = this[INTERNAL] = {
+      self: this,
       module: module,
       reactions: {},
       computedProperties: new Map(),
@@ -544,7 +545,7 @@ class CueElement extends HTMLElement {
       // Computation Subscriptions
       internal.dependencyGraph.has(key) && internal.subscriptions.push(module.data.bindings[key].store.subscribe(
         module.data.bindings[key].key,
-        () => Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data)
+        () => Reactor.cueComputations(key, internal)
       ));
 
       // Reaction Subscriptions
@@ -627,7 +628,7 @@ class CueElement extends HTMLElement {
       }
 
       if (internal.dependencyGraph.has(key)) {
-        Reactor.cueComputations(internal.dependencyGraph, internal.reactions, key, internal.data);
+        Reactor.cueComputations(key, internal);
       }
 
       Reactor.react();
