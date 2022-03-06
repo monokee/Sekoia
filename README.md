@@ -1,6 +1,5 @@
 # Sekoia.js
-<img align="left" src="https://github.com/monokee/sekoia/raw/master/logo.jpg" alt="Sekoia.js Logo" width="500"/>
-<br><br>
+***
 
 <img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/main-desktop-browser-logos.png" width="200" alt="All major browsers">
 <br><br>
