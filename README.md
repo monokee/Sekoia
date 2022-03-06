@@ -1,10 +1,7 @@
 # Sekoia.js
-***
 
 <img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/main-desktop-browser-logos.png" width="200" alt="All major browsers">
-<br><br>
 <pre><code>Sekoia.js // Vanilla ES6 - All major browsers</code></pre>
-<br>
 
 ##### 🧬 Micro-optimized reactivity engine
 Sekoia is powered by an advanced reactivity engine that enhances serializable data with first-class observability, time travel, shape and type consistency and insanely optimized state diffing.
