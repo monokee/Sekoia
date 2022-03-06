@@ -1,7 +1,7 @@
-import { Queue } from "../../store/internal/Queue.js";
+import { Queue } from "../../state/internal/Queue.js";
 import { renderList } from "../render-list.js";
 import { StateProvider } from "./StateProvider.js";
-import { ReactiveObject } from "../../store/ReactiveObject.js";
+import { ReactiveObject } from "../../state/ReactiveObject.js";
 
 export class ComponentElement extends HTMLElement {
 

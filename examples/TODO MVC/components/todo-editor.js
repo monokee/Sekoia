@@ -1,5 +1,5 @@
 import { defineComponent } from "../../../src/modules/component/define-component.js";
-import { ReactiveArray } from "../../../src/modules/store/ReactiveArray.js";
+import { ReactiveArray } from "../../../src/modules/state/ReactiveArray.js";
 import { TodoItem } from "./todo-item.js";
 
 export const TodoEditor = defineComponent('todo-editor', {
@@ -148,7 +148,7 @@ export const TodoEditor = defineComponent('todo-editor', {
 
     this.state.track('items', {
       maxEntries: 100,
-      throttle: 2000,
+      throttle: 500,
       onTrack: (value, index, total) => {
         this.state.set('_historyState', {
           undo: index > 0,

@@ -3565,7 +3565,7 @@ class ReactiveArray extends ReactiveWrapper {
 
 }
 
-function createStore(objectOrArray, options) {
+function createState(objectOrArray, options) {
   if (Array.isArray(objectOrArray)) {
     return new ReactiveArray(objectOrArray, options);
   } else {
@@ -3597,7 +3597,7 @@ export {
   onRequestStop,
   postRequest,
   putRequest,
-  createStore,
+  createState,
   PersistentStorage,
   ReactiveArray,
   ReactiveObject,

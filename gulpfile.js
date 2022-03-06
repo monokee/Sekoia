@@ -54,7 +54,7 @@ function buildModule() {
   onRequestStop,
   postRequest,
   putRequest,
-  createStore,
+  createState,
   PersistentStorage,
   ReactiveArray,
   ReactiveObject,

@@ -14,10 +14,10 @@ import { postRequest } from "./modules/server/post-request.js";
 import { putRequest } from "./modules/server/put-request.js";
 
 // Store
-import { createStore } from "./modules/store/create-store.js";
-import { PersistentStorage } from "./modules/store/PersistentStorage.js";
-import { ReactiveArray } from "./modules/store/ReactiveArray.js";
-import { ReactiveObject } from "./modules/store/ReactiveObject.js";
+import { createState } from "./modules/state/create-state.js";
+import { PersistentStorage } from "./modules/state/PersistentStorage.js";
+import { ReactiveArray } from "./modules/state/ReactiveArray.js";
+import { ReactiveObject } from "./modules/state/ReactiveObject.js";
 
 // Utils
 import { deepClone } from "./modules/utils/deep-clone.js";
@@ -38,7 +38,7 @@ const Sekoia = {
   onRequestStop,
   postRequest,
   putRequest,
-  createStore,
+  createState,
   PersistentStorage,
   ReactiveArray,
   ReactiveObject,

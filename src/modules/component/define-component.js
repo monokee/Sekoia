@@ -1,6 +1,6 @@
 import { ComponentModel } from "./internal/ComponentModel.js";
 import { ComponentElement } from "./internal/ComponentElement.js";
-import { ReactiveObject } from "../store/ReactiveObject.js";
+import { ReactiveObject } from "../state/ReactiveObject.js";
 
 export function defineComponent(name, config) {
 

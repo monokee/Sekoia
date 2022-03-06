@@ -1,4 +1,4 @@
-import { ReactiveObjectModel } from "../../store/internal/ReactiveObjectModel.js";
+import { ReactiveObjectModel } from "../../state/internal/ReactiveObjectModel.js";
 import { StateProvider } from "./StateProvider.js";
 
 // Regex matches when $self is:

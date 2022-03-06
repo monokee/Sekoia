@@ -1,4 +1,4 @@
-import { PersistentStorage } from "../../store/PersistentStorage.js";
+import { PersistentStorage } from "../../state/PersistentStorage.js";
 
 let CACHE = null;
 
