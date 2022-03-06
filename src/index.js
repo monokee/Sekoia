@@ -1,17 +1,61 @@
-import { Server } from "./modules/server.js";
-import { Store } from "./modules/store.js";
-import { Component } from "./modules/component.js";
-import { Router } from "./modules/router.js";
+// Component
+import { createElement } from "./modules/component/create-element.js";
+import { defineComponent } from "./modules/component/define-component.js";
+import { renderList } from "./modules/component/render-list.js";
+
+// Router
+import { Router } from "./modules/router/router.js";
+
+// Server
+import { deleteRequest } from "./modules/server/delete-request.js";
+import { getRequest } from "./modules/server/get-request.js";
+import { onRequestStart, onRequestStop } from "./modules/server/on-request.js";
+import { postRequest } from "./modules/server/post-request.js";
+import { putRequest } from "./modules/server/put-request.js";
+
+// Store
+import { createStore } from "./modules/store/create-store.js";
+import { PersistentStorage } from "./modules/store/PersistentStorage.js";
+import { ReactiveArray } from "./modules/store/ReactiveArray.js";
+import { ReactiveObject } from "./modules/store/ReactiveObject.js";
+
+// Utils
+import { deepClone } from "./modules/utils/deep-clone.js";
+import { deepEqual } from "./modules/utils/deep-equal.js";
+import { hashString } from "./modules/utils/hash-string.js";
+import { throttle } from "./modules/utils/throttle.js";
+import { defer } from "./modules/utils/defer.js";
 
 //removeIf(esModule)
-const Cue = {Component, Store, Server, Router};
+const Sekoia = {
+  createElement,
+  defineComponent,
+  renderList,
+  Router,
+  deleteRequest,
+  getRequest,
+  onRequestStart,
+  onRequestStop,
+  postRequest,
+  putRequest,
+  createStore,
+  PersistentStorage,
+  ReactiveArray,
+  ReactiveObject,
+  deepClone,
+  deepEqual,
+  hashString,
+  throttle,
+  defer
+};
+
 if (typeof module === 'object' && typeof module.exports === 'object') {
-  module.exports = Cue;
+  module.exports = Sekoia;
 } else if (typeof define === 'function' && define.amd) {
-  define('Cue', [], function() {
-    return Cue;
+  define('Sekoia', [], function() {
+    return Sekoia;
   });
 } else {
-  window.Cue = Cue;
+  window.Sekoia = Sekoia;
 }
 //endRemoveIf(esModule)

@@ -9,7 +9,7 @@ const removeCode = require('gulp-remove-code');
 function buildIIFE() {
   return src('src/index.js')
     .pipe(rollup({}, 'esm'))
-    .pipe(rename('cue.js'))
+    .pipe(rename('sekoia.js'))
     .pipe(iife({
       useStrict: false,
       trimCode: true,
@@ -22,13 +22,20 @@ function buildIIFE() {
 }
 
 function minifyIIFE() {
-  return src('build/cue.js')
+  return src('build/sekoia.js')
     .pipe(minify({
       mangle: {
-        toplevel: true
+        toplevel: true,
+        keep_fnames: false,
+        properties: {
+          regex: new RegExp('^__') // properties and methods starting with two underscores are mangled
+        }
+      },
+      output: {
+        comments: false
       }
     }))
-    .pipe(rename('cue.min.js'))
+    .pipe(rename('sekoia.min.js'))
     .pipe(dest('build'));
 }
 
@@ -36,8 +43,28 @@ function buildModule() {
   return src('src/index.js')
     .pipe(rollup({}, 'esm'))
     .pipe(removeCode({esModule: true}))
-    .pipe(footer('export {Component, Store, Server, Router};'))
-    .pipe(rename('cue.module.js'))
+    .pipe(footer(`export {
+  createElement,
+  defineComponent,
+  renderList,
+  Router,
+  deleteRequest,
+  getRequest,
+  onRequestStart,
+  onRequestStop,
+  postRequest,
+  putRequest,
+  createStore,
+  PersistentStorage,
+  ReactiveArray,
+  ReactiveObject,
+  deepClone,
+  deepEqual,
+  hashString,
+  throttle,
+  defer
+}`))
+    .pipe(rename('sekoia.module.js'))
     .pipe(dest('build'));
 }
 

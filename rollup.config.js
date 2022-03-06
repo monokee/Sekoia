@@ -1,7 +1,7 @@
 export default {
   input: 'src/index.js',
   output: {
-    file: 'build/cue.js',
+    file: 'build/sekoia.js',
     format: 'esm'
   }
 }

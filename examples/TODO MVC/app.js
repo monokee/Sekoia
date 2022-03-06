@@ -1,12 +1,12 @@
-import { Component } from "../../build/cue.module.js";
-import { TodoStore } from "./data/store.js";
+import { defineComponent } from "../../src/modules/component/define-component.js";
+import { TodoEditor } from "./components/todo-editor.js";
 
-Component.define('todo-mvc', {
+defineComponent('todo-mvc', {
 
   element: (`
     <header>
-      <img $="logo" src="" alt="logo">
       <h1 $="headline"></h1>
+      <img $="logo" src="" alt="logo">
     </header>
     ${TodoEditor()}
     <footer>
@@ -16,40 +16,57 @@ Component.define('todo-mvc', {
   `),
 
   style: (`
-  
-    * {
-      box-sizing: border-box;
+    :root * { 
+      box-sizing: border-box!important;
     }
-    
-    $self {
-      position: relative;
+    :root body{
       width: 100vw;
       height: 100vh;
+      margin:0;
+      font-family: Roboto, sans-serif;
+      color: rgb(232, 235, 238);
+      background-color: rgb(22,25,28);
+      user-select: none;
+    }
+   :root ::-webkit-scrollbar{
+      width: 3px;
+    }
+   :root ::-webkit-scrollbar-track{
+      background: transparent;
+    }
+   :root ::-webkit-scrollbar-thumb{
+      background:rgba(235,235,235,0.35);
+      border-radius: 3px;
+    }
+    $self {
+      position: relative;
+      width: clamp(15rem, 90%, 50rem);
+      margin-left: auto;
+      margin-right: auto;
+      padding: 1.5rem 1.5rem 5.5rem 1.5rem;
+      height: 100%;
       overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding-top: 5.5em;
-      font-family: Roboto, sans-serif;
-      color: rgb(232,235,238);
-      background-color: rgb(22,25,28);
-      user-select: none;
-    }
-    
+    } 
     header {
       position: relative;
+      width: 100%;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
+      margin-bottom: 3.5rem;
     }
-
+    $headline {
+      font-weight: 300;
+    }
     $logo {
-      width: 4.5em;
-      height: 4.5em;
-      margin-right: 1em;
+      height: 5.5em;
+      object-fit: cover;
+      border-radius: 16px;
     }
-
     $editorContainer {
       position: relative;
       z-index: 1;
@@ -57,7 +74,6 @@ Component.define('todo-mvc', {
       max-width: 95%;
       box-shadow: none;
     }
-
     footer {
       margin-top: auto;
       margin-bottom: 1em;
@@ -67,40 +83,38 @@ Component.define('todo-mvc', {
       flex-direction: column;
       align-items: center;
       justify-content: center;
-    }
-    
+    } 
     footer p {
       margin: 0;
     }
-    
   `),
 
-  data: {
+  state: {
 
     appTitle: {
-      value: TodoStore.bind('appTitle'),
-      reaction({$headline}, value) {
+      value: 'Todo MVC',
+      render({$headline}, value) {
         $headline.textContent = value;
       }
     },
 
     appLogo: {
-      value: TodoStore.bind('appLogo'),
-      reaction({$logo}, value) {
+      value: '../../logo.jpg',
+      render({$logo}, value) {
         $logo.src = value;
       }
     },
 
     appAuthor: {
-      value: TodoStore.bind('appAuthor'),
-      reaction({$author}, value) {
+      value: 'monokee',
+      render({$author}, value) {
         $author.textContent = `Written by ${value}`;
       }
     },
 
     footerInfo: {
-      value: 'Illustrations by drawkit.io',
-      reaction({$info}, value) {
+      value: 'No rights reserved.',
+      render({$info}, value) {
         $info.textContent = value;
       }
     }
