@@ -1,6 +1,6 @@
 <img src="https://raw.githubusercontent.com/monokee/Sekoia/master/logo.jpg" height="250">
 <br><br>
-<i>Scalable reactive application architecture built on living web standards with a focus on micro-optimized performance, semantic APIs and customElements that don't suck.</i>
+<i>Scalable reactive application architecture built on living web standards with a focus on micro-optimized performance, semantic APIs and customElements that don't suck.</i> 🥺 👉👈
 <br><br>
 <img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/main-desktop-browser-logos.png" width="200" alt="All major browsers">
 <pre><code>Sekoia.js // Vanilla ES6 - All major browsers</code></pre>
