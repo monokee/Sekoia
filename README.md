@@ -9,13 +9,15 @@
 Sekoia is powered by an advanced reactivity engine that enhances serializable data with first-class observability, time travel, shape and type consistency and insanely optimized state diffing.
 <br>
 - [Documentation](./src/modules/state)
-- [TodoMVC Example](./examples/TODO%20MVC)
+- [TodoMVC Live Demo](https://codepen.io/monokee/project/editor/XxWGbV#)
+- [TodoMVC Source](./examples/TODO%20MVC)
 
 ### ⚡️ Data driven custom elements
 Sekoia gives your UI code structure by making native customElements reactive and composable while facilitating architecturally clean access to the DOM. 
 <br>
 - [Documentation](./src/modules/component)
-- [TodoMVC Example](./examples/TODO%20MVC)
+- [TodoMVC Live Demo](https://codepen.io/monokee/project/editor/XxWGbV#)
+- [TodoMVC Source](./examples/TODO%20MVC)
 
 ***
 
