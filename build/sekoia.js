@@ -86,7 +86,7 @@ const Core = {
 
       if (!target.hasOwnProperty(sourceProperty)) {
         throw {
-          type: 'cue-internal',
+          type: 'sekoia-internal',
           message: `Cannot resolve computed property "${computedProperty.ownPropertyName}" because dependency "${sourceProperty}" doesn't exist.`
         }
       }
@@ -331,7 +331,7 @@ const Core = {
         // the computation itself will most definitely fail but we only care about the property dependencies so we can safely ignore all errors.
         computedProperty.computation(installer);
       } catch(e) {
-        if (e.type && e.type === 'cue-internal') {
+        if (e.type && e.type === 'sekoia-internal') {
           throw new Error(e.message);
         }
       }
@@ -495,8 +495,6 @@ class ComputedProperty {
 
 }
 
-ComputedProperty.prototype._isComputedProperty_ = true;
-
 class ReactiveObjectModel {
 
   constructor(properties) {
@@ -599,7 +597,7 @@ class ComponentModel {
 
           } else if (attribute === 'state') {
 
-            if (value && value._internal_) {
+            if (value && value.$$) {
               tag += ' provided-state="' + StateProvider.setState(value) + '"';
             } else {
               tag += ' composed-state-data="' + StateProvider.setState(value) + '"';
@@ -622,14 +620,14 @@ class ComponentModel {
     const element = document.createElement(name);
 
     if (attributes) {
-      if (attributes._internal_) { // fast path
+      if (attributes.$$) { // fast path
         element.state = attributes;
       } else {
         for (const attribute in attributes) {
           if (attributes.hasOwnProperty(attribute)) {
             const value = attributes[attribute];
             if (attribute === 'state') {
-              if (value && value._internal_) {
+              if (value && value.$$) {
                 element.state = value;
               } else {
                 element.state = createState(value);
@@ -1374,16 +1372,16 @@ class ReactiveObjectInternals {
 
         const value = this.modelNativeData[key];
 
-        if (value && value._internal_) {
+        if (value && value.$$) {
 
           if (cloneChildren) {
-            this.nativeData[key] = value._internal_.owner.clone();
+            this.nativeData[key] = value.$$.owner.clone();
           } else {
             this.nativeData[key] = value;
           }
 
-          this.nativeData[key]._internal_.parentInternals = this;
-          this.nativeData[key]._internal_.ownPropertyName = key;
+          this.nativeData[key].$$.parentInternals = this;
+          this.nativeData[key].$$.ownPropertyName = key;
 
         } else {
 
@@ -1424,8 +1422,8 @@ class ReactiveObjectInternals {
 
       const value = this.modelNativeData[key];
 
-      if (value?._internal_) {
-        return value._internal_.getDefaultData();
+      if (value?.$$) {
+        return value.$$.getDefaultData();
       } else {
         return value;
       }
@@ -1451,8 +1449,8 @@ class ReactiveObjectInternals {
     for (key in this.modelNativeData) {
       if (this.modelNativeData.hasOwnProperty(key)) {
         val = this.modelNativeData[key];
-        if (val?._internal_) {
-          this.settableProperties[key] = val._internal_.getDefaultData();
+        if (val?.$$) {
+          this.settableProperties[key] = val.$$.getDefaultData();
         } else {
           this.settableProperties[key] = val;
         }
@@ -1470,8 +1468,8 @@ class ReactiveObjectInternals {
       const value = this.nativeData[key];
 
       if (writableOnly) {
-        if (value?._internal_) {
-          return value._internal_.getData(writableOnly);
+        if (value?.$$) {
+          return value.$$.getData(writableOnly);
         } else if (!this.privateKeys.has(key)) {
           return value;
         }
@@ -1501,8 +1499,8 @@ class ReactiveObjectInternals {
       if (this.nativeData.hasOwnProperty(key)) {
         val = this.nativeData[key];
         if (writableOnly) {
-          if (val?._internal_) {
-            wrapper[key] = val._internal_.getData(writableOnly);
+          if (val?.$$) {
+            wrapper[key] = val.$$.getData(writableOnly);
           } else if (!this.privateKeys.has(key)) {
             wrapper[key] = val;
           }
@@ -1532,9 +1530,9 @@ class ReactiveObjectInternals {
 
     if (this.nativeData.hasOwnProperty(key)) {
 
-      if (this.nativeData[key]?._internal_) {
+      if (this.nativeData[key]?.$$) {
 
-        this.nativeData[key]._internal_.setData(value, silent);
+        this.nativeData[key].$$.setData(value, silent);
 
       } else if (Core.patchData(this.nativeData[key], value, this.nativeData, key) && !silent) {
 
@@ -1565,10 +1563,10 @@ class ReactiveObjectInternals {
       // forward the subscription to the bound object
       return this.boundProperties.get(key).observeSource(callback, unobservable, silent);
 
-    } else if (this.nativeData[key]?._internal_) {
+    } else if (this.nativeData[key]?.$$) {
 
       // use wildcard listener on child object
-      return this.nativeData[key]._internal_.observe('*', callback, unobservable, silent);
+      return this.nativeData[key].$$.observe('*', callback, unobservable, silent);
 
     } else {
 
@@ -1783,25 +1781,25 @@ class ReactiveObjectInternals {
 class ReactiveWrapper {
 
   constructor(internal) {
-    Object.defineProperty(this, '_internal_', {
+    Object.defineProperty(this, '$$', {
       value: internal
     });
   }
 
   get(key) {
     if (key === void 0) {
-      return this._internal_.getData(false);
+      return this.$$.getData(false);
     } else {
-      return this._internal_.getDatum(key, false);
+      return this.$$.getDatum(key, false);
     }
   }
 
   default(key) {
     // return deep clone of writable default values
     if (key === void 0) {
-      return deepClone(this._internal_.getDefaultData());
+      return deepClone(this.$$.getDefaultData());
     } else {
-      return deepClone(this._internal_.getDefaultDatum(key));
+      return deepClone(this.$$.getDefaultDatum(key));
     }
   }
 
@@ -1811,7 +1809,7 @@ class ReactiveWrapper {
     if (key === void 0) {
 
       // getData(true) already returns a shallow copy...
-      const copy = this._internal_.getData(true);
+      const copy = this.$$.getData(true);
 
       // ...make it deep
       if (Array.isArray(copy)) {
@@ -1830,7 +1828,7 @@ class ReactiveWrapper {
 
     } else {
 
-      return deepClone(this._internal_.getDatum(key, true));
+      return deepClone(this.$$.getDatum(key, true));
 
     }
 
@@ -1838,9 +1836,9 @@ class ReactiveWrapper {
 
   set(key, value) {
     if (typeof key === 'object') {
-      this._internal_.setData(key);
+      this.$$.setData(key);
     } else {
-      this._internal_.setDatum(key, value);
+      this.$$.setDatum(key, value);
     }
   }
 
@@ -1906,7 +1904,7 @@ class StateTracker {
 
     } else {
 
-      state = state?._internal_ ? state.snapshot() : state;
+      state = state?.$$ ? state.snapshot() : state;
 
       if (checkUniqueness && deepEqual(state, this.__stack[this.__index])) {
 
@@ -1955,11 +1953,11 @@ class ReactiveObject extends ReactiveWrapper {
   static _from_(model, data) {
 
     const clone = Object.create(ReactiveObject.prototype);
-    clone._internal_ = new ReactiveObjectInternals(model);
-    clone._internal_.owner = clone;
+    clone.$$ = new ReactiveObjectInternals(model);
+    clone.$$.owner = clone;
 
     if (data) {
-      clone._internal_.setData(data, true);
+      clone.$$.setData(data, true);
     }
 
     return clone;
@@ -1974,7 +1972,7 @@ class ReactiveObject extends ReactiveWrapper {
   }
 
   clone(data) {
-    return this.constructor._from_(this._internal_.model, data);
+    return this.constructor._from_(this.$$.model, data);
   }
 
   observe(key, callback, options = {}) {
@@ -1984,7 +1982,7 @@ class ReactiveObject extends ReactiveWrapper {
       // { ...key: callback } -> convenient but non cancelable, non silent
       for (const k in key) {
         if (key.hasOwnProperty(k)) {
-          this._internal_.observe(k, key[k], false, false);
+          this.$$.observe(k, key[k], false, false);
         }
       }
 
@@ -1992,15 +1990,15 @@ class ReactiveObject extends ReactiveWrapper {
 
       if ((options.throttle || 0) > 0) {
 
-        return this._internal_.observe(key, Queue.throttle(callback, options.throttle), options.cancelable, options.silent);
+        return this.$$.observe(key, Queue.throttle(callback, options.throttle), options.cancelable, options.silent);
 
       } else if ((options.defer || 0) > 0) {
 
-        return this._internal_.observe(key, defer(callback, options.defer), options.cancelable, options.silent);
+        return this.$$.observe(key, defer(callback, options.defer), options.cancelable, options.silent);
 
       } else {
 
-        return this._internal_.observe(key, callback, options.cancelable, options.silent);
+        return this.$$.observe(key, callback, options.cancelable, options.silent);
 
       }
 
@@ -2009,18 +2007,18 @@ class ReactiveObject extends ReactiveWrapper {
   }
 
   bind(key) {
-    return this._internal_.bind(key);
+    return this.$$.bind(key);
   }
 
   track(key, options = {}) {
 
     key || (key = '*');
 
-    const stateTrackers = this._internal_.stateTrackers || (this._internal_.stateTrackers = new Map());
+    const stateTrackers = this.$$.stateTrackers || (this.$$.stateTrackers = new Map());
 
     if (stateTrackers.has(key)) {
       throw new Error(`Cannot track state of "${key}" because the property is already being tracked.`);
-    } else if (this._internal_.computedProperties.has(key)) {
+    } else if (this.$$.computedProperties.has(key)) {
       throw new Error(`Cannot track computed property "${key}". Only track writable properties.`);
     }
 
@@ -2041,12 +2039,12 @@ class ReactiveObject extends ReactiveWrapper {
 
   undo(key) {
     key || (key = '*');
-    this.restore(key, this._internal_.stateTrackers?.get(key)?.prev());
+    this.restore(key, this.$$.stateTrackers?.get(key)?.prev());
   }
 
   redo(key) {
     key || (key = '*');
-    this.restore(key, this._internal_.stateTrackers?.get(key)?.next());
+    this.restore(key, this.$$.stateTrackers?.get(key)?.next());
   }
 
   restore(key, trackPosition) {
@@ -2056,13 +2054,13 @@ class ReactiveObject extends ReactiveWrapper {
       key = '*';
     }
 
-    const tracker = this._internal_.stateTrackers?.get(key);
+    const tracker = this.$$.stateTrackers?.get(key);
 
     if (tracker && tracker.has(trackPosition)) {
       if (key === '*') {
-        this._internal_.setData(tracker.get(trackPosition), false);
+        this.$$.setData(tracker.get(trackPosition), false);
       } else {
-        this._internal_.setDatum(key, tracker.get(trackPosition), false);
+        this.$$.setDatum(key, tracker.get(trackPosition), false);
       }
     }
 
@@ -2120,7 +2118,7 @@ class ComponentElement extends HTMLElement {
           this.state = this.state || ReactiveObject._from_(MODEL.state);
 
           if (this.hasAttribute('composed-state-data')) {
-            this.state._internal_.setData(StateProvider.popState(this.getAttribute('composed-state-data')), false);
+            this.state.$$.setData(StateProvider.popState(this.getAttribute('composed-state-data')), false);
             this.removeAttribute('composed-state-data');
           }
 
@@ -2129,7 +2127,7 @@ class ComponentElement extends HTMLElement {
         // Register render callbacks
         for (const [key, callback] of MODEL.renderEvents) {
           // simple granular render functions: render({...$ref}, currentValue)
-          this.state._internal_.observe(key, value => callback(REFS, value));
+          this.state.$$.observe(key, value => callback(REFS, value));
         }
 
         // Create automatic list renderings
@@ -2141,9 +2139,9 @@ class ComponentElement extends HTMLElement {
             updateChild: config.updateChild
           };
 
-          const reactiveArray = this.state._internal_.getDatum(key);
-          reactiveArray._internal_.setStructuralObserver(value => {
-            renderList(value._internal_.nativeData, cfg);
+          const reactiveArray = this.state.$$.getDatum(key);
+          reactiveArray.$$.setStructuralObserver(value => {
+            renderList(value.$$.nativeData, cfg);
           });
 
         }
@@ -2199,18 +2197,59 @@ function defineComponent(name, config) {
 
 }
 
-const ORIGIN = window.location.origin + window.location.pathname;
-const ABSOLUTE_ORIGIN_NAMES = [ORIGIN, window.location.hostname, window.location.hostname + '/', window.location.origin];
-if (ORIGIN[ORIGIN.length - 1] !== '/') ABSOLUTE_ORIGIN_NAMES.push(ORIGIN + '/');
-if (window.location.pathname && window.location.pathname !== '/') ABSOLUTE_ORIGIN_NAMES.push(window.location.pathname);
+let RESIZE_OBSERVER, HANDLERS, RESIZE_BUFFER;
+
+function onResize(element, handler) {
+
+  if (element === window || element === document || element === document.documentElement) {
+    element = document.body;
+  }
+
+  if ((HANDLERS || (HANDLERS = new Map())).has(element)) {
+    HANDLERS.get(element).push(handler);
+  } else {
+    HANDLERS.set(element, [handler]);
+  }
+
+  (RESIZE_OBSERVER || (RESIZE_OBSERVER = new ResizeObserver(entries => {
+    clearTimeout(RESIZE_BUFFER);
+    RESIZE_BUFFER = setTimeout(ON_RESIZE, 100, entries);
+  }))).observe(element);
+
+}
+
+function ON_RESIZE(entries) {
+  for (let i = 0, entry, handlers; i < entries.length; i++) {
+    entry = entries[i];
+    handlers = HANDLERS.get(entry.target);
+    if (handlers) {
+      for (let k = 0; k < handlers.length; k++) {
+        handlers[k](entry);
+      }
+    }
+  }
+}
+
+const LOCATION = window.location;
+const HISTORY = window.history;
+const ORIGIN = LOCATION.origin + LOCATION.pathname;
+
+const ABSOLUTE_ORIGIN_NAMES = [ORIGIN, LOCATION.hostname, LOCATION.hostname + '/', LOCATION.origin];
+if (ORIGIN[ORIGIN.length - 1] !== '/') {
+  ABSOLUTE_ORIGIN_NAMES.push(ORIGIN + '/');
+}
+if (LOCATION.pathname && LOCATION.pathname !== '/') {
+  ABSOLUTE_ORIGIN_NAMES.push(LOCATION.pathname);
+}
+
 const ALLOWED_ORIGIN_NAMES = ['/', '#', '/#', '/#/', ...ABSOLUTE_ORIGIN_NAMES];
 const ORIGIN_URL = new URL(ORIGIN);
 const CLEAN_ORIGIN = removeTrailingSlash(ORIGIN);
 
 const REGISTERED_FILTERS = new Map();
 const REGISTERED_ACTIONS = new Set();
-const WILDCARD_ACTIONS = [];
 
+const WILDCARD_ACTIONS = [];
 let WILDCARD_FILTER = null;
 
 const ROUTES_STRUCT = {};
@@ -2223,10 +2262,10 @@ const DEFAULT_TRIGGER_OPTIONS = {
 };
 
 let HAS_POPSTATE_LISTENER = false;
-let CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(window.location.search);
+let CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(LOCATION.search);
 let CURRENT_ROUTE_FRAGMENTS = ['/'];
-if (window.location.hash) {
-  CURRENT_ROUTE_FRAGMENTS.push(...window.location.hash.split('/'));
+if (LOCATION.hash) {
+  CURRENT_ROUTE_FRAGMENTS.push(...LOCATION.hash.split('/'));
 }
 
 const Router = {
@@ -2303,8 +2342,8 @@ const Router = {
 
   navigate(route, options = {}) {
 
-    if (route.lastIndexOf('http', 0) === 0 && route !== window.location.href) {
-      return window.location.href = route;
+    if (route.lastIndexOf('http', 0) === 0 && route !== LOCATION.href) {
+      return LOCATION.href = route;
     }
 
     const { hash, query, rel } = getRouteParts(route);
@@ -2380,7 +2419,7 @@ const Router = {
 
   resolve(options = {}) {
     // should be called once after all filters and actions have been registered
-    this.navigate(window.location.href, options);
+    this.navigate(LOCATION.href, options);
   },
 
   getQueryParameters(key) {
@@ -2393,9 +2432,11 @@ const Router = {
 
   addQueryParameters(key, value) {
 
-    if (typeof value === 'undefined' && typeof key === 'object') {
+    if (typeof key === 'object') {
       for (const k in key) {
-        CURRENT_QUERY_PARAMETERS[k] = key[k];
+        if (key.hasOwnProperty(k)) {
+          CURRENT_QUERY_PARAMETERS[k] = key[k];
+        }
       }
     } else {
       CURRENT_QUERY_PARAMETERS[key] = value;
@@ -2438,7 +2479,7 @@ function addPopStateListenerOnce() {
 
     // never fired on initial page load in all up-to-date browsers
     window.addEventListener('popstate', () => {
-      Router.navigate(window.location.href, {
+      Router.navigate(LOCATION.href, {
         history: 'replaceState',
         forceReload: false
       });
@@ -2455,18 +2496,18 @@ function performNavigation(hash, query, keepQuery, historyMode) {
 
   ORIGIN_URL.hash = hash;
   ORIGIN_URL.search = keepQuery ? buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS) : query;
-  window.history[historyMode](null, document.title, ORIGIN_URL.toString());
+  HISTORY[historyMode](null, document.title, ORIGIN_URL.toString());
 
 }
 
 function updateQueryString() {
   ORIGIN_URL.search = buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS);
-  window.history.replaceState(null, document.title, ORIGIN_URL.toString());
+  HISTORY.replaceState(null, document.title, ORIGIN_URL.toString());
 }
 
 function reRoute(newRoute) {
   if (newRoute.lastIndexOf('http', 0) === 0) {
-    return window.location.href = newRoute;
+    return LOCATION.href = newRoute;
   } else {
     return Router.navigate(newRoute, {
       history: 'replaceState',
@@ -2786,16 +2827,18 @@ function makeCall(url, method, token, data = {}) {
       referrer: 'no-referrer',
       body: method === 'GET' ? null : typeof data === 'string' ? data : JSON.stringify(data)
     }).then(res => {
-      if (!res.ok || res.status !== 204) {
-        return res.text().then(text => {
-          try {
-            return JSON.parse(text);
-          } catch (_) {
-            return text;
-          }
+      const ct = res.headers.get('content-type');
+      const fn = ct && ct.includes('application/json') ? 'json' : 'text';
+      if (!res.ok) {
+        return res[fn]().then(x => {
+          throw x;
         });
       } else {
-        return {};
+        if (res.status === 204) {
+          return {};
+        } else {
+          return res[fn]();
+        }
       }
     }).finally(() => {
       PENDING_CALLS.delete(url);
@@ -3011,22 +3054,22 @@ class PersistentStorage {
 
 }
 
-let CACHE = null;
+const CACHE = () => CACHE.$$ || (CACHE.$$ = new PersistentStorage({
+  name: 'sekoia::network::cache'
+}));
 
-function setCache(hash, value, expires) {
-  return (CACHE || (CACHE = new PersistentStorage({
-    name: 'sekoia::network::cache'
-  }))).set(hash, {
+function setCache(hash, value, cacheSeconds) {
+  return CACHE().set(hash, {
     value: value,
-    expires: Date.now() + expires * 1000
+    expires: Date.now() + (cacheSeconds * 1000)
   });
 }
 
 function getCache(hash) {
-  return CACHE.get(hash).then(entry => {
+  return CACHE().get(hash).then(entry => {
     if (entry) {
       if (entry.expires < Date.now()) {
-        CACHE.delete(hash);
+        CACHE().delete(hash);
         throw false;
       } else {
         return entry.value;
@@ -3037,12 +3080,12 @@ function getCache(hash) {
   });
 }
 
-function getRequest(url, expires = 0, token = '') {
+function getRequest(url, cacheSeconds = 0, token = '') {
   const hash = hashString(url);
   return getCache(hash)
     .then(data => data)
     .catch(() => makeCall(url, 'GET', token).then(res => {
-      expires > 0 && setCache(hash, res, expires);
+      cacheSeconds > 0 && setCache(hash, res, cacheSeconds);
       return res;
     }));
 }
@@ -3092,8 +3135,8 @@ class ReactiveArrayInternals {
 
       this.model = data => {
         const model = options.model(data);
-        if (model && model._internal_) {
-          model._internal_.parentInternals = this;
+        if (model && model.$$) {
+          model.$$.parentInternals = this;
         }
         return model;
       };
@@ -3108,9 +3151,9 @@ class ReactiveArrayInternals {
 
     for (let i = 0, item; i < sourceArray.length; i++) {
       item = sourceArray[i];
-      if (item._internal_) {
-        item._internal_.parentInternals = this;
-        this.defaultData.push(deepClone(item._internal_.getDefaultData()));
+      if (item.$$) {
+        item.$$.parentInternals = this;
+        this.defaultData.push(deepClone(item.$$.getDefaultData()));
       } else {
         this.defaultData.push(deepClone(item));
       }
@@ -3129,8 +3172,8 @@ class ReactiveArrayInternals {
 
     const item = this.nativeData[index];
 
-    if (writableOnly && item?._internal_) {
-      return item._internal_.getData(writableOnly);
+    if (writableOnly && item?.$$) {
+      return item.$$.getData(writableOnly);
     } else {
       return item;
     }
@@ -3143,8 +3186,8 @@ class ReactiveArrayInternals {
 
     for (let i = 0, item; i < this.nativeData.length; i++) {
       item = this.nativeData[i];
-      if (writableOnly && item?._internal_) {
-        copy.push(item._internal_.getData(writableOnly));
+      if (writableOnly && item?.$$) {
+        copy.push(item.$$.getData(writableOnly));
       } else {
         copy.push(item);
       }
@@ -3175,13 +3218,13 @@ class ReactiveArrayInternals {
 
       if (current !== value) {
 
-        if (current?._internal_ && value && typeof value === 'object' && !value._internal_) {
+        if (current?.$$ && value && typeof value === 'object' && !value.$$) {
 
-          current._internal_.setData(value, silent); // patch object
+          current.$$.setData(value, silent); // patch object
 
         } else { // replace
 
-          if (!value || value._internal_ || typeof value !== 'object') {
+          if (!value || value.$$ || typeof value !== 'object') {
             this.nativeData[i] = value;
           } else {
             this.nativeData[i] = this.model(value);
@@ -3207,13 +3250,13 @@ class ReactiveArrayInternals {
 
     if (current !== value) {
 
-      if (current?._internal_ && value && typeof value === 'object' && !value._internal_) {
+      if (current?.$$ && value && typeof value === 'object' && !value.$$) {
 
-        current._internal_.setData(value, silent); // patch object
+        current.$$.setData(value, silent); // patch object
 
       } else { // replace
 
-        if (!value || value._internal_ || typeof value !== 'object') {
+        if (!value || value.$$ || typeof value !== 'object') {
           this.nativeData[index] = value;
         } else {
           this.nativeData[index] = this.model(value);
@@ -3318,35 +3361,35 @@ class ReactiveArray extends ReactiveWrapper {
 
   constructor(array, options) {
     super(new ReactiveArrayInternals(array, options));
-    this._internal_.owner = this;
+    this.$$.owner = this;
   }
 
   clone() {
-    return new this.constructor(this._internal_.defaultData, {
-      _model_: this._internal_.model
+    return new this.constructor(this.$$.defaultData, {
+      _model_: this.$$.model
     });
   }
 
   // Accessors & Iterators
 
   get length() {
-    return this._internal_.nativeData.length;
+    return this.$$.nativeData.length;
   }
 
   every(callbackFn) {
-    return this._internal_.nativeData.every(callbackFn);
+    return this.$$.nativeData.every(callbackFn);
   }
 
   some(callbackFn) {
-    return this._internal_.nativeData.some(callbackFn);
+    return this.$$.nativeData.some(callbackFn);
   }
 
   findIndex(callbackFn) {
-    return this._internal_.nativeData.findIndex(callbackFn);
+    return this.$$.nativeData.findIndex(callbackFn);
   }
 
   findLastIndex(callbackFn) {
-    const array = this._internal_.nativeData;
+    const array = this.$$.nativeData;
     let i = array.length;
     while (i--) {
       if (callbackFn(array[i], i, array)) {
@@ -3357,80 +3400,80 @@ class ReactiveArray extends ReactiveWrapper {
   }
 
   includes(item) {
-    return this._internal_.nativeData.includes(item);
+    return this.$$.nativeData.includes(item);
   }
 
   indexOf(item, fromIndex) {
-    return this._internal_.nativeData.indexOf(item, fromIndex);
+    return this.$$.nativeData.indexOf(item, fromIndex);
   }
 
   lastIndexOf(item, fromIndex) {
-    return this._internal_.nativeData.lastIndexOf(item, fromIndex);
+    return this.$$.nativeData.lastIndexOf(item, fromIndex);
   }
 
   find(callbackFn) {
-    return this._internal_.nativeData.find(callbackFn);
+    return this.$$.nativeData.find(callbackFn);
   }
 
   slice(start) {
-    return this._internal_.nativeData.slice(start);
+    return this.$$.nativeData.slice(start);
   }
 
   forEach(callbackFn) {
-    return this._internal_.nativeData.forEach(callbackFn);
+    return this.$$.nativeData.forEach(callbackFn);
   }
 
   filter(compareFn) {
-    return this._internal_.nativeData.filter(compareFn);
+    return this.$$.nativeData.filter(compareFn);
   }
 
   map(callbackFn) {
-    return this._internal_.nativeData.map(callbackFn);
+    return this.$$.nativeData.map(callbackFn);
   }
 
   reduce(reducerFn, initialValue) {
-    return this._internal_.nativeData.reduce(reducerFn, initialValue);
+    return this.$$.nativeData.reduce(reducerFn, initialValue);
   }
 
   // Mutators
 
   pop() {
-    if (this._internal_.nativeData.length) {
-      const value = this._internal_.nativeData.pop();
-      this._internal_.didMutate();
+    if (this.$$.nativeData.length) {
+      const value = this.$$.nativeData.pop();
+      this.$$.didMutate();
       return value;
     }
   }
 
   push(item) {
 
-    if (!item || item._internal_ || typeof item !== 'object') {
-      this._internal_.nativeData.push(item);
+    if (!item || item.$$ || typeof item !== 'object') {
+      this.$$.nativeData.push(item);
     } else {
-      this._internal_.nativeData.push(this._internal_.model(item));
+      this.$$.nativeData.push(this.$$.model(item));
     }
 
-    this._internal_.didMutate();
+    this.$$.didMutate();
 
   }
 
   shift() {
-    if (this._internal_.nativeData.length) {
-      const value = this._internal_.nativeData.shift();
-      this._internal_.didMutate();
+    if (this.$$.nativeData.length) {
+      const value = this.$$.nativeData.shift();
+      this.$$.didMutate();
       return value;
     }
   }
 
   unshift(item) {
 
-    if (!item || item._internal_ || typeof item !== 'object') {
-      this._internal_.nativeData.unshift(item);
+    if (!item || item.$$ || typeof item !== 'object') {
+      this.$$.nativeData.unshift(item);
     } else {
-      this._internal_.nativeData.unshift(this._internal_.model(item));
+      this.$$.nativeData.unshift(this.$$.model(item));
     }
 
-    this._internal_.didMutate();
+    this.$$.didMutate();
 
   }
 
@@ -3442,20 +3485,20 @@ class ReactiveArray extends ReactiveWrapper {
 
     } else if (!items.length) { // remove items
 
-      const removedItems = this._internal_.nativeData.splice(start, deleteCount);
-      this._internal_.didMutate();
+      const removedItems = this.$$.nativeData.splice(start, deleteCount);
+      this.$$.didMutate();
       return removedItems;
 
     } else { // remove/add
 
       for (let i = 0; i < items.length; i++) {
-        if (items[i] && !items[i]._internal_ && typeof items[i] === 'object') {
-          items[i] = this._internal_.model(items[i]);
+        if (items[i] && !items[i].$$ && typeof items[i] === 'object') {
+          items[i] = this.$$.model(items[i]);
         }
       }
 
-      const removedItems = this._internal_.nativeData.splice(start, deleteCount, ...items);
-      this._internal_.didMutate();
+      const removedItems = this.$$.nativeData.splice(start, deleteCount, ...items);
+      this.$$.didMutate();
       return removedItems;
 
     }
@@ -3463,15 +3506,15 @@ class ReactiveArray extends ReactiveWrapper {
   }
 
   reverse() {
-    if (this._internal_.nativeData.length > 1) {
-      this._internal_.nativeData.reverse();
-      this._internal_.didMutate();
+    if (this.$$.nativeData.length > 1) {
+      this.$$.nativeData.reverse();
+      this.$$.didMutate();
     }
   }
 
   sort(compareFn) {
 
-    const array = this._internal_.nativeData;
+    const array = this.$$.nativeData;
 
     if (array.length > 1) {
 
@@ -3480,7 +3523,7 @@ class ReactiveArray extends ReactiveWrapper {
 
       for (let i = 0; i < array.length; i++) {
         if (array[i] !== copy[i]) {
-          this._internal_.didMutate();
+          this.$$.didMutate();
           break;
         }
       }
@@ -3491,7 +3534,7 @@ class ReactiveArray extends ReactiveWrapper {
 
   filterInPlace(compareFn) {
 
-    const array = this._internal_.nativeData;
+    const array = this.$$.nativeData;
 
     let didChange = false;
 
@@ -3503,18 +3546,18 @@ class ReactiveArray extends ReactiveWrapper {
     }
 
     if (didChange) {
-      this._internal_.didMutate();
+      this.$$.didMutate();
     }
 
   }
 
   clear() {
 
-    const array = this._internal_.nativeData;
+    const array = this.$$.nativeData;
 
     if (array.length) {
       while (array.length) array.pop();
-      this._internal_.didMutate();
+      this.$$.didMutate();
     }
 
   }
@@ -3523,11 +3566,11 @@ class ReactiveArray extends ReactiveWrapper {
 
   observe(callback, options = {}) {
     if ((options.throttle || 0) > 0) {
-      return this._internal_.observe('*', Queue.throttle(callback, options.throttle), options.cancelable, options.silent);
+      return this.$$.observe('*', Queue.throttle(callback, options.throttle), options.cancelable, options.silent);
     } else if ((options.defer || 0) > 0) {
-      return this._internal_.observe('*', defer(callback, options.defer), options.cancelable, options.silent);
+      return this.$$.observe('*', defer(callback, options.defer), options.cancelable, options.silent);
     } else {
-      return this._internal_.observe('*', callback, options.cancelable, options.silent);
+      return this.$$.observe('*', callback, options.cancelable, options.silent);
     }
   }
 
@@ -3535,32 +3578,32 @@ class ReactiveArray extends ReactiveWrapper {
 
   track(options = {}) {
 
-    if (this._internal_.stateTracker) {
+    if (this.$$.stateTracker) {
       throw new Error(`Cannot track state of ReactiveArray because it is already being tracked.`);
     }
 
-    const tracker = this._internal_.stateTracker = new StateTracker(options.onTrack, options.maxEntries);
+    const tracker = this.$$.stateTracker = new StateTracker(options.onTrack, options.maxEntries);
 
     // check ReactiveObject.track() for explanation
     const checkUniqueness = (options.throttle || 0) > 0 || (options.defer || 0) > 0;
 
     // observer immediately tracks initial state
-    this._internal_.observe('*', val => tracker.add(val, checkUniqueness), false, false);
+    this.$$.observe('*', val => tracker.add(val, checkUniqueness), false, false);
 
   }
 
   undo() {
-    this.restore(this._internal_.stateTracker?.prev());
+    this.restore(this.$$.stateTracker?.prev());
   }
 
   redo() {
-    this.restore(this._internal_.stateTracker?.next());
+    this.restore(this.$$.stateTracker?.next());
   }
 
   restore(trackPosition) {
-    const tracker = this._internal_.stateTracker;
+    const tracker = this.$$.stateTracker;
     if (tracker && tracker.has(trackPosition)) {
-      this._internal_.setData(tracker.get(trackPosition), false);
+      this.$$.setData(tracker.get(trackPosition), false);
     }
   }
 
@@ -3591,6 +3634,7 @@ function throttle (callback, interval) {
 const Sekoia = {
   createElement,
   defineComponent,
+  onResize,
   renderList,
   Router,
   deleteRequest,

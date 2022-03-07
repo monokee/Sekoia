@@ -8,35 +8,35 @@ export class ReactiveArray extends ReactiveWrapper {
 
   constructor(array, options) {
     super(new ReactiveArrayInternals(array, options));
-    this._internal_.owner = this;
+    this.$$.owner = this;
   }
 
   clone() {
-    return new this.constructor(this._internal_.defaultData, {
-      _model_: this._internal_.model
+    return new this.constructor(this.$$.defaultData, {
+      _model_: this.$$.model
     });
   }
 
   // Accessors & Iterators
 
   get length() {
-    return this._internal_.nativeData.length;
+    return this.$$.nativeData.length;
   }
 
   every(callbackFn) {
-    return this._internal_.nativeData.every(callbackFn);
+    return this.$$.nativeData.every(callbackFn);
   }
 
   some(callbackFn) {
-    return this._internal_.nativeData.some(callbackFn);
+    return this.$$.nativeData.some(callbackFn);
   }
 
   findIndex(callbackFn) {
-    return this._internal_.nativeData.findIndex(callbackFn);
+    return this.$$.nativeData.findIndex(callbackFn);
   }
 
   findLastIndex(callbackFn) {
-    const array = this._internal_.nativeData;
+    const array = this.$$.nativeData;
     let i = array.length;
     while (i--) {
       if (callbackFn(array[i], i, array)) {
@@ -47,80 +47,80 @@ export class ReactiveArray extends ReactiveWrapper {
   }
 
   includes(item) {
-    return this._internal_.nativeData.includes(item);
+    return this.$$.nativeData.includes(item);
   }
 
   indexOf(item, fromIndex) {
-    return this._internal_.nativeData.indexOf(item, fromIndex);
+    return this.$$.nativeData.indexOf(item, fromIndex);
   }
 
   lastIndexOf(item, fromIndex) {
-    return this._internal_.nativeData.lastIndexOf(item, fromIndex);
+    return this.$$.nativeData.lastIndexOf(item, fromIndex);
   }
 
   find(callbackFn) {
-    return this._internal_.nativeData.find(callbackFn);
+    return this.$$.nativeData.find(callbackFn);
   }
 
   slice(start) {
-    return this._internal_.nativeData.slice(start);
+    return this.$$.nativeData.slice(start);
   }
 
   forEach(callbackFn) {
-    return this._internal_.nativeData.forEach(callbackFn);
+    return this.$$.nativeData.forEach(callbackFn);
   }
 
   filter(compareFn) {
-    return this._internal_.nativeData.filter(compareFn);
+    return this.$$.nativeData.filter(compareFn);
   }
 
   map(callbackFn) {
-    return this._internal_.nativeData.map(callbackFn);
+    return this.$$.nativeData.map(callbackFn);
   }
 
   reduce(reducerFn, initialValue) {
-    return this._internal_.nativeData.reduce(reducerFn, initialValue);
+    return this.$$.nativeData.reduce(reducerFn, initialValue);
   }
 
   // Mutators
 
   pop() {
-    if (this._internal_.nativeData.length) {
-      const value = this._internal_.nativeData.pop();
-      this._internal_.didMutate();
+    if (this.$$.nativeData.length) {
+      const value = this.$$.nativeData.pop();
+      this.$$.didMutate();
       return value;
     }
   }
 
   push(item) {
 
-    if (!item || item._internal_ || typeof item !== 'object') {
-      this._internal_.nativeData.push(item);
+    if (!item || item.$$ || typeof item !== 'object') {
+      this.$$.nativeData.push(item);
     } else {
-      this._internal_.nativeData.push(this._internal_.model(item));
+      this.$$.nativeData.push(this.$$.model(item));
     }
 
-    this._internal_.didMutate();
+    this.$$.didMutate();
 
   }
 
   shift() {
-    if (this._internal_.nativeData.length) {
-      const value = this._internal_.nativeData.shift();
-      this._internal_.didMutate();
+    if (this.$$.nativeData.length) {
+      const value = this.$$.nativeData.shift();
+      this.$$.didMutate();
       return value;
     }
   }
 
   unshift(item) {
 
-    if (!item || item._internal_ || typeof item !== 'object') {
-      this._internal_.nativeData.unshift(item);
+    if (!item || item.$$ || typeof item !== 'object') {
+      this.$$.nativeData.unshift(item);
     } else {
-      this._internal_.nativeData.unshift(this._internal_.model(item));
+      this.$$.nativeData.unshift(this.$$.model(item));
     }
 
-    this._internal_.didMutate();
+    this.$$.didMutate();
 
   }
 
@@ -132,20 +132,20 @@ export class ReactiveArray extends ReactiveWrapper {
 
     } else if (!items.length) { // remove items
 
-      const removedItems = this._internal_.nativeData.splice(start, deleteCount);
-      this._internal_.didMutate();
+      const removedItems = this.$$.nativeData.splice(start, deleteCount);
+      this.$$.didMutate();
       return removedItems;
 
     } else { // remove/add
 
       for (let i = 0; i < items.length; i++) {
-        if (items[i] && !items[i]._internal_ && typeof items[i] === 'object') {
-          items[i] = this._internal_.model(items[i]);
+        if (items[i] && !items[i].$$ && typeof items[i] === 'object') {
+          items[i] = this.$$.model(items[i]);
         }
       }
 
-      const removedItems = this._internal_.nativeData.splice(start, deleteCount, ...items);
-      this._internal_.didMutate();
+      const removedItems = this.$$.nativeData.splice(start, deleteCount, ...items);
+      this.$$.didMutate();
       return removedItems;
 
     }
@@ -153,15 +153,15 @@ export class ReactiveArray extends ReactiveWrapper {
   }
 
   reverse() {
-    if (this._internal_.nativeData.length > 1) {
-      this._internal_.nativeData.reverse();
-      this._internal_.didMutate();
+    if (this.$$.nativeData.length > 1) {
+      this.$$.nativeData.reverse();
+      this.$$.didMutate();
     }
   }
 
   sort(compareFn) {
 
-    const array = this._internal_.nativeData;
+    const array = this.$$.nativeData;
 
     if (array.length > 1) {
 
@@ -170,7 +170,7 @@ export class ReactiveArray extends ReactiveWrapper {
 
       for (let i = 0; i < array.length; i++) {
         if (array[i] !== copy[i]) {
-          this._internal_.didMutate();
+          this.$$.didMutate();
           break;
         }
       }
@@ -181,7 +181,7 @@ export class ReactiveArray extends ReactiveWrapper {
 
   filterInPlace(compareFn) {
 
-    const array = this._internal_.nativeData;
+    const array = this.$$.nativeData;
 
     let didChange = false;
 
@@ -193,18 +193,18 @@ export class ReactiveArray extends ReactiveWrapper {
     }
 
     if (didChange) {
-      this._internal_.didMutate();
+      this.$$.didMutate();
     }
 
   }
 
   clear() {
 
-    const array = this._internal_.nativeData;
+    const array = this.$$.nativeData;
 
     if (array.length) {
       while (array.length) array.pop();
-      this._internal_.didMutate();
+      this.$$.didMutate();
     }
 
   }
@@ -213,11 +213,11 @@ export class ReactiveArray extends ReactiveWrapper {
 
   observe(callback, options = {}) {
     if ((options.throttle || 0) > 0) {
-      return this._internal_.observe('*', Queue.throttle(callback, options.throttle), options.cancelable, options.silent);
+      return this.$$.observe('*', Queue.throttle(callback, options.throttle), options.cancelable, options.silent);
     } else if ((options.defer || 0) > 0) {
-      return this._internal_.observe('*', defer(callback, options.defer), options.cancelable, options.silent);
+      return this.$$.observe('*', defer(callback, options.defer), options.cancelable, options.silent);
     } else {
-      return this._internal_.observe('*', callback, options.cancelable, options.silent);
+      return this.$$.observe('*', callback, options.cancelable, options.silent);
     }
   }
 
@@ -225,32 +225,32 @@ export class ReactiveArray extends ReactiveWrapper {
 
   track(options = {}) {
 
-    if (this._internal_.stateTracker) {
+    if (this.$$.stateTracker) {
       throw new Error(`Cannot track state of ReactiveArray because it is already being tracked.`);
     }
 
-    const tracker = this._internal_.stateTracker = new StateTracker(options.onTrack, options.maxEntries);
+    const tracker = this.$$.stateTracker = new StateTracker(options.onTrack, options.maxEntries);
 
     // check ReactiveObject.track() for explanation
     const checkUniqueness = (options.throttle || 0) > 0 || (options.defer || 0) > 0;
 
     // observer immediately tracks initial state
-    this._internal_.observe('*', val => tracker.add(val, checkUniqueness), false, false);
+    this.$$.observe('*', val => tracker.add(val, checkUniqueness), false, false);
 
   }
 
   undo() {
-    this.restore(this._internal_.stateTracker?.prev());
+    this.restore(this.$$.stateTracker?.prev());
   }
 
   redo() {
-    this.restore(this._internal_.stateTracker?.next());
+    this.restore(this.$$.stateTracker?.next());
   }
 
   restore(trackPosition) {
-    const tracker = this._internal_.stateTracker;
+    const tracker = this.$$.stateTracker;
     if (tracker && tracker.has(trackPosition)) {
-      this._internal_.setData(tracker.get(trackPosition), false);
+      this.$$.setData(tracker.get(trackPosition), false);
     }
   }
 

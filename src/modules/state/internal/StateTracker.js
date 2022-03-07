@@ -52,7 +52,7 @@ export class StateTracker {
 
     } else {
 
-      state = state?._internal_ ? state.snapshot() : state;
+      state = state?.$$ ? state.snapshot() : state;
 
       if (checkUniqueness && deepEqual(state, this.__stack[this.__index])) {
 

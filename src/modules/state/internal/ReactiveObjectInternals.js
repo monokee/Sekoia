@@ -32,16 +32,16 @@ export class ReactiveObjectInternals {
 
         const value = this.modelNativeData[key];
 
-        if (value && value._internal_) {
+        if (value && value.$$) {
 
           if (cloneChildren) {
-            this.nativeData[key] = value._internal_.owner.clone();
+            this.nativeData[key] = value.$$.owner.clone();
           } else {
             this.nativeData[key] = value;
           }
 
-          this.nativeData[key]._internal_.parentInternals = this;
-          this.nativeData[key]._internal_.ownPropertyName = key;
+          this.nativeData[key].$$.parentInternals = this;
+          this.nativeData[key].$$.ownPropertyName = key;
 
         } else {
 
@@ -82,8 +82,8 @@ export class ReactiveObjectInternals {
 
       const value = this.modelNativeData[key];
 
-      if (value?._internal_) {
-        return value._internal_.getDefaultData();
+      if (value?.$$) {
+        return value.$$.getDefaultData();
       } else {
         return value;
       }
@@ -109,8 +109,8 @@ export class ReactiveObjectInternals {
     for (key in this.modelNativeData) {
       if (this.modelNativeData.hasOwnProperty(key)) {
         val = this.modelNativeData[key];
-        if (val?._internal_) {
-          this.settableProperties[key] = val._internal_.getDefaultData();
+        if (val?.$$) {
+          this.settableProperties[key] = val.$$.getDefaultData();
         } else {
           this.settableProperties[key] = val;
         }
@@ -128,8 +128,8 @@ export class ReactiveObjectInternals {
       const value = this.nativeData[key];
 
       if (writableOnly) {
-        if (value?._internal_) {
-          return value._internal_.getData(writableOnly);
+        if (value?.$$) {
+          return value.$$.getData(writableOnly);
         } else if (!this.privateKeys.has(key)) {
           return value;
         }
@@ -159,8 +159,8 @@ export class ReactiveObjectInternals {
       if (this.nativeData.hasOwnProperty(key)) {
         val = this.nativeData[key];
         if (writableOnly) {
-          if (val?._internal_) {
-            wrapper[key] = val._internal_.getData(writableOnly);
+          if (val?.$$) {
+            wrapper[key] = val.$$.getData(writableOnly);
           } else if (!this.privateKeys.has(key)) {
             wrapper[key] = val;
           }
@@ -190,9 +190,9 @@ export class ReactiveObjectInternals {
 
     if (this.nativeData.hasOwnProperty(key)) {
 
-      if (this.nativeData[key]?._internal_) {
+      if (this.nativeData[key]?.$$) {
 
-        this.nativeData[key]._internal_.setData(value, silent);
+        this.nativeData[key].$$.setData(value, silent);
 
       } else if (Core.patchData(this.nativeData[key], value, this.nativeData, key) && !silent) {
 
@@ -223,10 +223,10 @@ export class ReactiveObjectInternals {
       // forward the subscription to the bound object
       return this.boundProperties.get(key).observeSource(callback, unobservable, silent);
 
-    } else if (this.nativeData[key]?._internal_) {
+    } else if (this.nativeData[key]?.$$) {
 
       // use wildcard listener on child object
-      return this.nativeData[key]._internal_.observe('*', callback, unobservable, silent);
+      return this.nativeData[key].$$.observe('*', callback, unobservable, silent);
 
     } else {
 

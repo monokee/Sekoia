@@ -3,25 +3,25 @@ import { deepClone } from "../../utils/deep-clone.js";
 export class ReactiveWrapper {
 
   constructor(internal) {
-    Object.defineProperty(this, '_internal_', {
+    Object.defineProperty(this, '$$', {
       value: internal
     });
   }
 
   get(key) {
     if (key === void 0) {
-      return this._internal_.getData(false);
+      return this.$$.getData(false);
     } else {
-      return this._internal_.getDatum(key, false);
+      return this.$$.getDatum(key, false);
     }
   }
 
   default(key) {
     // return deep clone of writable default values
     if (key === void 0) {
-      return deepClone(this._internal_.getDefaultData());
+      return deepClone(this.$$.getDefaultData());
     } else {
-      return deepClone(this._internal_.getDefaultDatum(key));
+      return deepClone(this.$$.getDefaultDatum(key));
     }
   }
 
@@ -31,7 +31,7 @@ export class ReactiveWrapper {
     if (key === void 0) {
 
       // getData(true) already returns a shallow copy...
-      const copy = this._internal_.getData(true);
+      const copy = this.$$.getData(true);
 
       // ...make it deep
       if (Array.isArray(copy)) {
@@ -50,7 +50,7 @@ export class ReactiveWrapper {
 
     } else {
 
-      return deepClone(this._internal_.getDatum(key, true));
+      return deepClone(this.$$.getDatum(key, true));
 
     }
 
@@ -58,9 +58,9 @@ export class ReactiveWrapper {
 
   set(key, value) {
     if (typeof key === 'object') {
-      this._internal_.setData(key);
+      this.$$.setData(key);
     } else {
-      this._internal_.setDatum(key, value);
+      this.$$.setDatum(key, value);
     }
   }
 

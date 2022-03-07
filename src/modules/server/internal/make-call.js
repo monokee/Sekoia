@@ -31,16 +31,18 @@ export function makeCall(url, method, token, data = {}) {
       referrer: 'no-referrer',
       body: method === 'GET' ? null : typeof data === 'string' ? data : JSON.stringify(data)
     }).then(res => {
-      if (!res.ok || res.status !== 204) {
-        return res.text().then(text => {
-          try {
-            return JSON.parse(text);
-          } catch (_) {
-            return text;
-          }
+      const ct = res.headers.get('content-type');
+      const fn = ct && ct.includes('application/json') ? 'json' : 'text';
+      if (!res.ok) {
+        return res[fn]().then(x => {
+          throw x;
         });
       } else {
-        return {};
+        if (res.status === 204) {
+          return {};
+        } else {
+          return res[fn]();
+        }
       }
     }).finally(() => {
       PENDING_CALLS.delete(url);

@@ -18,8 +18,8 @@ export class ReactiveArrayInternals {
 
       this.model = data => {
         const model = options.model(data);
-        if (model && model._internal_) {
-          model._internal_.parentInternals = this;
+        if (model && model.$$) {
+          model.$$.parentInternals = this;
         }
         return model;
       }
@@ -34,9 +34,9 @@ export class ReactiveArrayInternals {
 
     for (let i = 0, item; i < sourceArray.length; i++) {
       item = sourceArray[i];
-      if (item._internal_) {
-        item._internal_.parentInternals = this;
-        this.defaultData.push(deepClone(item._internal_.getDefaultData()));
+      if (item.$$) {
+        item.$$.parentInternals = this;
+        this.defaultData.push(deepClone(item.$$.getDefaultData()));
       } else {
         this.defaultData.push(deepClone(item));
       }
@@ -55,8 +55,8 @@ export class ReactiveArrayInternals {
 
     const item = this.nativeData[index];
 
-    if (writableOnly && item?._internal_) {
-      return item._internal_.getData(writableOnly);
+    if (writableOnly && item?.$$) {
+      return item.$$.getData(writableOnly);
     } else {
       return item;
     }
@@ -69,8 +69,8 @@ export class ReactiveArrayInternals {
 
     for (let i = 0, item; i < this.nativeData.length; i++) {
       item = this.nativeData[i];
-      if (writableOnly && item?._internal_) {
-        copy.push(item._internal_.getData(writableOnly));
+      if (writableOnly && item?.$$) {
+        copy.push(item.$$.getData(writableOnly));
       } else {
         copy.push(item);
       }
@@ -101,13 +101,13 @@ export class ReactiveArrayInternals {
 
       if (current !== value) {
 
-        if (current?._internal_ && value && typeof value === 'object' && !value._internal_) {
+        if (current?.$$ && value && typeof value === 'object' && !value.$$) {
 
-          current._internal_.setData(value, silent); // patch object
+          current.$$.setData(value, silent); // patch object
 
         } else { // replace
 
-          if (!value || value._internal_ || typeof value !== 'object') {
+          if (!value || value.$$ || typeof value !== 'object') {
             this.nativeData[i] = value;
           } else {
             this.nativeData[i] = this.model(value);
@@ -133,13 +133,13 @@ export class ReactiveArrayInternals {
 
     if (current !== value) {
 
-      if (current?._internal_ && value && typeof value === 'object' && !value._internal_) {
+      if (current?.$$ && value && typeof value === 'object' && !value.$$) {
 
-        current._internal_.setData(value, silent); // patch object
+        current.$$.setData(value, silent); // patch object
 
       } else { // replace
 
-        if (!value || value._internal_ || typeof value !== 'object') {
+        if (!value || value.$$ || typeof value !== 'object') {
           this.nativeData[index] = value;
         } else {
           this.nativeData[index] = this.model(value);

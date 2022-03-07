@@ -1,6 +1,7 @@
 // Component
 import { createElement } from "./modules/component/create-element.js";
 import { defineComponent } from "./modules/component/define-component.js";
+import { onResize } from "./modules/component/on-resize.js";
 import { renderList } from "./modules/component/render-list.js";
 
 // Router
@@ -30,6 +31,7 @@ import { defer } from "./modules/utils/defer.js";
 const Sekoia = {
   createElement,
   defineComponent,
+  onResize,
   renderList,
   Router,
   deleteRequest,

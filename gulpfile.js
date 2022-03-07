@@ -46,6 +46,7 @@ function buildModule() {
     .pipe(footer(`export {
   createElement,
   defineComponent,
+  onResize,
   renderList,
   Router,
   deleteRequest,

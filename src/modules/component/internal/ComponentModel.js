@@ -35,7 +35,7 @@ export class ComponentModel {
 
           } else if (attribute === 'state') {
 
-            if (value && value._internal_) {
+            if (value && value.$$) {
               tag += ' provided-state="' + StateProvider.setState(value) + '"';
             } else {
               tag += ' composed-state-data="' + StateProvider.setState(value) + '"';
@@ -58,14 +58,14 @@ export class ComponentModel {
     const element = document.createElement(name);
 
     if (attributes) {
-      if (attributes._internal_) { // fast path
+      if (attributes.$$) { // fast path
         element.state = attributes;
       } else {
         for (const attribute in attributes) {
           if (attributes.hasOwnProperty(attribute)) {
             const value = attributes[attribute];
             if (attribute === 'state') {
-              if (value && value._internal_) {
+              if (value && value.$$) {
                 element.state = value;
               } else {
                 element.state = createState(value);

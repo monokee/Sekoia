@@ -1,21 +1,21 @@
 import { PersistentStorage } from "../../state/PersistentStorage.js";
 
-let CACHE = null;
+const CACHE = () => CACHE.$$ || (CACHE.$$ = new PersistentStorage({
+  name: 'sekoia::network::cache'
+}));
 
-export function setCache(hash, value, expires) {
-  return (CACHE || (CACHE = new PersistentStorage({
-    name: 'sekoia::network::cache'
-  }))).set(hash, {
+export function setCache(hash, value, cacheSeconds) {
+  return CACHE().set(hash, {
     value: value,
-    expires: Date.now() + expires * 1000
+    expires: Date.now() + (cacheSeconds * 1000)
   });
 }
 
 export function getCache(hash) {
-  return CACHE.get(hash).then(entry => {
+  return CACHE().get(hash).then(entry => {
     if (entry) {
       if (entry.expires < Date.now()) {
-        CACHE.delete(hash);
+        CACHE().delete(hash);
         throw false;
       } else {
         return entry.value;

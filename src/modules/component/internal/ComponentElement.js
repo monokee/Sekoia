@@ -53,7 +53,7 @@ export class ComponentElement extends HTMLElement {
           this.state = this.state || ReactiveObject._from_(MODEL.state);
 
           if (this.hasAttribute('composed-state-data')) {
-            this.state._internal_.setData(StateProvider.popState(this.getAttribute('composed-state-data')), false);
+            this.state.$$.setData(StateProvider.popState(this.getAttribute('composed-state-data')), false);
             this.removeAttribute('composed-state-data');
           }
 
@@ -62,7 +62,7 @@ export class ComponentElement extends HTMLElement {
         // Register render callbacks
         for (const [key, callback] of MODEL.renderEvents) {
           // simple granular render functions: render({...$ref}, currentValue)
-          this.state._internal_.observe(key, value => callback(REFS, value));
+          this.state.$$.observe(key, value => callback(REFS, value));
         }
 
         // Create automatic list renderings
@@ -74,9 +74,9 @@ export class ComponentElement extends HTMLElement {
             updateChild: config.updateChild
           };
 
-          const reactiveArray = this.state._internal_.getDatum(key);
-          reactiveArray._internal_.setStructuralObserver(value => {
-            renderList(value._internal_.nativeData, cfg);
+          const reactiveArray = this.state.$$.getDatum(key);
+          reactiveArray.$$.setStructuralObserver(value => {
+            renderList(value.$$.nativeData, cfg);
           });
 
         }

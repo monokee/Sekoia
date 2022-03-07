@@ -10,11 +10,11 @@ export class ReactiveObject extends ReactiveWrapper {
   static _from_(model, data) {
 
     const clone = Object.create(ReactiveObject.prototype);
-    clone._internal_ = new ReactiveObjectInternals(model);
-    clone._internal_.owner = clone;
+    clone.$$ = new ReactiveObjectInternals(model);
+    clone.$$.owner = clone;
 
     if (data) {
-      clone._internal_.setData(data, true);
+      clone.$$.setData(data, true);
     }
 
     return clone;
@@ -29,7 +29,7 @@ export class ReactiveObject extends ReactiveWrapper {
   }
 
   clone(data) {
-    return this.constructor._from_(this._internal_.model, data);
+    return this.constructor._from_(this.$$.model, data);
   }
 
   observe(key, callback, options = {}) {
@@ -39,7 +39,7 @@ export class ReactiveObject extends ReactiveWrapper {
       // { ...key: callback } -> convenient but non cancelable, non silent
       for (const k in key) {
         if (key.hasOwnProperty(k)) {
-          this._internal_.observe(k, key[k], false, false);
+          this.$$.observe(k, key[k], false, false);
         }
       }
 
@@ -47,15 +47,15 @@ export class ReactiveObject extends ReactiveWrapper {
 
       if ((options.throttle || 0) > 0) {
 
-        return this._internal_.observe(key, Queue.throttle(callback, options.throttle), options.cancelable, options.silent);
+        return this.$$.observe(key, Queue.throttle(callback, options.throttle), options.cancelable, options.silent);
 
       } else if ((options.defer || 0) > 0) {
 
-        return this._internal_.observe(key, defer(callback, options.defer), options.cancelable, options.silent);
+        return this.$$.observe(key, defer(callback, options.defer), options.cancelable, options.silent);
 
       } else {
 
-        return this._internal_.observe(key, callback, options.cancelable, options.silent);
+        return this.$$.observe(key, callback, options.cancelable, options.silent);
 
       }
 
@@ -64,18 +64,18 @@ export class ReactiveObject extends ReactiveWrapper {
   }
 
   bind(key) {
-    return this._internal_.bind(key);
+    return this.$$.bind(key);
   }
 
   track(key, options = {}) {
 
     key || (key = '*');
 
-    const stateTrackers = this._internal_.stateTrackers || (this._internal_.stateTrackers = new Map());
+    const stateTrackers = this.$$.stateTrackers || (this.$$.stateTrackers = new Map());
 
     if (stateTrackers.has(key)) {
       throw new Error(`Cannot track state of "${key}" because the property is already being tracked.`);
-    } else if (this._internal_.computedProperties.has(key)) {
+    } else if (this.$$.computedProperties.has(key)) {
       throw new Error(`Cannot track computed property "${key}". Only track writable properties.`);
     }
 
@@ -96,12 +96,12 @@ export class ReactiveObject extends ReactiveWrapper {
 
   undo(key) {
     key || (key = '*');
-    this.restore(key, this._internal_.stateTrackers?.get(key)?.prev());
+    this.restore(key, this.$$.stateTrackers?.get(key)?.prev());
   }
 
   redo(key) {
     key || (key = '*');
-    this.restore(key, this._internal_.stateTrackers?.get(key)?.next());
+    this.restore(key, this.$$.stateTrackers?.get(key)?.next());
   }
 
   restore(key, trackPosition) {
@@ -111,13 +111,13 @@ export class ReactiveObject extends ReactiveWrapper {
       key = '*';
     }
 
-    const tracker = this._internal_.stateTrackers?.get(key);
+    const tracker = this.$$.stateTrackers?.get(key);
 
     if (tracker && tracker.has(trackPosition)) {
       if (key === '*') {
-        this._internal_.setData(tracker.get(trackPosition), false);
+        this.$$.setData(tracker.get(trackPosition), false);
       } else {
-        this._internal_.setDatum(key, tracker.get(trackPosition), false);
+        this.$$.setDatum(key, tracker.get(trackPosition), false);
       }
     }
 
