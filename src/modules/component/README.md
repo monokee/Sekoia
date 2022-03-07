@@ -1,17 +1,16 @@
 # Sekoia Components
 
-##### Data driven custom elements
-<ul>
-    <li>Composable, data-driven customElements</li>
-    <li>Zero use of shadow DOM, soft-scoped CSS</li>
-    <li>Zero use of <i>{{ templating }}</i> and zero logic in markup</li>
-    <li>Architecturally clean, programmatic DOM access</li>
-    <li>Micro-optimized, async rendering and pooled models</li>
-</ul>
+##### Data driven custom elements that don't suck.
 
-Sekoia Components give your UI code structure by making native customElements reactive and composable while enforcing one-way data flow and facilitating 
+> Sekoia Components give your UI code structure by making native customElements reactive and composable while enforcing one-way data flow and facilitating 
 architecturally clean access to the DOM.
-Build on living web standards, insanely optimized for performance, clean and scalable application design and developer sanity.
+Built on living web standards, micro-optimized for performance while providing clean and scalable application design conventions.
+
+- Composable, data-driven customElements
+- Zero use of shadow DOM, soft-scoped CSS
+- Zero use of <i>{{ templating }}</i> and zero logic in markup
+- Architecturally clean, programmatic DOM access
+- Micro-optimized, async rendering and pooled models
 
 ***
 ### 👨‍💻 Getting Started
@@ -83,12 +82,12 @@ Your markup should be truly static. Don't include anything that should dynamical
 }
 ```
 
-<b>Note</b> the special "$" attribute. Sekoia automatically parses your component and passes these "refs" to all render and lifecycle callbacks
+> Note the special "$" attribute. Sekoia automatically parses your component and passes these "$refs" to all render and lifecycle callbacks
 for pre-cached programmatic access. <i>(Yes, inspired by jQuery, and I'm not ashamed to admit it).</i>
 ***
 ### 🎨 Component.style
 Plain old CSS - with a twist.
-The CSS written here will be semi-scoped to your component. Semi-scoping means that outside, global CSS can still reach into the
+The CSS written here will be softly scoped to your component. Soft scoping means that outside, global CSS can still reach into the
 component for global theming etc via classes. Sekoia simply prepends all selectors with the tag name of the component. 
 Refs like "$title" can be used as style selectors as is.
 
@@ -117,8 +116,22 @@ into:
     text-transform: uppercase;
   }
 ``` 
-...and append these rules to a global stylesheet. Note that $title
-has been re-written to a runtime globally unique classname.
+...and append these rules to a global stylesheet that is used by all instances of the component. 
+Note that $title has been re-written to a runtime globally unique classname.
+
+##### Escaping scope
+You may want to style your components based on global classes attached to an ancestor element like
+```body``` while keeping all of your style definitions inside of the component. That's easy:
+```css
+  /* Escape component scope via :root */
+  :root body.isLandscape $self {
+    position: absolute;
+  }
+  /* Becomes -> */
+  body.isLandscape my-component {
+    position: absolute;
+  }
+``` 
 
 ***
 
@@ -127,34 +140,36 @@ has been re-written to a runtime globally unique classname.
 Think of state as a simple, high-level description of the moving parts of your component. 
 This is the data that components need to somehow display to the user. 
 
-<i>Internally components consume Sekoia's observable reactive state modules. For an in-depth
-understanding of the modeling and reactivity concepts see:
-[Reactive State Documentation](../state)</i>
+> Internally components consume Sekoia's observable reactive state modules. For an in-depth
+understanding of state modeling and reactivity concepts see:
+[Reactive State Documentation](../state)
 
 ### 🎞 Rendering
 
-<i>A built-in shortcut for state.observe(property)</i><br>
+*A built-in shortcut for state.observe(property)*<br>
 
-Render callbacks are reactions that are fired in response to data changes and update fragments of DOM.
+Render callbacks are reactions that fire in response to data changes and update fragments of DOM.
 ```javascript
 state: {
+
+  title: { 
+    value: ({users}) => users.length ? 'Our Users' : 'We have no users...',
+    render({$title}, value) {
+      $title.textContent = value;
+    }   
+  },
+
   users: { 
     value: [
       {firstName: 'John', lastName: 'Williams'}, 
       {firstName: 'Hans', lastName: 'Zimmer'}
     ],
     render({$userList}, user) {
-      // don't actually do this - see a better list rendering example below
       $userList.innerHTML = value.map(user => (`<li>${user.firstName}</li>`));
     } 
-  },
-  title: { 
-    value: ({users}) => users.length ? 'Our Users' : 'We have no users...',
-    render({$title}, value) {
-      $title.textContent = value;
-    }   
-  } 
-},
+  }
+
+}
 ```
 Render callbacks receive an object of all "$ref" elements as their first argument. For convenience, you can destructure the elements
 you need to manipulate directly in the parameter.
@@ -163,14 +178,16 @@ The second parameter is the value of the data property that has changed in the s
 The single responsibility of reactions is to update the DOM. You cannot access "this" inside of reactions for "this" reason.
 All you should need is the $ref elements you want to update with the value of the data property that has changed.
 
-When you work with $refs, you directly target <b>real DOM nodes</b> - there is no abstraction layer - render callbacks thus offer
+> When you work with $refs, you directly target <b>real DOM nodes</b> - there is no abstraction layer - render callbacks thus offer
 incredible performance.
 And because these callbacks are only running in response to actual changes of the data model, even complex Sekoia Components never become 
 slow, hard to predict or maintain.
 
 #### List rendering and reconciliation
 For high-performance list rendering the ```render``` property should be a configuration object
-that Sekoia internally passes to the high performance DOM reconciler. 
+that Sekoia internally passes to the high performance DOM reconciler.
+<br>
+- See the [TodoMVC Example](../../../examples/TODO%20MVC) for an implementation
 ````javascript
 users: {
   value: new ReactiveArray([
@@ -209,8 +226,8 @@ Sekoia automatically determines if the value has actually changed and only then 
 And if for whatever reason the value changes one million times before the next frame is rendered,
 the reaction will still only be fired once with the most recent value - thanks to Sekoia's powerful auto-buffering renderer.
 
-<i>Note: State only accepts data that matches the shape and type of the state model's default data.
-See [Reactive State Documentation](../state) for details</i>
+> Note: State only accepts data that matches the shape and type of the state model's default data.
+See [Reactive State Documentation](../state) for details
 
 ***
 
@@ -218,6 +235,31 @@ See [Reactive State Documentation](../state) for details</i>
 The only Lifecycle method Sekoia Components need is called once per component instance, after the component has been 
 inserted into the DOM. Receives "$refs" as first and only argument. Typically, this is where you would bind input events, 
 retrieve server data etc.
+
+```javascript
+initialize({$self, $toggle, $list}) {
+  
+  // bind events to $refs...
+  $toggle.addEventListener('click', e => {
+    this.handleClick();
+  });
+  
+  // ... or delegate to the component itself
+  this.addEventListener('click', e => {
+    if ($toggle.contains(e.target)) {
+      this.handleClick();
+    }
+  });
+
+  console.assert($self === this);
+
+},
+
+handleClick() { 
+  // The state's render callback will update the DOM in response.
+  this.state.set('active', !this.state.get('active'));
+}
+```
 
 ***
 
@@ -242,7 +284,7 @@ export const ChildComponent = defineComponent('child-component', {
   `)
 });
 ```
-<br><br>
+
 parent-component.js:
 
 ```javascript
@@ -264,8 +306,8 @@ to the DOM.
 ```javascript
 ChildComponent({
   class: 'pos-rel pd-250',
-  style: 'will-change: opacity',
-  state: {
+  style: 'will-change: opacity', // use inline dom-strings
+  state: { // state can be object
     user: {
       name: 'Jonathan'
     }
@@ -285,8 +327,9 @@ Similar to calling ```Factor({...attribute})``` but instead of returning a compo
 ##### Factory.state({...data})
 
 Returns an instance of the Component's internal reactive state with the provided snapshot data. This is used
-for list rendering as Factory.state can be used as a model of ReactiveArray. See 
-[Reactive State Documentation](../state)
+for list rendering as Factory.state can be used directly as a model of ReactiveArray.
+- [Reactive State Documentation](../state)
+- [TodoMVC Example](../../../examples/TODO%20MVC)
 
 ***
 
@@ -296,8 +339,9 @@ components share the same ComponentModel prototype and template for <b>greatly o
 When the first instance of a Component is attached to the DOM for the first time, the ComponentModel sets itself up once by 
 scoping the CSS, collecting $refs and setting up the state model. All subsequent instances of the Component pull from the
 ComponentModel's pooled template, styles and state model with <b>no additional roundtrips to expensive DOM APIs or state resolvers.</b>
-The extensive caching strategies and smart reuse of resolved data structures gives Sekoia Components a real performance edge,
-even over native customElements with the same functionality.
+
+> The extensive pooling and caching of resolved data structures allows Sekoia Components to outperform most frameworks and
+> even native customElements while providing clean architectural conventions for scalable application design.
 
 
 

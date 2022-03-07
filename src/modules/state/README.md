@@ -101,7 +101,10 @@ These methods are available on all instances of ReactiveObject and ReactiveArray
 The expected behaviour is documented for ReactiveObject first with some [special exceptions for ReactiveArray](#reactivearray-specialties) at the bottom of the section.
 
 ##### get([key])
-returns data of key or entire object if key is undefined
+returns data of key or entire object if key is undefined. 
+> When retrieving nested ReactiveObjects or ReactiveArrays, the actual Reactive interface is returned.
+> To retrieve plain, serializable data call snapshot() on the returned interface or retrieve a snapshot 
+> directly from the reactive parent.
 
 ##### default([key])
 Returns a deep clone the initial data value that was passed when the model was defined on the first object instantiation.
@@ -110,22 +113,34 @@ Returns entire object when no key is provided.
 ##### snapshot([key])
 Returns a deep clone of writable (serializable) properties. Useful for persistence and immutable state updates.
 ```javascript
-State.snapshot();
-/*
-{
-  _firstName: 'Jonathan',
-  _lastName: 'Ochmann', 
-  _nickname: 'Jon', 
+State.snapshot() === {
+  firstName: 'Jonathan',
+  lastName: 'Ochmann', 
+  nickname: 'Jon', 
   friends: []
 }
-*/
 ```
 
 ##### set([key], value)
 Assigns target data to object if target matches the type (in case of primitives) or shape (in case of objects) of the state model.
 The algorithm works with arbitrarily nested data structures consisting of { plain: objects } and [ plain, arrays ].
-<br><br>
-<i>Equality rules for setting data:<br>
+```javascript
+State.set('firstName', 'Terry');
+
+State.set({
+  firstName: 'Terry',
+  lastName: 'Gilliam',
+  whatever: [] // will be ignored because it's not part of the model
+});
+
+// won't do anything. firstName must be String.
+State.set('firstName', 123);
+
+// will throw - Do not set computed properties (duh!)
+State.set('greeting', 'Goodbye');
+```
+> **Equality rules for patching data:**
+<br>
 Let source be the ReactiveObject and target be invading data.
 When source and target are both primitives, their type must match, but their value must be different in order to be assigned.
 When source and target are objects, the algorithm recursively applies the target object's properties to the source object's properties.
@@ -140,13 +155,12 @@ Arrays are allowed to change length. When source is an empty array, we push any 
 into source because we have no way to compare existing items. When source is an array that has items and target is an array
 that has more items than source, any added items must match the shape or type of the last item in the source array.
 When the target array is shorter than or equal in length to the source array, we patch each item recursively.
-</i>
 
 ##### reset([key])
 Resets a state object to the data passed with the initial model definition (i.e the first object creation)
 
 ##### clone([data])
-Creates a new instance of the object model and immediately assigns the passed data.
+Creates a new instance of the object model and immediately assigns the passed data. Data must match the model's shape.
 
 ```javascript
 // use "State" as a model to instantiate 
@@ -169,23 +183,36 @@ Registers a callback function that is fired when the observed keys' value change
 The callback receives the current value as the only argument.
 Observers fire once immediately after registration.
 When throttle or defer > 0 the observer is throttled or deferred to the provided interval in milliseconds.
-Returns unobserve function when options.cancelable === true, or nothing otherwise.
+Returns unobserve function when ```options.cancelable = true```, undefined otherwise.
+<br>
+
 ```javascript
 State.observe('greeting', value => {
-  // fires whenever greeting computes a new value.
+  // fires whenever greeting computes a new value
+  // and once, immediately after registration
 });
 
-State.observe('*', value => {
-  // wildcard listener will fire when any 
-  // public property (see Private Properties below)
+const unobserve = State.observe('*', value => {
+  // wildcard listener fires when any 
+  // public property (see "Private Properties")
   // in the object has changed, including propagated
   // changes from nested reactive objects.
+}, {
+ cancelable: true, // make observe() return an unobserve function
+ throttle: 250 // execute no more than once every 250ms
 });
 ```
+> It is theoretically possible that throttled or deferred observers may fire 
+the same state value they fired previously. Consider this scenario:<br>
+(1) Observed state changes to a new value.<br>
+(2) Sekoia queues the state observer.<br>
+(3) The observer is waiting for it's defer/throttle timeout to pass.<br>
+(4) The state value changes back to the initial value while the observer is waiting.<br>
+(5) The observer fires with the same value it fired previously.<br>
 
 ##### bind(key)
-Returns a binding which can be implemented as a property value on other objects. key must
-be public.
+Returns a binding which can be implemented as a property value on other objects. Source property must
+be public. Target property must be public unless it is bound to a [readonly computed property](#-computed-properties).
 ```javascript
 // The "source of truth" object
 const StateA = new ReactiveObject({
@@ -197,7 +224,7 @@ const StateA = new ReactiveObject({
 // The object bound to source object
 const StateB = new ReactiveObject({
   bar: StateA.bind('foo'),
-  boo: StateA.bind('_baz'), // -> THROWS. Do not bind private properties. See "Private Properties" below
+  boo: StateA.bind('_baz'), // -> THROWS. Do not bind private properties. See "Private Properties"
   _baz: StateA.bind('foo'), // -> THROWS. Do not bind private properties to writable properties.
   _ok: StateA.bind('uff')   // -> Works because "uff" is readonly (and public)
 });
@@ -206,11 +233,14 @@ const StateB = new ReactiveObject({
 
 ##### track(key, [options = {maxEntries: 100, onTrack: fn, throttle: 0 / defer: 0}])
 Record all state changes for time-travel. Records entire object when
-key is wildcard '*'. options.maxEntries determines how many state changes
+key is wildcard.
+<br>
+```options.maxEntries``` determines how many state changes
 are recorded before old state changes get removed from the beginning of the
-internal history stack. options.onTrack is a callback function that is invoked
-whenever you time-travel to a tracked state. Note: Recorded states are guaranteed
-to be unique - even when asynchronously throttled or deferred.
+internal history track. <br>
+```options.onTrack(𝑓)``` is a callback function that is invoked
+whenever you time-travel to a tracked state. 
+<br>
 ```javascript
 State.track('prop', {
   maxEntries: 500,
@@ -221,6 +251,7 @@ State.track('prop', {
   }
 })
 ```
+> Recorded states are guaranteed to be unique - even when asynchronously throttled or deferred.
 
 ##### undo(key)
 Time travel to the last tracked state change. Requires that object or key is being tracked.
@@ -233,45 +264,44 @@ Time travel to specified trackPosition. trackPosition is an index in the interna
 history array.
 
 ## ReactiveArray Specialties
-ReactiveArrays have some important distinctions from ReactiveObjects. 
+ReactiveArrays have some important distinctions from ReactiveObjects:
 
-<ul>
-    <li>Most obviously, ReactiveArrays can change lengths, or, in other words, as opposed to ReactiveObjects, their property keys (indices) are allowed to change.</li>
-    <li>Individual indices cannot be observed. ```ReactiveArray.observe(handler => {})``` does not receive a "key" argument. All observers are wildcard observers that react to anything happening within the array.</li>
-    <li>ReactiveArray can be instantiated with a model creation function that transforms any data that is added to the array at runtime.</li>
-    <li>ReactiveArrays have no computed properties, no bindings and no private keys</li>
-</ul>
+- Most obviously, ReactiveArrays can change lengths, or, in other words, as opposed to ReactiveObjects, their property keys (indices) are allowed to change.
+- Individual indices cannot be observed. ```ReactiveArray.observe(handler => {})``` does not receive a "key" argument. All observers are wildcard observers that react to anything happening within the array.
+- ReactiveArray can be instantiated with a model creation function that transforms any data that is added to the array at runtime.
+- ReactiveArrays have no computed properties, no bindings and no private keys.
 
-In addition to the methods from ReactiveObject, ReactiveArray also implements reactive versions of all methods from Array.prototype:<br>
+In addition to the methods from ReactiveObject, ReactiveArray also implements reactive versions of all methods from <b>Array.prototype</b>
+<br>
 ##### Accessors and Iterators
-<ul>
-  <li>every</li>
-  <li>some</li>
-  <li>findIndex</li>
-  <li>findLastIndex</li>
-  <li>includes</li>
-  <li>indexOf</li>
-  <li>lastIndexOf</li>
-  <li>find</li>
-  <li>slice</li>
-  <li>forEach</li>
-  <li>map</li>
-  <li>filter</li>
-  <li>reduce</li>
-</ul>
+
+- every
+- some
+- findIndex
+- findLastIndex
+- includes
+- indexOf
+- lastIndexOf
+- find
+- slice
+- forEach
+- map
+- filter
+- reduce
 
 ##### Mutators
-<ul>
-  <li>pop</li>
-  <li>push</li>
-  <li>shift</li>
-  <li>unshift</li>
-  <li>splice</li>
-  <li>reverse</li>
-  <li>sort</li>
-  <li>filterInPlace (just like filter() but mutating)</li>
-  <li>clear (removes all items from array)</li>
-</ul>
+
+- pop
+- push
+- shift
+- unshift
+- splice
+- reverse
+- sort
+- filterInPlace (just like filter() but mutating)
+- clear (removes all items from array)
+
+> When ReactiveArrays contain nested ReactiveObjects, the object patching rules described above apply for all mutators as well.
 
 ***
 

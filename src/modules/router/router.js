@@ -1,17 +1,25 @@
 import { deepClone } from "../utils/deep-clone.js";
 
-const ORIGIN = window.location.origin + window.location.pathname;
-const ABSOLUTE_ORIGIN_NAMES = [ORIGIN, window.location.hostname, window.location.hostname + '/', window.location.origin];
-if (ORIGIN[ORIGIN.length - 1] !== '/') ABSOLUTE_ORIGIN_NAMES.push(ORIGIN + '/');
-if (window.location.pathname && window.location.pathname !== '/') ABSOLUTE_ORIGIN_NAMES.push(window.location.pathname);
+const LOCATION = window.location;
+const HISTORY = window.history;
+const ORIGIN = LOCATION.origin + LOCATION.pathname;
+
+const ABSOLUTE_ORIGIN_NAMES = [ORIGIN, LOCATION.hostname, LOCATION.hostname + '/', LOCATION.origin];
+if (ORIGIN[ORIGIN.length - 1] !== '/') {
+  ABSOLUTE_ORIGIN_NAMES.push(ORIGIN + '/');
+}
+if (LOCATION.pathname && LOCATION.pathname !== '/') {
+  ABSOLUTE_ORIGIN_NAMES.push(LOCATION.pathname);
+}
+
 const ALLOWED_ORIGIN_NAMES = ['/', '#', '/#', '/#/', ...ABSOLUTE_ORIGIN_NAMES];
 const ORIGIN_URL = new URL(ORIGIN);
 const CLEAN_ORIGIN = removeTrailingSlash(ORIGIN);
 
 const REGISTERED_FILTERS = new Map();
 const REGISTERED_ACTIONS = new Set();
-const WILDCARD_ACTIONS = [];
 
+const WILDCARD_ACTIONS = [];
 let WILDCARD_FILTER = null;
 
 const ROUTES_STRUCT = {};
@@ -24,10 +32,10 @@ const DEFAULT_TRIGGER_OPTIONS = {
 };
 
 let HAS_POPSTATE_LISTENER = false;
-let CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(window.location.search);
+let CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(LOCATION.search);
 let CURRENT_ROUTE_FRAGMENTS = ['/'];
-if (window.location.hash) {
-  CURRENT_ROUTE_FRAGMENTS.push(...window.location.hash.split('/'));
+if (LOCATION.hash) {
+  CURRENT_ROUTE_FRAGMENTS.push(...LOCATION.hash.split('/'));
 }
 
 export const Router = {
@@ -104,8 +112,8 @@ export const Router = {
 
   navigate(route, options = {}) {
 
-    if (route.lastIndexOf('http', 0) === 0 && route !== window.location.href) {
-      return window.location.href = route;
+    if (route.lastIndexOf('http', 0) === 0 && route !== LOCATION.href) {
+      return LOCATION.href = route;
     }
 
     const { hash, query, rel } = getRouteParts(route);
@@ -181,7 +189,7 @@ export const Router = {
 
   resolve(options = {}) {
     // should be called once after all filters and actions have been registered
-    this.navigate(window.location.href, options);
+    this.navigate(LOCATION.href, options);
   },
 
   getQueryParameters(key) {
@@ -194,9 +202,11 @@ export const Router = {
 
   addQueryParameters(key, value) {
 
-    if (typeof value === 'undefined' && typeof key === 'object') {
+    if (typeof key === 'object') {
       for (const k in key) {
-        CURRENT_QUERY_PARAMETERS[k] = key[k];
+        if (key.hasOwnProperty(k)) {
+          CURRENT_QUERY_PARAMETERS[k] = key[k];
+        }
       }
     } else {
       CURRENT_QUERY_PARAMETERS[key] = value;
@@ -239,7 +249,7 @@ function addPopStateListenerOnce() {
 
     // never fired on initial page load in all up-to-date browsers
     window.addEventListener('popstate', () => {
-      Router.navigate(window.location.href, {
+      Router.navigate(LOCATION.href, {
         history: 'replaceState',
         forceReload: false
       });
@@ -256,18 +266,18 @@ function performNavigation(hash, query, keepQuery, historyMode) {
 
   ORIGIN_URL.hash = hash;
   ORIGIN_URL.search = keepQuery ? buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS) : query;
-  window.history[historyMode](null, document.title, ORIGIN_URL.toString());
+  HISTORY[historyMode](null, document.title, ORIGIN_URL.toString());
 
 }
 
 function updateQueryString() {
   ORIGIN_URL.search = buildQueryStringFromParams(CURRENT_QUERY_PARAMETERS);
-  window.history.replaceState(null, document.title, ORIGIN_URL.toString());
+  HISTORY.replaceState(null, document.title, ORIGIN_URL.toString());
 }
 
 function reRoute(newRoute) {
   if (newRoute.lastIndexOf('http', 0) === 0) {
-    return window.location.href = newRoute;
+    return LOCATION.href = newRoute;
   } else {
     return Router.navigate(newRoute, {
       history: 'replaceState',

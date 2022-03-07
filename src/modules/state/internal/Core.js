@@ -49,7 +49,7 @@ export const Core = {
 
       if (!target.hasOwnProperty(sourceProperty)) {
         throw {
-          type: 'cue-internal',
+          type: 'sekoia-internal',
           message: `Cannot resolve computed property "${computedProperty.ownPropertyName}" because dependency "${sourceProperty}" doesn't exist.`
         }
       }
@@ -294,7 +294,7 @@ export const Core = {
         // the computation itself will most definitely fail but we only care about the property dependencies so we can safely ignore all errors.
         computedProperty.computation(installer);
       } catch(e) {
-        if (e.type && e.type === 'cue-internal') {
+        if (e.type && e.type === 'sekoia-internal') {
           throw new Error(e.message);
         }
       }

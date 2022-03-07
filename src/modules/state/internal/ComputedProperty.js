@@ -56,5 +56,3 @@ export class ComputedProperty {
   }
 
 }
-
-ComputedProperty.prototype._isComputedProperty_ = true;
