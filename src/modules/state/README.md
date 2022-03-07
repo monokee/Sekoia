@@ -140,21 +140,20 @@ State.set('firstName', 123);
 State.set('greeting', 'Goodbye');
 ```
 > **Equality rules for patching data:**
-<br>
-Let source be the ReactiveObject and target be invading data.
-When source and target are both primitives, their type must match, but their value must be different in order to be assigned.
-When source and target are objects, the algorithm recursively applies the target object's properties to the source object's properties.
-The target object must deeply match the source object's shape. This means that the property keys must match, and the property values
-must match type. In other words, target objects are not allowed to add or remove properties from source object (when both are plain objects)
-and the property values of target must recursively match the shape or type of the source object's property values.
-Any target property value that does not match it's corresponding source property value does not get assigned.
-Mismatches do not throw errors - the algorithm will default to the source property value and continue to attempt to
-assign any remaining target property values that match. When an actual assignment happens, and dependent observers are queued.
-Arrays are treated similar to plain objects with an important distinction:
-Arrays are allowed to change length. When source is an empty array, we push any items from the target array
-into source because we have no way to compare existing items. When source is an array that has items and target is an array
-that has more items than source, any added items must match the shape or type of the last item in the source array.
-When the target array is shorter than or equal in length to the source array, we patch each item recursively.
+> Let source be the ReactiveObject and target be invading data.
+> When source and target are both primitives, their type must match, but their value must be different in order to be assigned.
+> When source and target are objects, the algorithm recursively applies the target object's properties to the source object's properties.
+> The target object must deeply match the source object's shape. This means that the property keys must match, and the property values
+> must match type. In other words, target objects are not allowed to add or remove properties from source object (when both are plain objects)
+> and the property values of target must recursively match the shape or type of the source object's property values.
+> Any target property value that does not match it's corresponding source property value does not get assigned.
+> Mismatches do not throw errors - the algorithm will default to the source property value and continue to attempt to
+> assign any remaining target property values that match. When an actual assignment happens, and dependent observers are queued.
+> Arrays are treated similar to plain objects with an important distinction:
+> Arrays are allowed to change length. When source is an empty array, we push any items from the target array
+> into source because we have no way to compare existing items. When source is an array that has items and target is an array
+> that has more items than source, any added items must match the shape or type of the last item in the source array.
+> When the target array is shorter than or equal in length to the source array, we patch each item recursively.
 
 ##### reset([key])
 Resets a state object to the data passed with the initial model definition (i.e the first object creation)
