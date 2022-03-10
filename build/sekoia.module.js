@@ -2093,7 +2093,7 @@ class ComponentElement extends HTMLElement {
 
       const MODEL = this._model_;
 
-      const REFS = new Proxy({$self: this}, {
+      const REFS = this.refs = new Proxy({$self: this}, {
         get: (target, key) => {
           return target[key] || (target[key] = this.getElementsByClassName(MODEL.refs.get(key))[0]);
         }
