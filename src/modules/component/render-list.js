@@ -1,7 +1,7 @@
 export function renderList(data, config) {
 
-  // accept arrays, convert plain objects to arrays, convert null or undefined to array
-  const newArray = Array.isArray(data) ? data.slice(0) : Object.values(data || {});
+  // accept reactive arrays, normal arrays and convert plain objects, null and undefined to arrays
+  const newArray = data?.$$ ? data.$$.nativeData.slice(0) : Array.isArray(data) ? data.slice(0) : Object.values(data || {});
   const parent = config.parentElement;
 
   // keep reference to old data on element

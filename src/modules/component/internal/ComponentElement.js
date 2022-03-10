@@ -76,7 +76,7 @@ export class ComponentElement extends HTMLElement {
 
           const reactiveArray = this.state.$$.getDatum(key);
           reactiveArray.$$.setStructuralObserver(value => {
-            renderList(value.$$.nativeData, cfg);
+            renderList(value, cfg);
           });
 
         }
