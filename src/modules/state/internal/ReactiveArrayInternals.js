@@ -155,6 +155,16 @@ export class ReactiveArrayInternals {
 
   }
 
+  internalize(items) {
+    for (let i = 0, item; i < items.length; i++) {
+      item = items[i];
+      if (typeof item === 'object' && item && !item.$$) {
+        items[i] = this.model(item);
+      }
+    }
+    return items;
+  }
+
   observe(wildcardKey, callback, unobservable, silent) {
 
     // ReactiveArrays have two types of observers:

@@ -66,6 +66,10 @@ export class ReactiveArray extends ReactiveWrapper {
     return this.$$.nativeData.slice(start);
   }
 
+  concat(...arrays) {
+    return this.$$.nativeData.concat(...arrays);
+  }
+
   forEach(callbackFn) {
     return this.$$.nativeData.forEach(callbackFn);
   }
@@ -92,16 +96,9 @@ export class ReactiveArray extends ReactiveWrapper {
     }
   }
 
-  push(item) {
-
-    if (!item || item.$$ || typeof item !== 'object') {
-      this.$$.nativeData.push(item);
-    } else {
-      this.$$.nativeData.push(this.$$.model(item));
-    }
-
+  push(...items) {
+    this.$$.nativeData.push(...this.$$.internalize(items));
     this.$$.didMutate();
-
   }
 
   shift() {
@@ -112,16 +109,9 @@ export class ReactiveArray extends ReactiveWrapper {
     }
   }
 
-  unshift(item) {
-
-    if (!item || item.$$ || typeof item !== 'object') {
-      this.$$.nativeData.unshift(item);
-    } else {
-      this.$$.nativeData.unshift(this.$$.model(item));
-    }
-
+  unshift(...items) {
+    this.$$.nativeData.unshift(...this.$$.internalize(items));
     this.$$.didMutate();
-
   }
 
   splice(start, deleteCount, ...items) {
@@ -138,13 +128,7 @@ export class ReactiveArray extends ReactiveWrapper {
 
     } else { // remove/add
 
-      for (let i = 0; i < items.length; i++) {
-        if (items[i] && !items[i].$$ && typeof items[i] === 'object') {
-          items[i] = this.$$.model(items[i]);
-        }
-      }
-
-      const removedItems = this.$$.nativeData.splice(start, deleteCount, ...items);
+      const removedItems = this.$$.nativeData.splice(start, deleteCount, ...this.$$.internalize(items));
       this.$$.didMutate();
       return removedItems;
 
@@ -194,6 +178,22 @@ export class ReactiveArray extends ReactiveWrapper {
 
     if (didChange) {
       this.$$.didMutate();
+    }
+
+  }
+
+  concatInPlace(array, prepend = false) {
+
+    if (array?.length) {
+
+      if (prepend) {
+        this.$$.nativeData.unshift(...this.$$.internalize(array));
+      } else {
+        this.$$.nativeData.push(...this.$$.internalize(array));
+      }
+
+      this.$$.didMutate();
+
     }
 
   }

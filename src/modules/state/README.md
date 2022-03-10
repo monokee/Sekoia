@@ -283,6 +283,7 @@ In addition to the methods from ReactiveObject, ReactiveArray also implements re
 - lastIndexOf
 - find
 - slice
+- concat
 - forEach
 - map
 - filter
@@ -298,6 +299,7 @@ In addition to the methods from ReactiveObject, ReactiveArray also implements re
 - reverse
 - sort
 - filterInPlace (just like filter() but mutating)
+- concatInPlace(array, prepend = false) -> add array contents to end or beginning
 - clear (removes all items from array)
 
 > When ReactiveArrays contain nested ReactiveObjects, the object patching rules described above apply for all mutators as well.
