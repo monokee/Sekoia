@@ -2156,6 +2156,30 @@ class ComponentElement extends HTMLElement {
 
   }
 
+  cloneNode(withState = false) {
+
+    if (withState && !this._initialized_) {
+      throw new Error('Cannot clone component with state before initialization.');
+    }
+
+    const instance = document.createElement(this.tagName);
+
+    // copy top level attributes
+    for (let i = 0, attribute; i < this.attributes.length; i++) {
+      attribute = this.attributes[i];
+      instance.setAttribute(attribute.nodeName, attribute.nodeValue);
+    }
+
+    // copy state if required
+    withState && this.state && instance.setAttribute(
+      'composed-state-data',
+      StateProvider.setState(this.state.snapshot())
+    );
+
+    return instance;
+
+  }
+
 }
 
 function defineComponent(name, config) {
@@ -2229,6 +2253,28 @@ function ON_RESIZE(entries) {
   }
 }
 
+function onDragOver(element, onDrop) {
+
+  element.addEventListener('dragenter', e => {
+    element.classList.add('dragover');
+  });
+
+  element.addEventListener('dragleave', e => {
+    element.classList.remove('dragover');
+  });
+
+  element.addEventListener('dragover', e => {
+    e.preventDefault();
+  });
+
+  element.addEventListener('drop', e => {
+    e.preventDefault();
+    element.classList.remove('dragover');
+    onDrop(e.dataTransfer.files);
+  });
+
+}
+
 const LOCATION = window.location;
 const HISTORY = window.history;
 const ORIGIN = LOCATION.origin + LOCATION.pathname;
@@ -2269,56 +2315,136 @@ if (LOCATION.hash) {
 
 const Router = {
 
-  before(route, filter) {
+  registerRedirects(redirects) {
 
-    addPopStateListenerOnce();
+    /**
+     * A higher level abstraction over Router.before.
+     * Register dynamic redirect hooks for individual routes.
+     * Use wildcard * to redirect any request conditionally.
+     * Example:
+     * redirects = {
+     *  '/': '#home', -> redirect every root request to #home
+     *  '#public': false -> don't redirect. same as omitting property completely
+     *  '#protected': queryParams => {
+     *    if (System.currentUser.role !== 'admin') {
+     *      return '#403' -> redirect non-admins to 403 page. else undefined is returned so we don't redirect.
+     *    }
+     *  }
+     *}
+     * */
 
-    if (route === '*') {
+    const requestPermission = (path, params, respondWith) => {
 
-      if (WILDCARD_FILTER !== null) {
-        console.warn('Router.before(*, filter) - overwriting previously registered wildcard filter (*)');
+      // when no filter is registered for this path we allow it
+      if (!redirects.hasOwnProperty(path)) {
+        return respondWith(path);
       }
 
-      WILDCARD_FILTER = filter;
+      const filter = redirects[path];
+      const redirect = typeof filter === 'function' ? filter(params) : filter;
+
+      if (!redirect || typeof redirect !== 'string') { // falsy values don't redirect
+        respondWith(path);
+      } else { // redirect non-empty strings
+        respondWith(redirect);
+      }
+
+    };
+
+    for (const path in redirects) {
+      if (redirects.hasOwnProperty(path) && !this.hasFilter(path)) {
+        this.before(path, requestPermission);
+      }
+    }
+
+    return this;
+
+  },
+
+  before(route, filter) {
+
+    if (typeof route === 'object') {
+
+      for (const rt in route) {
+        if (route.hasOwnProperty(rt)) {
+          this.on(rt, route[rt]);
+        }
+      }
 
     } else {
 
-      const { hash } = getRouteParts(route);
+      addPopStateListenerOnce();
 
-      if (REGISTERED_FILTERS.has(hash)) {
-        throw new Error(`Router.beforeRoute() already has a filter for ${hash === '#' ? `${route} (root url)` : route}`);
+      if (route === '*') {
+
+        if (WILDCARD_FILTER !== null) {
+          console.warn('Router.before(*, filter) - overwriting previously registered wildcard filter (*)');
+        }
+
+        WILDCARD_FILTER = filter;
+
+      } else {
+
+        const { hash } = getRouteParts(route);
+
+        if (REGISTERED_FILTERS.has(hash)) {
+          throw new Error(`Router.beforeRoute() already has a filter for ${hash === '#' ? `${route} (root url)` : route}`);
+        }
+
+        REGISTERED_FILTERS.set(hash, filter);
+
       }
 
-      REGISTERED_FILTERS.set(hash, filter);
-
     }
+
+    return this;
 
   },
 
   on(route, action) {
 
-    addPopStateListenerOnce();
+    if (typeof route === 'object') {
 
-    if (route === '*') {
-
-      if (WILDCARD_ACTIONS.indexOf(action) === -1) {
-        WILDCARD_ACTIONS.push(action);
+      for (const rt in route) {
+        if (route.hasOwnProperty(rt)) {
+          this.on(rt, route[rt]);
+        }
       }
 
     } else {
 
-      const { hash } = getRouteParts(route);
+      addPopStateListenerOnce();
 
-      if (REGISTERED_ACTIONS.has(hash)) {
-        throw new Error('Router.onRoute() already has a action for "' + hash === '#' ? (route + ' (root url)') : route + '".');
+      if (route === '*') {
+
+        if (WILDCARD_ACTIONS.indexOf(action) === -1) {
+          WILDCARD_ACTIONS.push(action);
+        }
+
+      } else {
+
+        const {hash} = getRouteParts(route);
+
+        if (REGISTERED_ACTIONS.has(hash)) {
+          throw new Error('Router.onRoute() already has a action for "' + hash === '#' ? (route + ' (root url)') : route + '".');
+        }
+
+        REGISTERED_ACTIONS.add(hash);
+
+        assignActionToRouteStruct(hash, action);
+
       }
-
-      REGISTERED_ACTIONS.add(hash);
-
-      assignActionToRouteStruct(hash, action);
 
     }
 
+    return this;
+
+  },
+
+  resolve(options = {}) {
+    // should be called once after all filters and actions have been registered
+    this.navigate(LOCATION.href, options);
+    return this;
   },
 
   hasFilter(route) {
@@ -2342,83 +2468,92 @@ const Router = {
   navigate(route, options = {}) {
 
     if (route.lastIndexOf('http', 0) === 0 && route !== LOCATION.href) {
-      return LOCATION.href = route;
-    }
 
-    const { hash, query, rel } = getRouteParts(route);
+      LOCATION.href = route;
 
-    options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
-
-    if (options.keepQuery === true) {
-      Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(query));
     } else {
-      CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(query);
-    }
 
-    // Filters
-    if (WILDCARD_FILTER) { // 1.0 - Apply wildcard filter
+      const {hash, query, rel} = getRouteParts(route);
 
-      WILDCARD_FILTER(rel, CURRENT_QUERY_PARAMETERS, response => {
+      options = Object.assign({}, DEFAULT_TRIGGER_OPTIONS, options);
 
-        if (response !== rel) {
+      if (options.keepQuery === true) {
+        Object.assign(CURRENT_QUERY_PARAMETERS, buildParamsFromQueryString(query));
+      } else {
+        CURRENT_QUERY_PARAMETERS = buildParamsFromQueryString(query);
+      }
 
-          reRoute(response);
+      // Filters
+      if (WILDCARD_FILTER) { // 1.0 - Apply wildcard filter
 
-        } else {
+        WILDCARD_FILTER(rel, CURRENT_QUERY_PARAMETERS, response => {
 
-          if (REGISTERED_FILTERS.has(hash)) { // 1.1 - Apply route filters
+          if (response !== rel) {
 
-            REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
-
-              if (response !== rel) {
-
-                reRoute(response);
-
-              } else {
-
-                performNavigation(hash, query, options.keepQuery, options.history);
-
-              }
-
-            });
+            reRoute(response);
 
           } else {
 
-            performNavigation(hash, query, options.keepQuery, options.history);
+            if (REGISTERED_FILTERS.has(hash)) { // 1.1 - Apply route filters
+
+              REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
+
+                if (response && typeof response === 'string') { // only continue if response is truthy and string
+
+                  if (response !== rel) {
+
+                    reRoute(response);
+
+                  } else {
+
+                    performNavigation(hash, query, options.keepQuery, options.history);
+
+                  }
+
+                }
+
+              });
+
+            } else {
+
+              performNavigation(hash, query, options.keepQuery, options.history);
+
+            }
 
           }
 
-        }
+        });
 
-      });
+      } else if (REGISTERED_FILTERS.has(hash)) { // 2.0 - Apply route filters
 
-    } else if (REGISTERED_FILTERS.has(hash)) { // 2.0 - Apply route filters
+        REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
 
-      REGISTERED_FILTERS.get(hash)(rel, CURRENT_QUERY_PARAMETERS, response => {
+          if (response && typeof response === 'string') {
 
-        if (response !== rel) {
+            if (response !== rel) {
 
-          reRoute(response);
+              reRoute(response);
 
-        } else {
+            } else {
 
-          performNavigation(hash, query, options.keepQuery, options.history);
+              performNavigation(hash, query, options.keepQuery, options.history);
 
-        }
+            }
 
-      });
+          }
 
-    } else {
+        });
 
-      performNavigation(hash, query, options.keepQuery, options.history);
+      } else {
+
+        performNavigation(hash, query, options.keepQuery, options.history);
+
+      }
 
     }
 
-  },
+    return this;
 
-  resolve(options = {}) {
-    // should be called once after all filters and actions have been registered
-    this.navigate(LOCATION.href, options);
   },
 
   getQueryParameters(key) {
@@ -2443,11 +2578,14 @@ const Router = {
 
     updateQueryString();
 
+    return this;
+
   },
 
   setQueryParameters(params) {
     CURRENT_QUERY_PARAMETERS = deepClone(params);
     updateQueryString();
+    return this;
   },
 
   removeQueryParameters(key) {
@@ -2465,6 +2603,8 @@ const Router = {
     }
 
     updateQueryString();
+
+    return this;
 
   }
 
@@ -2555,7 +2695,7 @@ function executeRouteActions(hash) {
     if (fragment === fragmentsToRecompute[0]) { // detect overlap
       fragment = fragmentsToRecompute.shift(); // remove first element (only there for overlap detection)
       break;
-    } else {
+    } else if (currentRouteNode && currentRouteNode[fragment]) {
       currentRouteNode = currentRouteNode[fragment].children;
     }
 
@@ -3134,7 +3274,7 @@ class ReactiveArrayInternals {
 
       this.model = data => {
         const model = options.model(data);
-        if (model && model.$$) {
+        if (model?.$$) {
           model.$$.parentInternals = this;
         }
         return model;
@@ -3150,7 +3290,7 @@ class ReactiveArrayInternals {
 
     for (let i = 0, item; i < sourceArray.length; i++) {
       item = sourceArray[i];
-      if (item.$$) {
+      if (item?.$$) {
         item.$$.parentInternals = this;
         this.defaultData.push(deepClone(item.$$.getDefaultData()));
       } else {
@@ -3643,6 +3783,7 @@ export {
   createElement,
   defineComponent,
   onResize,
+  onDragOver,
   renderList,
   Router,
   deleteRequest,

@@ -92,4 +92,28 @@ export class ComponentElement extends HTMLElement {
 
   }
 
+  cloneNode(withState = false) {
+
+    if (withState && !this._initialized_) {
+      throw new Error('Cannot clone component with state before initialization.');
+    }
+
+    const instance = document.createElement(this.tagName);
+
+    // copy top level attributes
+    for (let i = 0, attribute; i < this.attributes.length; i++) {
+      attribute = this.attributes[i];
+      instance.setAttribute(attribute.nodeName, attribute.nodeValue);
+    }
+
+    // copy state if required
+    withState && this.state && instance.setAttribute(
+      'composed-state-data',
+      StateProvider.setState(this.state.snapshot())
+    );
+
+    return instance;
+
+  }
+
 }

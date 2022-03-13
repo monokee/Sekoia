@@ -18,7 +18,7 @@ export class ReactiveArrayInternals {
 
       this.model = data => {
         const model = options.model(data);
-        if (model && model.$$) {
+        if (model?.$$) {
           model.$$.parentInternals = this;
         }
         return model;
@@ -34,7 +34,7 @@ export class ReactiveArrayInternals {
 
     for (let i = 0, item; i < sourceArray.length; i++) {
       item = sourceArray[i];
-      if (item.$$) {
+      if (item?.$$) {
         item.$$.parentInternals = this;
         this.defaultData.push(deepClone(item.$$.getDefaultData()));
       } else {

@@ -47,6 +47,7 @@ function buildModule() {
   createElement,
   defineComponent,
   onResize,
+  onDragOver,
   renderList,
   Router,
   deleteRequest,

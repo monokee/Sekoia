@@ -2,6 +2,7 @@
 import { createElement } from "./modules/component/create-element.js";
 import { defineComponent } from "./modules/component/define-component.js";
 import { onResize } from "./modules/component/on-resize.js";
+import { onDragOver } from "./modules/component/on-dragover.js";
 import { renderList } from "./modules/component/render-list.js";
 
 // Router
@@ -32,6 +33,7 @@ const Sekoia = {
   createElement,
   defineComponent,
   onResize,
+  onDragOver,
   renderList,
   Router,
   deleteRequest,
